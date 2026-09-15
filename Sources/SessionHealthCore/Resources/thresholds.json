@@ -1,0 +1,34 @@
+{
+  "version": 4,
+  "context": {
+    "window_fill_percent": {
+      "notice": 40,
+      "elevated": 60,
+      "high": 90,
+      "rationale": "Three marks on one scale, and the scale is the claim: the fuller the window, the more of it is old and no longer load-bearing, and the higher the risk that the model is working around its own history. None of the three measures that risk — no such measurement exists for the current generation, and the vendors' own position is that quality holds across the window. 40% and 60% are ours; the yellow one was 30% until 2026-09-15 and was raised because a mark that nearly every session and nearly every limit window reaches says nothing by the time it is lit. So is 90%, but it is placed against a published fact: Claude Code compacts at about 967K on a native 1M window and at the 200K boundary on a 200K one (code.claude.com/docs/en/model-config, checked 2026-09-15), so 90% is the last point at which a warning still arrives before the CLI rewrites the session itself. Codex configures its own compaction point and does not publish it."
+    },
+    "expensive_turn": {
+      "window_share_percent": 10,
+      "tokens": 20000,
+      "rationale": "Not measured. Two ceilings, either of which is enough: a turn worth a tenth of the window, or 20K tokens outright. The absolute one is not a fallback for an unknown window — on a 1M window a tenth of it is 100K, so a share-only rule would go quiet on exactly the longest sessions."
+    }
+  },
+  "limits": {
+    "percent": {
+      "notice": 40,
+      "elevated": 60,
+      "high": 90,
+      "rationale": "The same three marks as the context scale, deliberately: a colour means one thing everywhere in the widget rather than one thing per light. Not measured — nobody publishes where a subscription window starts being worth planning around, and the 60 / 80 this replaces were ours as well. The yellow mark moved from 30% to 40% on 2026-09-15, with the context scale and for the same reason: a third of a window gone is not yet news about either of them."
+    },
+    "quiet_when_window_remaining_percent": {
+      "remaining_percent": 5,
+      "rationale": "Not measured. A limit window's marks stay quiet once less than this share of its own length is left to run: 60% of a weekly window with five days to go and 60% of a five-hour one with twenty minutes to go are different situations, and interrupting someone over a window about to come back on its own is noise. A share of the window rather than a number of minutes, because five hours and a week are not comparable in absolute time."
+    }
+  },
+  "sessions": {
+    "active_within_minutes": {
+      "minutes": 30,
+      "rationale": "Not measured — a sensible default. Thirty minutes is where a session being worked on stops looking like one that is finished; it was chosen for that rather than derived, and any number in the same neighbourhood lists the same sessions. Correct it if running sessions drop off the list, or finished ones linger on it."
+    }
+  }
+}

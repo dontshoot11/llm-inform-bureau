@@ -1,0 +1,13 @@
+# Рабочие документы планирования — не для публичного репозитория
+TODO/
+
+# macOS
+.DS_Store
+
+# Swift / Xcode
+.build/
+DerivedData/
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+*.xcuserstate

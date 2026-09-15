@@ -1,0 +1,221 @@
+# AgentFiles
+
+Everything this app knows about where Claude Code and Codex leave their traces on disk, and
+nothing about what those traces mean. The rules live in `SessionHealthCore`; this module's
+only job is to turn files into the value types those rules take.
+
+## Why the two halves are separate
+
+File formats change with a CLI release; rules change when we learn something. Keeping them
+apart means a format change is a fix in one file with its own tests, and the rules never grow
+a special case for a field that moved.
+
+It also means the awkward outcomes have a place to be named. Every reader here returns
+`SourceReading`, which has three cases rather than two:
+
+| Outcome | When | What the widget shows |
+| --- | --- | --- |
+| `.value` | the files answered | the numbers, and how old they are |
+| `.noData` | nothing has been reported yet — no sessions, none that reached the API, a source not connected | a sentence saying so |
+| `.unavailable` | the files are there and no longer parse | a sentence saying the source changed |
+
+"Nothing yet" and "this stopped working" look identical in a widget that can only be empty,
+and they call for different reactions: one waits, the other needs a look at the format. An
+empty list of sessions is a `.value`, not an absence — "nothing is running" is a fact.
+
+## The three sources
+
+| Source | Gives | Needs installing |
+| --- | --- | --- |
+| Codex rollouts | Codex limits **and** Codex sessions, window size included | no |
+| Claude transcripts | Claude sessions: tokens held, project, turn growth — and the subagents running inside them | no |
+| statusLine wrapper | Claude limits, and the size of a Claude context window | **yes** |
+
+Three readers, because Codex says everything in one file and Claude says it in two places —
+neither of which is complete on its own.
+
+### Codex: one file says everything
+
+`~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`. Every API response appends an `event_msg` of
+type `token_count` carrying `rate_limits` *and* `info.last_token_usage` with
+`model_context_window`. So the freshest reading of both is the last such event in the most
+recently written rollout. No network call, no login, nothing to keep in sync — and it is
+exactly what `/usage` and `/status` show.
+
+Three things found on disk that the reader has to know about:
+
+- **A rollout carries several limit pools.** Only `limit_id: "codex"` is the subscription;
+  there is also a reserve pool and a `premium` pool that is usually all nulls. Taking the
+  last `rate_limits` line blindly would show an empty pool as 0% spent.
+- **`primary` is the short rolling window, `secondary` the weekly one** (300 and 10080
+  minutes on this account). They map to `LimitWindow.Kind.short` and `.weekly`, so the rules
+  never have to know whose vocabulary this is.
+- **`last_token_usage` is the context held, `total_token_usage` is the session total.** The
+  second only ever grows and is not a budget; on a long session it runs into the millions
+  against a 258K window.
+
+The session's working directory is not in any of that — it is in the `session_meta` line at
+the head of the file, which is why this reader reads both ends of a rollout.
+
+### Claude: two sources, neither complete
+
+A transcript (`~/.claude/projects/**/*.jsonl`) is always there and never knows the size of the
+context window. The statusLine wrapper knows the size and the subscription limits, and is only
+there once it has been installed. So:
+
+- **tokens held** always come from the transcript: `input_tokens +
+  cache_creation_input_tokens + cache_read_input_tokens` of the last assistant line, the same
+  sum the status line's own `used_percentage` is calculated from;
+- **the window size** is filled in from the wrapper payload for the same session id, when
+  there is one. `UsageReader.withWindowSizes` is the whole of that join;
+- **the limits** come from the wrapper alone. There is no file under `~/.claude` that carries
+  them, so without the wrapper the panel says "no data" — which is the truth, not a gap.
+
+Three shapes in a transcript the reader has to know about:
+
+- **Sidechain lines.** Anything a subagent writes into the session's file is marked
+  `isSidechain: true`, and its tokens are not the session's context. They are skipped *here* —
+  in the agent's own file, below, they are the only thing there is.
+- **A `tool_result` is a user line.** Turns are separated by user *prompts*, and a tool result
+  is the middle of the turn already running. Growth over "the last turn" is measured from the
+  last real prompt, which is what makes an expensive turn mean a single expensive request.
+- **`cwd` moves during a session.** A command run deeper in the tree changes it, and every
+  line after that carries the new path — so the project is read from the *first* `cwd` in the
+  file, the one the session started in and the one Claude Code named the transcript's own
+  directory after. Naming a session after where it wandered to showed one project as two.
+  The directory name cannot be decoded back into a path instead: it is the path with every
+  `/` and `.` turned into `-`, and `colors.css` and `colors/css` come out the same.
+
+### Claude: the subagents of a session
+
+A subagent is not in its session's transcript at all. Claude Code writes it beside the session:
+`<session id>/subagents/agent-<id>.jsonl`, with `agent-<id>.meta.json` next to it carrying
+`agentType`, the `description` whoever started it gave, and `spawnDepth`.
+
+- **Every line in that file is a sidechain line** — the very thing a session's reading throws
+  away. So the rule is not "skip sidechain lines" but "a sidechain line is not the *session's*
+  context": in the agent's own file it is the whole of it.
+- **They are found through their session, not by the walk.** Agent files are written after the
+  session they belong to, so counting them among the newest transcripts spent the budget of
+  files to look at on one busy session and pushed other projects' sessions off the list. The
+  walk skips anything in a `subagents` directory; each active session is then asked for its own.
+- **An agent ends on `end_turn`.** A session is closed off by a `cost-state` line; an agent has
+  no equivalent, and is over when its last message is a final answer. One that was interrupted
+  never writes one, so the activity rule still applies to it — and an agent never outlives the
+  session it was started from.
+- **The metadata file may not be there** — around one agent in forty on this machine. The row
+  stays, with the plain word "Subagent" for a name.
+- **The window size is inherited.** The metadata names a `model` only when one was set for the
+  agent (`inherit` being a fork saying it kept the session's), and that is the signal: no model
+  named means the session's window, a named one means the size is unknown. An alias like `opus`
+  cannot be matched against the identifier of a variant (`claude-opus-5[1m]`), and the model on
+  an agent's own lines never carries the variant either — so a percentage would be a percentage
+  of somebody else's window. The model written on the agent's lines is the safety net under
+  that: if it disagrees with the session's, nothing is inherited.
+
+`/clear` starts a new transcript file, so a cleared session reads as a new session with no
+context yet. The old file does *not* simply age out: `/clear` writes the finished session's
+cost into it as a last line, which touches the file and makes the activity rule count it as
+being worked on for another half hour — the session that has just ended sitting in the panel
+beside the one that replaced it, looking equally alive.
+
+That same line is how they are told apart. A transcript is over when its last `cost-state`
+line comes after the last line of the conversation (`user` or `assistant`): resuming a session
+appends messages after the marker and the session counts again, while the housekeeping lines
+that can follow it carry no message and leave it closed. Codex has no equivalent — a rollout
+ends on `task_complete`, which is the end of a turn, not of the session — so there the
+activity rule is still the only answer.
+
+## Reading the ends of a large file
+
+Rollouts and transcripts reach hundreds of megabytes. `FileTail` reads the end of one —
+512 KB for a rollout, 1 MB for a transcript — and drops both the first and the last incomplete
+line: the first because the window starts in the middle of one, the last because a file being
+appended to right now ends in half a line rather than in a broken one.
+
+Each reader widens once when the first window did not answer: 8 MB for a rollout, 16 MB for a
+transcript, and only for the number that was missing. The tokens held are always on the last
+line; it is the beginning of a long turn that can be far back — and a long turn is exactly the
+one worth calling expensive. `FileTail.headLines` reads the other end for Codex's
+`session_meta`, which carries the whole system prompt and runs to tens of kilobytes on its own.
+
+Which files are opened at all is the activity rule's decision, applied to the modification date
+before anything is read. A refresh therefore costs what is running, not what the machine has
+stored.
+
+## Noticing that something changed
+
+Both CLIs append to a file as a turn ends, so the end of a turn is a file system event and
+nothing has to be polled for it. `SourceWatcher` watches the three trees with FSEvents and says
+only *that* something changed — which files to re-read is decided where it was already being
+decided, from modification dates.
+
+Two details that are not obvious from the API:
+
+- **A directory that does not exist yet is watched through its parent.** FSEvents resolves a
+  path when the stream is created, so a machine that has not run Codex would otherwise need a
+  restart once it has. One level up only — above that lies the home directory.
+- **Paths are resolved before they are watched.** A watch registered through a symlink never
+  fires, and `/var`, `/tmp` and every temporary directory on macOS are symlinks.
+
+## An agent that is not on this machine
+
+Not everyone runs both. `UsageReading.installed` answers that separately from every reading,
+from whether the CLI's own directory exists — `~/.claude/projects`, `~/.codex/sessions`. The
+distinction it draws is between two absences that used to look identical:
+
+| On disk | What it means | What the panel says |
+| --- | --- | --- |
+| no directory | the agent is not on this machine | "Not installed on this Mac — nothing to connect." |
+| a directory, no files | the agent is here and has not answered yet | "No Codex sessions yet — one appears the first time Codex answers." |
+
+An empty tree is deliberately *installed*: telling someone to install what they already have is
+the worse of the two mistakes. The readers themselves do not draw this line — for them both are
+`.noData`, because the difference is about the machine and not about a file.
+
+## Before there is anything to read
+
+`SetupInspector` answers the one question that comes before every reading: has each source
+written anything at all. It is not a fourth reader — it opens nothing and parses nothing, it
+only looks for one file of each kind. The difference it draws is the one a person needs on the
+first day: a source that has never written is either waiting for the CLI to be used, or waiting
+for the wrapper to be installed, and those call for different reactions. What that turns into
+on screen is the first-run window; the words are `Briefing`'s, in `Phrasing`.
+
+`WelcomeRecord` sits next to it for the same reason — it is the other question about the
+machine rather than about a reading: whether that explanation has already been shown.
+
+## Using it
+
+```swift
+let reading = UsageReader().read(config: load.config)
+
+switch reading.claudeLimits {
+case .value(let snapshot):     show(snapshot)           // snapshot.observedAt is its age
+case .noData(let explanation): show(explanation)        // e.g. the wrapper is not connected
+case .unavailable(let reason): show(reason)
+}
+
+reading.sessions(of: .codex).value ?? []                // an empty list means nothing is running
+```
+
+Every store takes the directory it reads as an initialiser argument, which is how the tests
+run against fixtures instead of against whatever the machine happens to have.
+
+## Files
+
+| File | Holds |
+| --- | --- |
+| `SourceReading.swift` | The three outcomes every reader returns |
+| `UsageReader.swift` | Both services read at once, and the join between the two Claude sources |
+| `CodexRollouts.swift` | Codex limits and Codex sessions, out of the rollouts |
+| `ClaudeTranscripts.swift` | Claude sessions and the subagents running inside them, out of the transcripts |
+| `ClaudeStatus.swift` | Claude limits and window sizes, out of what the wrapper leaves |
+| `SessionFiles.swift` | Finding the files a service has most recently written, and telling a session's transcript from a subagent's |
+| `FileTail.swift` | Reading the ends of a large file without loading it |
+| `SourceWatcher.swift` | Noticing that one of the trees changed, which is how a finished turn is noticed |
+| `Setup.swift` | Which sources have written anything at all, and whether the first run has been explained |
+
+The wrapper itself is `Scripts/statusline-wrapper.sh`; see `Scripts/Scripts.md`.
+
+Tests: `Tests/SessionHealthTests/`, run with `swift run SessionHealthTests`.
