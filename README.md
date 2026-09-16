@@ -138,11 +138,16 @@ anything so signed that arrived over the network is refused until the mark is cl
 removes the app rather than the mark. Press **Done**, then run the second command.
 
 On macOS 26 that command is the only way through: the dialog leaves no "Open Anyway" entry in
-System Settings → Privacy & Security — checked on a downloaded image. On macOS 13 and 14 the
-usual alternative is Control-click in Finder → **Open**; that route is **not verified here**,
-there was no Mac on those versions to try it on. The command works on all of them.
+System Settings → Privacy & Security — checked on a downloaded image. The routes usually named
+for older systems — that same "Open Anyway" entry on macOS 15, Control-click in Finder →
+**Open** on macOS 13 and 14 — are **not verified here**, there was no Mac on those versions to
+try them on. The command works on all of them.
 
 ### Step 4 — The first run
+
+Open it from Launchpad or `/Applications`, or with `open -a LLMInformBureau`. The installer
+starts the app itself, but not while the quarantine mark is on it — so after a download the
+first launch is yours to make.
 
 The app opens one window explaining where each of its numbers comes from and what is not
 connected yet. It carries the **Open at login** checkbox; afterwards the same checkbox lives
@@ -189,8 +194,8 @@ lives inside the installed app, which is the whole copy of this repository a rec
 
 ```sh
 sh /Applications/LLMInformBureau.app/Contents/Resources/install-statusline.sh            # the plan
-sh /Applications/LLMInformBureau.app/Contents/Resources/install-statusline.sh --apply
-sh /Applications/LLMInformBureau.app/Contents/Resources/install-statusline.sh --uninstall
+sh /Applications/LLMInformBureau.app/Contents/Resources/install-statusline.sh --apply       # connect it
+sh /Applications/LLMInformBureau.app/Contents/Resources/install-statusline.sh --uninstall   # put the old command back
 ```
 
 From a clone the same script is `Scripts/install-statusline.sh`; both copies behave the same,

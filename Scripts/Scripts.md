@@ -29,9 +29,16 @@ number in the app are one number, and there is no second place to remember to ch
 
 `INSTALL.txt` is written here, as a heredoc, rather than kept as a file to copy: it carries the
 version it was built with, and a copy sitting in the repository is a copy that goes out of step
-with the script it describes. It is everything the recipient is given in writing — the two
-commands and their order, the Gatekeeper dialog and which of its buttons not to press,
-connecting the wrapper, updating, removing.
+with the script it describes. It is everything the recipient is given in writing — mounting the
+image, the two commands and their order, the Gatekeeper dialog and which of its buttons not to
+press, opening the app afterwards, connecting the wrapper, what to do when a step fails,
+updating, removing.
+
+It has been read once from the outside — by a reader given this text and nothing else, no
+repository behind it — and the gaps that reading found are closed here: the image has to be mounted before the first command names a volume, the dry
+run is worth mentioning before the command that skips it and not after, the installer asks
+nothing — the wrapper goes in with `--apply` and comes out with the wrapper's own
+`--uninstall` — and after the second command nobody has started the app, so the text says to.
 
 The volume is called `LLMInformBureau`, without spaces, because the recipient's first command
 names the mount point and has to survive being retyped.
