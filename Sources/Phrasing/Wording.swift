@@ -21,6 +21,11 @@ public enum Wording {
     /// there is nothing to install for this app's sake, and nothing to wait for.
     public static let notInstalled = "Not installed on this Mac — nothing to connect."
 
+    /// A window with nothing left, where there is room for a word and not for a sentence.
+    /// What it costs is said in full when the limits are opened out; folded away, the cross
+    /// beside it is already saying most of it.
+    public static let spentLabel = "spent"
+
     /// A limit window inside a sentence about it: "Claude weekly limit 62% used".
     public static func limitName(_ kind: LimitWindow.Kind) -> String {
         kind == .short ? "5-hour limit" : "weekly limit"

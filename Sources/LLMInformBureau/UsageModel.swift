@@ -83,6 +83,14 @@ final class UsageModel: ObservableObject {
     /// attempt — a complaint about a file somebody has since fixed is worse than none.
     @Published private(set) var slotProblem: String?
 
+    /// Whether the panel's limits half is opened out.
+    ///
+    /// Folded by default, and kept here rather than in the view so that it survives the panel
+    /// being closed and opened again — the panel's own state does not. It does not survive a
+    /// relaunch, and is not meant to: this is which half somebody is reading today, not a
+    /// setting, and the app keeps no settings it was not asked to keep.
+    @Published var limitsExpanded = false
+
     /// The marks currently in force, republished on every pass along with everything they were
     /// applied to. The panel reads its own explanation of the colours out of this rather than
     /// spelling the numbers out again, so an edited config cannot leave the panel describing a

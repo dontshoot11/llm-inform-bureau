@@ -22,9 +22,13 @@ struct MenuContent: View {
             // two subjects and nothing else says which is which. They are also built by the
             // same two helpers below, so neither half can drift into looking more important
             // than the other.
-            caption("Subscription limits")
+            limitsCaption
             ForEach(AgentService.allCases, id: \.self) { service in
-                limitsEntry(service)
+                if showsLimitsInFull {
+                    limitsEntry(service)
+                } else {
+                    limitsSummary(service)
+                }
             }
 
             Divider()
@@ -130,6 +134,85 @@ struct MenuContent: View {
             confirmingTerminate = false
             model.cancelChange()
         }
+    }
+
+    // MARK: The limits half, folded and opened out
+
+    /// Whether the limits are shown in full.
+    ///
+    /// Folded by default, and the halves are not alike in this. A session's context moves
+    /// several times a turn and is the reason the panel is opened at all; a limit window
+    /// creeps, and the question it answers — "have I got room today" — is asked once in a
+    /// while. In full it costs sixteen lines of a panel that has to hold every running
+    /// session, and with ten of those open there is nothing left to hold them in.
+    ///
+    /// It opens itself for the one thing in that half that is not a reading: a change to
+    /// `settings.json` waiting for an answer, or a complaint that one did not happen. Those
+    /// have to be read, and a fold is no place to leave them.
+    private var showsLimitsInFull: Bool {
+        model.limitsExpanded || model.pendingChange != nil || model.slotProblem != nil
+    }
+
+    /// The section's name, and the one control that folds it.
+    ///
+    /// The whole caption is the target rather than the triangle alone: the triangle is eight
+    /// points wide, and a row of text that reacts to being clicked is what a person tries
+    /// first anyway.
+    private var limitsCaption: some View {
+        Button {
+            model.limitsExpanded.toggle()
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: showsLimitsInFull ? "chevron.down" : "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                caption("Subscription limits")
+            }
+        }
+        .buttonStyle(.plain)
+        .help(
+            showsLimitsInFull
+                ? "Fold the limits away — the two dots in the menu bar go on watching them"
+                : "Open the limits out: both windows, when each resets, and how old the reading is"
+        )
+    }
+
+    /// One service folded into a line: its light, its name, and the most spent of its windows.
+    ///
+    /// The worst window and not both, because that is the number the light is made of — the
+    /// same one the menu bar shows — so the folded row and the dot beside it cannot say two
+    /// different things. A service with nothing reported shows no number at all rather than a
+    /// zero, the way everything else in this panel does.
+    @ViewBuilder
+    private func limitsSummary(_ service: AgentService) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            StatusLight(light: model.lights(of: service).limits, diameter: 6)
+                .alignmentGuide(.firstTextBaseline) { $0.height * 0.5 + 2.5 }
+            Text(Wording.service(service))
+                .font(.callout)
+            Spacer()
+            // The offer to connect keeps its place even folded away. It is the only thing in
+            // this half that cannot wait to be opened out — until it is pressed there are no
+            // limits to fold in the first place.
+            if service == .claude, model.slot.isConnectable {
+                Button(SlotPhrasing.connect) { model.propose(.connect) }
+                    .controlSize(.small)
+                    .help(SlotPhrasing.connectHelp)
+            } else if let value = summary(of: service) {
+                Text(value)
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// What a folded service says on the right: how much of its worst window is gone, or that
+    /// the window has nothing left. Nothing at all when nobody has reported.
+    private func summary(of service: AgentService) -> String? {
+        guard let assessment = model.limits[service] else { return nil }
+        if assessment.isExhausted { return Wording.spentLabel }
+        guard let worst = assessment.worstUsedPercent else { return nil }
+        return "\(TokenDisplay.percent(worst)) used"
     }
 
     // MARK: The two halves

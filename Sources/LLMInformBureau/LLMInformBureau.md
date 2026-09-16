@@ -152,8 +152,18 @@ menu bar they are in.
 
 The panel carries, in order, its two halves named after the two dots in the bar:
 
-1. **Subscription limits** — each service under one light of its own: every window with its
-   percentage, its reset time, the plan, and how old the reading is.
+1. **Subscription limits**, folded away — each service on one line: its light, its name, and
+   the most spent of its windows. Opening it out gives every window with its percentage, its
+   reset time, the plan, and how old the reading is.
+   Folded, because the two halves are not alike. A session's context moves several times a
+   turn and is what the panel is opened for; a limit window creeps, and the question it
+   answers — "have I got room today" — is asked once in a while. In full it is sixteen lines
+   of a panel that also has to hold every running session, and with ten of those open there is
+   nothing left to hold them in. The folded line keeps the number the light is made of, so the
+   panel and the bar cannot say two different things about a service.
+   It opens itself for the one thing in that half that is not a reading: a change to
+   `settings.json` waiting for an answer, or a complaint that one did not happen. The offer to
+   connect keeps its place even folded — until it is pressed there are no limits to fold.
 2. **Active sessions — context** — the running sessions of both services, laid out by the same
    two builders as the half above it: service, the model it is answering on and the project on
    the lit line, "Context window" against how much of it is gone, and tokens held plus what the
