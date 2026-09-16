@@ -86,6 +86,24 @@ final class UsageModel: ObservableObject {
     /// marked with a cross and not with a dot of the same colour.
     @Published private(set) var levelLight: Light = .level(.normal)
 
+    /// How far through its pulse each service is, 0 to 1, for the services pulsing right now.
+    ///
+    /// Only the context light pulses, and only when a session's token count moves: the point is
+    /// to see out of the corner of an eye that the numbers behind the bar have changed, without
+    /// opening the panel to check. The limits light is left alone — a limit window creeping up
+    /// is not news.
+    ///
+    /// **It does not report a request in flight, and nothing here could.** Measured: while a
+    /// turn is being worked on, neither the statusLine payload nor the transcript is written —
+    /// both move only when a step lands. So a pulse means "the reading just changed", which is
+    /// the strongest true thing this app can say, and not "it is thinking right now".
+    @Published private(set) var pulse: [AgentService: Double] = [:]
+
+    /// The same pulse, per session, for the panel — where there is room to say which of three
+    /// Claude sessions moved. The bar has one light per service and can only blink for "one of
+    /// them did"; a row of its own can be honest about which.
+    @Published private(set) var sessionPulse: [String: Double] = [:]
+
     private let notifier: Notifier
     private var dispatch = AlertDispatch()
     private var watcher: SourceWatcher?
@@ -96,6 +114,16 @@ final class UsageModel: ObservableObject {
     /// read over the first, and the second must not be dropped either.
     private var isReading = false
     private var readAgain = false
+
+    /// What each service's sessions were holding, as of the last pass: session id to tokens.
+    /// A pulse is started when one of these numbers moves, which is the same number the panel
+    /// shows and the same one the agent's own status line shows.
+    ///
+    /// Deliberately the reading and not the file: a file can be rewritten with what was already
+    /// in it — the wrapper does exactly that when a turn ends without the count moving — and a
+    /// light that flashed for that would be announcing nothing.
+    private var lastHeld: [AgentService: [String: SessionNumbers]] = [:]
+    private var pulsing: Task<Void, Never>?
 
     init(paths: [URL] = SourceWatcher.defaultPaths, notifier: Notifier = Notifier()) {
         self.notifier = notifier
@@ -117,6 +145,7 @@ final class UsageModel: ObservableObject {
     deinit {
         heartbeat?.cancel()
         settling?.cancel()
+        pulsing?.cancel()
         watcher?.stop()
     }
 
@@ -148,6 +177,12 @@ final class UsageModel: ObservableObject {
             context: BudgetRules.serviceContextLevel(of: readings).map(Light.level) ?? .unknown
         )
     }
+
+    /// How far through its pulse this service is, or nil when it is not pulsing.
+    func pulse(of service: AgentService) -> Double? { pulse[service] }
+
+    /// How far through its pulse this session is, or nil when it is not pulsing.
+    func pulse(ofSession sessionID: String) -> Double? { sessionPulse[sessionID] }
 
     func refresh() async {
         // A read already running will see everything this one would have; asking it to go
@@ -193,6 +228,8 @@ final class UsageModel: ObservableObject {
         self.levelReason = worst.reason
         self.levelLight = worst.isSpent ? .spent : .level(worst.level)
 
+        startPulses(for: sessions)
+
         // Announced after the panel is current, so that opening the menu from a notification
         // shows the reading the notification is about.
         // Subagents go in along with their sessions: whether a reading is worth interrupting
@@ -203,6 +240,78 @@ final class UsageModel: ObservableObject {
             sessions: sessions.flatMap(\.assessments)
         )
         notifier.deliver(fresh.map { AlertPhrasing.text(for: $0, config: load.config) })
+    }
+
+    /// How long one pulse lasts, and how many frames it is drawn in.
+    ///
+    /// Short and few on purpose. The animation exists only while a pulse does — there is no
+    /// timer running the rest of the time, which is the whole reason this is affordable in a
+    /// menu bar app that otherwise wakes only when a file changes.
+    /// Three blinks, six frames: the light goes out and comes back three times, 200ms a state.
+    /// One flash is easy to miss if you were looking at the other half of the screen, which is
+    /// the whole situation this exists for.
+    ///
+    /// Six frames and not more. The frames are drawn by SwiftUI redrawing the menu bar label,
+    /// and a state that lasts 200ms survives that; a fade drawn over a dozen frames did not
+    /// show up at all — see `BarLights.blinkedOut`.
+    static let pulseDuration = Duration.milliseconds(1200)
+    static let pulseFrames = 6
+
+
+    /// Starts a pulse for every service whose sessions are holding different numbers than they
+    /// were on the last pass — a session's count moving, one appearing, one dropping off.
+    private func startPulses(for sessions: [SessionView]) {
+        var held: [AgentService: [String: SessionNumbers]] = [:]
+        for view in sessions {
+            held[view.snapshot.service, default: [:]][view.snapshot.sessionID] = SessionNumbers(
+                held: view.snapshot.contextTokens,
+                lastRequest: view.snapshot.turnGrowthTokens
+            )
+        }
+        let previous = lastHeld
+        lastHeld = held
+        // Nothing flashes on the first reading after launch: everything is new then, and a bar
+        // that flashes at startup says "this just changed" about a machine that has been idle
+        // for hours.
+        guard !previous.isEmpty else { return }
+
+        let moved = held.filter { $0.value != previous[$0.key] }
+        guard !moved.isEmpty else { return }
+        for (service, numbers) in moved {
+            pulse[service] = 0
+            let before = previous[service] ?? [:]
+            for (sessionID, current) in numbers where current != before[sessionID] {
+                sessionPulse[sessionID] = 0
+            }
+        }
+        animatePulses()
+    }
+
+    /// Advances every running pulse frame by frame, and stops the moment none is left.
+    private func animatePulses() {
+        guard pulsing == nil else { return }
+        let step = 1.0 / Double(Self.pulseFrames)
+        let frame = Self.pulseDuration / Self.pulseFrames
+        pulsing = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: frame)
+                guard let self, !Task.isCancelled else { return }
+                var next: [AgentService: Double] = [:]
+                for (service, phase) in self.pulse where phase + step < 1 {
+                    next[service] = phase + step
+                }
+                var nextSessions: [String: Double] = [:]
+                for (sessionID, phase) in self.sessionPulse where phase + step < 1 {
+                    nextSessions[sessionID] = phase + step
+                }
+                self.pulse = next
+                self.sessionPulse = nextSessions
+                if next.isEmpty, nextSessions.isEmpty {
+                    self.pulsing = nil
+                    return
+                }
+            }
+        }
     }
 
     /// Sessions with their subagents underneath them, worst session first.
@@ -269,4 +378,16 @@ final class UsageModel: ObservableObject {
     private nonisolated static func read(config: ThresholdConfig) async -> UsageReading {
         UsageReader().read(config: config)
     }
+}
+
+
+
+
+/// The two numbers the panel shows for a session: what it holds, and what the last request
+/// added. Both are compared, because the pulse should fire whenever either of the numbers a
+/// person is looking at has moved — they come from the same reading, and either one changing
+/// means the reading did.
+struct SessionNumbers: Equatable {
+    let held: Int
+    let lastRequest: Int?
 }

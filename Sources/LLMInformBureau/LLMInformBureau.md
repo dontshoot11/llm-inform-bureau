@@ -31,6 +31,27 @@ light. What it must never be is green: the single dot this replaced fell back to
 unreported reading, which is the one lie the panel forbids everywhere else. In the panel the
 ring stays, because a sentence explaining the absence stands next to it.
 
+**A light blinks when its number moves.** Three times, 200ms dark and 200ms lit, on the
+context light in the bar and on the row of the session that moved in the panel — both on the
+same phase, so they go out together. It fires when a session's held tokens or its last-request
+growth change, which is the same number the panel prints and the agent's own status line
+prints. In practice that marks both ends of a wait: the transcript is written when a question
+is sent and again when the answer lands.
+
+It is **not** a sign that a request is in flight, and nothing this app can read would be one:
+measured, while a turn is being worked on neither the statusLine payload nor the transcript is
+written at all. The blink says "this reading just changed", which is the strongest true thing
+available.
+
+Why blinking and not a glow: a halo fading in alpha over a point or two was drawn first and
+was simply invisible in a menu bar — the eye gets nothing from a gradient that small. A light
+being absent for 200ms is unmistakable, and it is the same kind of change as a light changing
+colour, which already redraws reliably. The slot is kept empty rather than closed up, for the
+same reason it is kept for a light with nothing behind it: position is what names a light.
+
+The animation runs only while a blink does. There is no timer the rest of the time — the app
+still wakes only when a file changes, which is what makes this affordable at all.
+
 **Three colours on one scale, under every light.** Yellow, orange and red mark the same three
 shares of a window whether the window is a subscription limit or a session's context, so a
 colour means one thing everywhere and nobody has to remember which light counts differently.

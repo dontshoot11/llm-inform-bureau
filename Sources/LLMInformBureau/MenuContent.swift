@@ -158,6 +158,7 @@ struct MenuContent: View {
 
         return entry(
             light: light(of: session),
+            blinkedOut: blinkedOut(model.pulse(ofSession: snapshot.sessionID)),
             name: Wording.service(snapshot.service),
             badge: snapshot.project,
             help: "The context this session holds — the second of its service's two dots in the menu bar. "
@@ -182,6 +183,7 @@ struct MenuContent: View {
 
         return HStack(alignment: .firstTextBaseline, spacing: 5) {
             StatusLight(light: light(of: subagent), diameter: 6)
+                .opacity(blinkedOut(model.pulse(ofSession: snapshot.sessionID)) ? 0 : 1)
                 .alignmentGuide(.firstTextBaseline) { $0.height * 0.5 + 2.5 }
                 .help(
                     "A subagent started by this session. It runs on the session's context window "
@@ -241,6 +243,15 @@ struct MenuContent: View {
     /// A reading whose window size nobody reported has no share to place on the scale, so its
     /// light says "no reading" rather than the green that every other unplaceable number in
     /// this app is careful not to show.
+    /// Whether a light is dark for this frame of its pulse — the same blink the menu bar does,
+    /// on the same phase, so the bar and the panel go out together rather than each on its own
+    /// beat. The rule itself lives with the drawing in `BarLights`; this is its one-line twin
+    /// for views, which cannot call into that drawing code.
+    private func blinkedOut(_ phase: Double?) -> Bool {
+        guard let phase else { return false }
+        return Int(phase * BarLights.blinkFrames) % 2 == 0
+    }
+
     private func light(of view: SessionView) -> Light {
         view.assessment.windowFillPercent == nil ? .unknown : .level(view.assessment.level)
     }
@@ -272,6 +283,7 @@ struct MenuContent: View {
     /// One entry of either half: a lit name, something secondary on the right, rows beneath.
     private func entry(
         light: Light,
+        blinkedOut: Bool = false,
         name: String,
         badge: String?,
         help: String,
@@ -280,6 +292,9 @@ struct MenuContent: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 StatusLight(light: light)
+                    // Hidden rather than removed: the row must not shift sideways while it
+                    // blinks, or the blink reads as the layout moving instead of the light.
+                    .opacity(blinkedOut ? 0 : 1)
                     .help(help)
                 Text(name)
                     .font(.headline)

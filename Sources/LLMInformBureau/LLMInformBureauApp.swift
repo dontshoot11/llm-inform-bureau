@@ -20,7 +20,7 @@ struct LLMInformBureauApp: App {
             // renders only the first — the status item takes one image and one title, and
             // names and lights have to interleave, which that cannot express.
             Image(nsImage: BarLights.image(for: AgentService.allCases.map {
-                (Wording.serviceInBar($0), model.lights(of: $0))
+                (Wording.serviceInBar($0), model.lights(of: $0), model.pulse(of: $0))
             }))
         }
         // The panel style, because the panel shows readings and their age rather than a list
@@ -97,16 +97,24 @@ enum BarLights {
     private static let betweenDots = 2.5
     private static let nameToDots = 3.0
     private static let betweenServices = 8.0
-    private static let badgeHeight = 16.0
+    /// 18 rather than 16: the two lights and the gap between them stand 14.5 tall, and a
+    /// 16-tall plate left 0.75 of air above and below — enough to read as lights glued to the
+    /// ceiling and the floor. 18 gives 1.75 each side and still leaves the plate clear of the
+    /// menu bar's own 22.
+    private static let badgeHeight = 18.0
     private static let badgePadding = 3.0
     private static let badgeRadius = 3.5
 
     /// Set lowercase, tight, small: inside a badge the name is a tag on the lights beside it,
     /// not a title. Capitals and letter-spacing were what the previous arrangement needed to
     /// read on the bare menu bar; on a plate they only cost width.
-    private static var font: NSFont { .systemFont(ofSize: 9, weight: .semibold) }
+    ///
+    /// 10pt rather than 9: at 9 the plate carried it, but the letters were smaller than
+    /// anything else in the menu bar and read as squinting. The extra point costs 3pt of width
+    /// out of 71, which is the cheapest part of this whole layout to spend.
+    private static var font: NSFont { .systemFont(ofSize: 10, weight: .semibold) }
 
-    static func image(for services: [(name: String, lights: ServiceLights)]) -> NSImage {
+    static func image(for services: [(name: String, lights: ServiceLights, pulse: Double?)]) -> NSImage {
         let widths = services.map { badgeWidth(for: $0.name) }
         let total = widths.reduce(0, +) + betweenServices * Double(max(services.count - 1, 0))
         let height = badgeHeight + 2
@@ -141,7 +149,10 @@ enum BarLights {
                 // and the pair centred on the same middle the name is centred on.
                 let dotsX = x + badgePadding + self.width(of: service.name) + nameToDots
                 draw(service.lights.limits, atX: dotsX, y: middle + betweenDots / 2)
-                draw(service.lights.context, atX: dotsX, y: middle - betweenDots / 2 - diameter)
+                let contextY = middle - betweenDots / 2 - diameter
+                if !blinkedOut(service.pulse) {
+                    draw(service.lights.context, atX: dotsX, y: contextY)
+                }
                 x += width + betweenServices
             }
             return true
@@ -150,6 +161,42 @@ enum BarLights {
         // the same. The cost is drawing the text ourselves, above.
         image.isTemplate = false
         return image
+    }
+
+    /// A ring that swells out of the context light and fades, once, when the number behind that
+    /// light has changed.
+    ///
+    /// It says "this reading just moved" — the same number the panel shows and the agent's own
+    /// status line shows. The point is the corner of an eye: seeing that the count went up
+    /// without opening the panel to look. It is not a sign that a request is in flight, and
+    /// nothing this app can read would be one; while a turn is being worked on, nothing is
+    /// written at all.
+    ///
+    /// The ring is drawn in the light's own colour and never changes the size of the image:
+    /// widening the bar for a moment would shove every other menu bar item sideways and back
+    /// twelve times a second. Its outer edge stays inside the height the badge already needs,
+    /// which is what `haloReach` is kept below.
+    /// Whether the context light is left undrawn for this frame of a pulse.
+    ///
+    /// Blinking is the light going out and coming back, not a glow swelling and fading. Both
+    /// were tried in the menu bar: a fade drawn in alpha over a ring a point or two wide was
+    /// invisible — the eye gets nothing from a gradient that small — while the light simply
+    /// being absent for 200ms is unmistakable. It is also the kind of change that redraws
+    /// reliably, the same as a light changing colour, rather than relying on a dozen frames
+    /// all arriving.
+    ///
+    /// The slot is kept, as it is for a light with nothing behind it: position is what names a
+    /// light, and a blink that moved its neighbour would be read as something else entirely.
+    /// Frames in one pulse. Kept equal to `UsageModel.pulseFrames`, which paces them: that one
+    /// is main-actor isolated and this drawing is not, so the number lives in both places and
+    /// each says so.
+    static let blinkFrames = 6.0
+
+    private static func blinkedOut(_ phase: Double?) -> Bool {
+        guard let phase else { return false }
+        // Even frames dark, odd frames lit, so a pulse starts by going out — the change happens
+        // the instant the reading does, rather than a frame later.
+        return Int(phase * blinkFrames) % 2 == 0
     }
 
     /// Name, lights and the padding around both — everything inside one plate.
