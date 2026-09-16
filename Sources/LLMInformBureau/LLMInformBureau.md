@@ -173,7 +173,9 @@ The panel carries, in order, its two halves named after the two dots in the bar:
    panel and the bar cannot say two different things about a service.
    It opens itself for the one thing in that half that is not a reading: a change to
    `settings.json` waiting for an answer, or a complaint that one did not happen. The offer to
-   connect keeps its place even folded — until it is pressed there are no limits to fold.
+   connect keeps its place even folded — until it is pressed there are no limits to fold, and
+   once it is pressed the same place says "no data yet" rather than going blank: the moment
+   after the button is the moment a person is watching it hardest.
 2. **Active sessions — context** — the running sessions of both services, laid out by the same
    two builders as the half above it: service, the model it is answering on and the project on
    the lit line, "Context window" against how much of it is gone, and tokens held plus what the

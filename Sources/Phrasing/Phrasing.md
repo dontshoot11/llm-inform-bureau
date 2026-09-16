@@ -49,7 +49,7 @@ one: context is `/context` in Claude Code and `/status` in Codex, limits are `/u
 | File | Holds |
 | --- | --- |
 | `AlertPhrasing.swift` | A crossed mark as a notification: title, body, command |
-| `Wording.swift` | What a mark is called, what a subagent's row is called, which command shows more of it, and what a service is called — `service` where there is room to say it, `serviceInBar` where the budget is pixels |
+| `Wording.swift` | What a mark is called, what a subagent's row is called, which command shows more of it, what a folded row with no reading yet says, and what a service is called — `service` where there is room to say it, `serviceInBar` where the budget is pixels |
 | `Briefing.swift` | What the first run says: where every number comes from, and what is not connected |
 | `TokenDisplay.swift` | Token counts and percentages, rounded the way the widget says them |
 | `TimeDisplay.swift` | Ages, reset times and window lengths |

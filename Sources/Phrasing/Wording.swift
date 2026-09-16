@@ -21,6 +21,15 @@ public enum Wording {
     /// there is nothing to install for this app's sake, and nothing to wait for.
     public static let notInstalled = "Not installed on this Mac — nothing to connect."
 
+    /// Said in a folded row whose service has reported nothing yet — the slot is connected and
+    /// the first answer of a session has not come back.
+    ///
+    /// Two words rather than none. The rule of this panel is that a reading nobody made shows a
+    /// sentence and never a zero; folded away there is no room for the sentence, and what was
+    /// there instead was an empty right-hand side, which reads as an app that did not do what
+    /// the button promised. The sentence itself is one fold away.
+    public static let noReadingYet = "no data yet"
+
     /// A window with nothing left, where there is room for a word and not for a sentence.
     /// What it costs is said in full when the limits are opened out; folded away, the cross
     /// beside it is already saying most of it.

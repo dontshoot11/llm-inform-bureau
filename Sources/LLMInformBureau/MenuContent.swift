@@ -195,7 +195,8 @@ struct MenuContent: View {
     /// The worst window and not both, because that is the number the light is made of — the
     /// same one the menu bar shows — so the folded row and the dot beside it cannot say two
     /// different things. A service with nothing reported shows no number at all rather than a
-    /// zero, the way everything else in this panel does.
+    /// zero, the way everything else in this panel does — two words in its place instead, so
+    /// that a row with nothing in it is never mistaken for a row that failed.
     @ViewBuilder
     private func limitsSummary(_ service: AgentService) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -220,6 +221,13 @@ struct MenuContent: View {
                 Text(summary.value)
                     .font(.callout.monospacedDigit())
                     .foregroundStyle(.secondary)
+            } else if model.usage?.isInstalled(service) == true {
+                // Installed, connected, and nothing reported yet. Two quiet words rather than
+                // an empty half-row: right after the button is pressed this is the only place
+                // a person is looking, and nothing there reads as nothing happening.
+                Text(Wording.noReadingYet)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
             }
         }
     }
