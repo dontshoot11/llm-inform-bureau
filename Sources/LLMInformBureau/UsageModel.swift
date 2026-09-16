@@ -88,15 +88,22 @@ final class UsageModel: ObservableObject {
 
     /// How far through its pulse each service is, 0 to 1, for the services pulsing right now.
     ///
-    /// Only the context light pulses, and only when a session's token count moves: the point is
-    /// to see out of the corner of an eye that the numbers behind the bar have changed, without
-    /// opening the panel to check. The limits light is left alone — a limit window creeping up
-    /// is not news.
+    /// Only the context light pulses, and it does so for two reasons, on one channel. It blinks
+    /// once through when a session's token count moves — seeing out of the corner of an eye
+    /// that the numbers behind the bar have changed, without opening the panel — and it goes on
+    /// blinking, beat after beat, for as long as a session is waiting on its agent. The limits
+    /// light is left alone either way: a limit window creeping up is not news.
     ///
-    /// **It does not report a request in flight, and nothing here could.** Measured: while a
-    /// turn is being worked on, neither the statusLine payload nor the transcript is written —
-    /// both move only when a step lands. So a pulse means "the reading just changed", which is
-    /// the strongest true thing this app can say, and not "it is thinking right now".
+    /// One channel rather than two on purpose. A second rhythm laid over the first is a ripple
+    /// in which neither is legible, and a period of 200ms against one of 400 is not something
+    /// an eye catches sideways, which is the only way this is ever looked at. What tells the
+    /// two apart is how long they last: three blinks and steady again is "the reading moved",
+    /// blinking that does not stop is "it is still working".
+    ///
+    /// **Waiting is derived, not observed.** Measured: while a turn is being worked on, neither
+    /// the statusLine payload nor the transcript is written — both move only when a step lands.
+    /// So the blink rests on what the last thing written leaves owed
+    /// (`SessionSnapshot.isAwaitingReply`), which is the strongest true thing this app can say.
     @Published private(set) var pulse: [AgentService: Double] = [:]
 
     /// The same pulse, per session, for the panel — where there is room to say which of three
@@ -124,6 +131,12 @@ final class UsageModel: ObservableObject {
     /// light that flashed for that would be announcing nothing.
     private var lastHeld: [AgentService: [String: SessionNumbers]] = [:]
     private var pulsing: Task<Void, Never>?
+
+    /// Who is waiting on an agent as of the last pass, by service for the bar and by session
+    /// for the panel. What keeps a blink going round instead of running out — and, being
+    /// replaced whole on every pass, what stops it the moment the answer lands.
+    private var waitingServices: Set<AgentService> = []
+    private var waitingSessions: Set<String> = []
 
     init(paths: [URL] = SourceWatcher.defaultPaths, notifier: Notifier = Notifier()) {
         self.notifier = notifier
@@ -228,6 +241,7 @@ final class UsageModel: ObservableObject {
         self.levelReason = worst.reason
         self.levelLight = worst.isSpent ? .spent : .level(worst.level)
 
+        updateWaiting(for: sessions)
         startPulses(for: sessions)
 
         // Announced after the panel is current, so that opening the menu from a notification
@@ -257,6 +271,27 @@ final class UsageModel: ObservableObject {
     static let pulseDuration = Duration.milliseconds(1200)
     static let pulseFrames = 6
 
+
+    /// Keeps the light of every session waiting on its agent blinking, and lets the rest run out.
+    ///
+    /// A subagent counts as a session of its own here, the way it does everywhere else: it has
+    /// a row in the panel, and a row that is working says so for itself. Its service blinks for
+    /// the same reason the bar blinks for any one of its sessions — the bar has one light and
+    /// can only say "one of these".
+    ///
+    /// Nothing is stopped here. A light that has stopped waiting simply finishes the blink it
+    /// is in and drops out, which is one beat at most and leaves it lit rather than dark: a
+    /// blink cut off mid-beat is read as the light going out for good.
+    private func updateWaiting(for sessions: [SessionView]) {
+        let waiting = sessions.flatMap { [$0] + $0.subagents }.filter(\.snapshot.isAwaitingReply)
+        waitingServices = Set(waiting.map(\.snapshot.service))
+        waitingSessions = Set(waiting.map(\.snapshot.sessionID))
+        guard !waiting.isEmpty else { return }
+
+        for service in waitingServices where pulse[service] == nil { pulse[service] = 0 }
+        for sessionID in waitingSessions where sessionPulse[sessionID] == nil { sessionPulse[sessionID] = 0 }
+        animatePulses()
+    }
 
     /// Starts a pulse for every service whose sessions are holding different numbers than they
     /// were on the last pass — a session's count moving, one appearing, one dropping off.
@@ -290,20 +325,24 @@ final class UsageModel: ObservableObject {
     /// Advances every running pulse frame by frame, and stops the moment none is left.
     private func animatePulses() {
         guard pulsing == nil else { return }
-        let step = 1.0 / Double(Self.pulseFrames)
         let frame = Self.pulseDuration / Self.pulseFrames
         pulsing = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: frame)
                 guard let self, !Task.isCancelled else { return }
                 var next: [AgentService: Double] = [:]
-                for (service, phase) in self.pulse where phase + step < 1 {
-                    next[service] = phase + step
+                for (service, phase) in self.pulse {
+                    next[service] = Self.advance(phase, looping: self.waitingServices.contains(service))
                 }
                 var nextSessions: [String: Double] = [:]
-                for (sessionID, phase) in self.sessionPulse where phase + step < 1 {
-                    nextSessions[sessionID] = phase + step
+                for (sessionID, phase) in self.sessionPulse {
+                    nextSessions[sessionID] = Self.advance(
+                        phase,
+                        looping: self.waitingSessions.contains(sessionID)
+                    )
                 }
+                // Assigning `nil` to a key removes it, which is how a blink that has run out
+                // leaves the dictionary and stops being drawn.
                 self.pulse = next
                 self.sessionPulse = nextSessions
                 if next.isEmpty, nextSessions.isEmpty {
@@ -312,6 +351,18 @@ final class UsageModel: ObservableObject {
                 }
             }
         }
+    }
+
+    /// The next frame of a blink, or `nil` once it has run out — which a light that is still
+    /// waiting never does: it starts the same blink over rather than stopping.
+    ///
+    /// Counted in frames rather than added up in fractions. A sixth added to itself six times
+    /// does not make one, and a beat that comes out a frame long every so often is exactly the
+    /// unevenness a blink that never stops would put on show.
+    private static func advance(_ phase: Double, looping: Bool) -> Double? {
+        let next = Int((phase * Double(pulseFrames)).rounded()) + 1
+        if next < pulseFrames { return Double(next) / Double(pulseFrames) }
+        return looping ? 0 : nil
     }
 
     /// Sessions with their subagents underneath them, worst session first.

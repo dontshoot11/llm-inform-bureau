@@ -8,6 +8,9 @@ import Foundation
 /// different ideas of what a transcript looks like.
 let workingDirectory = "/Users/nobody/petProjects/llm-inform-bureau"
 
+/// One assistant entry. `blocks` names the kinds of content block it carries, because one
+/// response is written as several of these — `thinking`, then `text`, then `tool_use` — and all
+/// of them carry the same `stop_reason`, which is the thing the waiting rule reads.
 func assistant(
     input: Int,
     cacheCreation: Int,
@@ -15,16 +18,32 @@ func assistant(
     sidechain: Bool = false,
     cwd: String = workingDirectory,
     model: String = "claude-opus-5",
-    stopReason: String = "tool_use"
+    stopReason: String = "tool_use",
+    blocks: [String] = ["text"]
 ) -> String {
-    """
+    let content = blocks.map { "{\"type\":\"\($0)\"}" }.joined(separator: ",")
+    return """
     {"type":"assistant","isSidechain":\(sidechain),"cwd":"\(cwd)",\
     "timestamp":"2026-09-15T16:03:08.915Z",\
     "message":{"role":"assistant","model":"\(model)","stop_reason":"\(stopReason)",\
+    "content":[\(content)],\
     "usage":{"input_tokens":\(input),\
     "cache_creation_input_tokens":\(cacheCreation),"cache_read_input_tokens":\(cacheRead),\
     "output_tokens":400}}}
     """
+}
+
+/// The housekeeping Claude Code writes after an answer lands. None of it carries a timestamp or
+/// a message, and all of it comes *after* the last thing said — which is why "the last line of
+/// the file" is not what the waiting rule asks.
+func serviceTail() -> [String] {
+    [
+        #"{"type":"system","subtype":"post_turn","sessionId":"abc"}"#,
+        #"{"type":"last-prompt","prompt":"do the thing"}"#,
+        #"{"type":"mode","mode":"default"}"#,
+        #"{"type":"atis-latch","value":false}"#,
+        #"{"type":"file-history-snapshot","messageId":"msg_1","snapshot":{}}"#
+    ]
 }
 
 func userPrompt(_ text: String, sidechain: Bool = false) -> String {

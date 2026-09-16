@@ -67,6 +67,16 @@ public struct SessionSnapshot: Equatable, Sendable {
     /// first reading of the session and there is nothing to compare against.
     public let turnGrowthTokens: Int?
 
+    /// Whether the agent owes this session an answer right now — a question was asked, or a
+    /// tool was called, and nothing has come back yet.
+    ///
+    /// Derived, not observed: nothing on disk announces a request in flight, so this is read
+    /// off the last thing written — whose entry it was, and whether it promised another. The
+    /// rule belongs to whichever reader knows the shape of its own source, and it is a fact
+    /// about the session rather than a decision of the view, so it is carried here beside
+    /// `lastActivityAt`.
+    public let isAwaitingReply: Bool
+
     /// Set when this reading is a subagent's rather than a session's. Everything above means
     /// the same thing either way — the difference is what it is allowed to do, which is why
     /// the rules and the panel ask this question and the reader does not answer it twice.
@@ -82,6 +92,7 @@ public struct SessionSnapshot: Equatable, Sendable {
         turnGrowthTokens: Int? = nil,
         project: String? = nil,
         lastActivityAt: Date = Date(),
+        isAwaitingReply: Bool = false,
         subagent: SubagentOrigin? = nil
     ) {
         self.sessionID = sessionID
@@ -91,6 +102,7 @@ public struct SessionSnapshot: Equatable, Sendable {
         self.turnGrowthTokens = turnGrowthTokens
         self.project = project
         self.lastActivityAt = lastActivityAt
+        self.isAwaitingReply = isAwaitingReply
         self.subagent = subagent
     }
 
@@ -107,6 +119,7 @@ public struct SessionSnapshot: Equatable, Sendable {
             turnGrowthTokens: turnGrowthTokens,
             project: project,
             lastActivityAt: lastActivityAt,
+            isAwaitingReply: isAwaitingReply,
             subagent: subagent
         )
     }

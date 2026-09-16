@@ -38,10 +38,21 @@ growth change, which is the same number the panel prints and the agent's own sta
 prints. In practice that marks both ends of a wait: the transcript is written when a question
 is sent and again when the answer lands.
 
-It is **not** a sign that a request is in flight, and nothing this app can read would be one:
-measured, while a turn is being worked on neither the statusLine payload nor the transcript is
-written at all. The blink says "this reading just changed", which is the strongest true thing
-available.
+**And it goes on blinking while a session waits on its agent.** The same light, the same beat,
+for as long as the agent owes an answer: a question was asked, or a tool was called, and
+nothing has come back. That is what the wait looks like from the corner of an eye — the state
+lasts as long as the waiting does, rather than marking only its two ends.
+
+Both signals share one light and one rhythm, and what tells them apart is how long they last:
+three blinks and steady again is "the reading moved", blinking that does not stop is "it is
+still working". A second rhythm was the alternative and was rejected — 200ms against 400ms is
+not a difference an eye catches sideways, and two beats laid over one light are a ripple in
+which neither is legible.
+
+Waiting is **derived, not observed**, and nothing this app can read would observe it: measured,
+while a turn is being worked on neither the statusLine payload nor the transcript is written at
+all. What the app reads is what the last thing written leaves owed — the rule, and what it
+cannot cover, are in `AgentFiles.md`.
 
 Why blinking and not a glow: a halo fading in alpha over a point or two was drawn first and
 was simply invisible in a menu bar — the eye gets nothing from a gradient that small. A light
@@ -49,8 +60,9 @@ being absent for 200ms is unmistakable, and it is the same kind of change as a l
 colour, which already redraws reliably. The slot is kept empty rather than closed up, for the
 same reason it is kept for a light with nothing behind it: position is what names a light.
 
-The animation runs only while a blink does. There is no timer the rest of the time — the app
-still wakes only when a file changes, which is what makes this affordable at all.
+The animation runs only while a blink does, and a wait is what keeps one going: the frames stop
+the moment nothing is blinking and nothing is waiting. There is no timer the rest of the time —
+the app still wakes only when a file changes, which is what makes this affordable at all.
 
 **Three colours on one scale, under every light.** Yellow, orange and red mark the same three
 shares of a window whether the window is a subscription limit or a session's context, so a

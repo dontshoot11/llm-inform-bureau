@@ -37,6 +37,7 @@ the cases are plain functions and would port to swift-testing mechanically.
 | `SessionActivityTests` | Which sessions count as being worked on right now, and both sides of the edge |
 | `ClaudeStatusTests` | Reading the statusLine wrapper's payloads, and the join between the two Claude sources |
 | `ClaudeTranscriptTests` | Reading a session out of a transcript: tokens held, turn growth, sidechains, `/clear` |
+| `WaitingStateTests` | Whether a session is waiting on its agent: the four moments of a turn, the housekeeping written after an answer, and a response arriving as several entries |
 | `CodexRolloutTests` | Reading limits and sessions out of rollout fixtures, including the shapes that mean "no data" and "source changed" |
 | `SetupTests` | Which sources read as connected, what the first run says about the ones that do not, and showing that explanation once |
 | `StatuslineInstallerTests` | What `Scripts/install-statusline.sh` does to the user's `settings.json`: the slot filled and emptied, a command that was already there surviving both, and every branch that must not write |

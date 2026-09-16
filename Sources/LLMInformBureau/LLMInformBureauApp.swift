@@ -163,20 +163,12 @@ enum BarLights {
         return image
     }
 
-    /// A ring that swells out of the context light and fades, once, when the number behind that
-    /// light has changed.
-    ///
-    /// It says "this reading just moved" — the same number the panel shows and the agent's own
-    /// status line shows. The point is the corner of an eye: seeing that the count went up
-    /// without opening the panel to look. It is not a sign that a request is in flight, and
-    /// nothing this app can read would be one; while a turn is being worked on, nothing is
-    /// written at all.
-    ///
-    /// The ring is drawn in the light's own colour and never changes the size of the image:
-    /// widening the bar for a moment would shove every other menu bar item sideways and back
-    /// twelve times a second. Its outer edge stays inside the height the badge already needs,
-    /// which is what `haloReach` is kept below.
-    /// Whether the context light is left undrawn for this frame of a pulse.
+    /// Frames in one blink of the context light. Kept equal to `UsageModel.pulseFrames`, which
+    /// paces them: that one is main-actor isolated and this drawing is not, so the number lives
+    /// in both places and each says so.
+    static let blinkFrames = 6.0
+
+    /// Whether the context light is left undrawn for this frame of a blink.
     ///
     /// Blinking is the light going out and coming back, not a glow swelling and fading. Both
     /// were tried in the menu bar: a fade drawn in alpha over a ring a point or two wide was
@@ -187,11 +179,10 @@ enum BarLights {
     ///
     /// The slot is kept, as it is for a light with nothing behind it: position is what names a
     /// light, and a blink that moved its neighbour would be read as something else entirely.
-    /// Frames in one pulse. Kept equal to `UsageModel.pulseFrames`, which paces them: that one
-    /// is main-actor isolated and this drawing is not, so the number lives in both places and
-    /// each says so.
-    static let blinkFrames = 6.0
-
+    ///
+    /// The bar is not told *why* it is blinking, and does not need to be: the reading moving
+    /// blinks three times and stops, a session waiting on its agent goes on blinking until the
+    /// answer lands. Which of the two it is, is `UsageModel`'s to know — here it is one phase.
     private static func blinkedOut(_ phase: Double?) -> Bool {
         guard let phase else { return false }
         // Even frames dark, odd frames lit, so a pulse starts by going out — the change happens

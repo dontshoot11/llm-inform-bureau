@@ -86,6 +86,45 @@ Three shapes in a transcript the reader has to know about:
   The directory name cannot be decoded back into a path instead: it is the path with every
   `/` and `.` turned into `-`, and `colors.css` and `colors/css` come out the same.
 
+### Whether a session is waiting on its agent
+
+A session's row says not only what it holds but whether the agent owes it an answer right now —
+`SessionSnapshot.isAwaitingReply`, which the panel and the bar blink on.
+
+**Nothing on disk announces a request in flight.** Measured: while a turn is worked on, neither
+the transcript nor the statusLine payload is written — 25 seconds of a busy session moved
+neither file's modification time. So the state is not observed but derived, from the last thing
+that *was* written: does it leave an answer owed.
+
+Two things make that readable:
+
+- **Which entries are asked.** The tail of a transcript is housekeeping written after the
+  answer landed — `last-prompt`, `mode`, `atis-latch`, `file-history-*`, `attachment`,
+  `system`, none of them carrying a message or a timestamp. "The last line of the file" is
+  therefore not the last thing said. Only `assistant` and `user` entries are asked, and only
+  the ones belonging to this file: a session's own, or an agent's sidechain entries in the
+  agent's own file.
+- **What that entry leaves owed.** A user entry owes an answer outright — and a `tool_result`
+  is a user entry, which is what keeps the wait unbroken while tools run. An assistant entry
+  owes one when it called a tool, and `stop_reason` is what says so, not the content blocks:
+  measured over 32,000 assistant entries on this machine, one response is written as several
+  entries — `thinking`, then `text`, then `tool_use` — all carrying the same `stop_reason`.
+  Reading the blocks would take that middle `text` entry for the end of the turn and break the
+  wait in two every time the agent said something before reaching for a tool. Any stop reason
+  other than `tool_use` — `end_turn`, and the handful of `stop_sequence` and `max_tokens` —
+  is the turn over: whatever happens next waits on the person, not on the agent.
+
+Two things this rule does not do, and both are honest rather than hidden:
+
+- **A session that has never answered has no row**, so its first turn cannot blink. The
+  transcript carries no `usage` until the first answer, and a row with no tokens on it would
+  be the zero this app does not invent. It applies to a new session and to one just cleared,
+  which starts a file of its own; every turn after the first is covered.
+- **A wait that never ends is still a wait here.** Counted over 382 transcripts on this
+  machine, 34 end owing an answer that never came — a closed terminal, a killed process, an
+  interrupt. Nothing in a transcript marks that, so the reading is true to the file and it is
+  the app above that decides how long to keep showing it.
+
 ### Claude: the subagents of a session
 
 A subagent is not in its session's transcript at all. Claude Code writes it beside the session:
@@ -209,7 +248,7 @@ run against fixtures instead of against whatever the machine happens to have.
 | `SourceReading.swift` | The three outcomes every reader returns |
 | `UsageReader.swift` | Both services read at once, and the join between the two Claude sources |
 | `CodexRollouts.swift` | Codex limits and Codex sessions, out of the rollouts |
-| `ClaudeTranscripts.swift` | Claude sessions and the subagents running inside them, out of the transcripts |
+| `ClaudeTranscripts.swift` | Claude sessions and the subagents running inside them, out of the transcripts — including whether one is waiting on its agent |
 | `ClaudeStatus.swift` | Claude limits and window sizes, out of what the wrapper leaves |
 | `SessionFiles.swift` | Finding the files a service has most recently written, and telling a session's transcript from a subagent's |
 | `FileTail.swift` | Reading the ends of a large file without loading it |
