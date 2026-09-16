@@ -95,7 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 enum BarLights {
     private static let diameter = 6.0
     private static let betweenDots = 2.5
-    private static let nameToDots = 3.0
+    private static let dotsToName = 3.0
     private static let betweenServices = 8.0
     /// 18 rather than 16: the two lights and the gap between them stand 14.5 tall, and a
     /// 16-tall plate left 0.75 of air above and below — enough to read as lights glued to the
@@ -143,11 +143,21 @@ enum BarLights {
                 // the baseline, then the descender to reach the box. Centring the line box
                 // instead leaves the name visibly high, because that box is as tall as the
                 // font's accents and descenders and the name uses neither.
-                text.draw(at: NSPoint(x: x + badgePadding, y: middle - font.capHeight / 2 + font.descender))
+                text.draw(
+                    at: NSPoint(
+                        x: x + badgePadding + diameter + dotsToName,
+                        y: middle - font.capHeight / 2 + font.descender
+                    )
+                )
 
-                // Stacked, in the order the panel puts them in: limits above, context below,
-                // and the pair centred on the same middle the name is centred on.
-                let dotsX = x + badgePadding + self.width(of: service.name) + nameToDots
+                // Lights first, name after — the order the panel reads in, where every row is a
+                // dot and then what it is about. Two arrangements of the same four lights that
+                // disagree about which side the colour is on cost a beat of looking every time
+                // the eye moves between the bar and the panel open under it.
+                //
+                // Stacked the way the panel stacks them too: limits above, context below, the
+                // pair centred on the same middle the name is centred on.
+                let dotsX = x + badgePadding
                 draw(service.lights.limits, atX: dotsX, y: middle + betweenDots / 2)
                 let contextY = middle - betweenDots / 2 - diameter
                 if !blinkedOut(service.pulse) {
@@ -192,7 +202,7 @@ enum BarLights {
 
     /// Name, lights and the padding around both — everything inside one plate.
     private static func badgeWidth(for name: String) -> Double {
-        badgePadding + width(of: name) + nameToDots + diameter + badgePadding
+        badgePadding + diameter + dotsToName + width(of: name) + badgePadding
     }
 
     private static func width(of name: String) -> Double {

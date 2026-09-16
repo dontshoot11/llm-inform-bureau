@@ -106,7 +106,13 @@ same one the bar applies to a source that has not reported at all.
 named for the two dots — "Subscription limits" and "Active sessions — context" — and a heading
 carries a light about its own contents — the limits heading about that service's limit windows,
 each session row about itself — because in the panel there is room to keep the two subjects
-apart. The bar has no sections, so it puts the pair side by side under the service name.
+apart. The bar has no sections, so it puts the pair together on one plate.
+
+**And on the same side in both: the lights come first, the name after.** Every row of the panel
+is a dot and then what it is about, and the bar sat the other way round until the two were seen
+open together — the panel hangs directly under the plate it belongs to, and two arrangements of
+the same four lights disagreeing about which side the colour is on cost a beat of looking every
+time the eye moves between them. Width is unchanged: the same parts in the other order.
 
 The bar answers "is anything worth looking at" and the panel answers "how much exactly". A
 percentage in the bar was the previous arrangement, and it said nothing about the half of the
