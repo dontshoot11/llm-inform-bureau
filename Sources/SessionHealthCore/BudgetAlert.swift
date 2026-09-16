@@ -31,13 +31,6 @@ public struct BudgetAlert: Equatable, Sendable {
         /// Share of the context window in use crossed a configured mark.
         case windowFill(percent: Double)
 
-        /// One turn grew the context by more than the configured share.
-        ///
-        /// Carries the context size it happened at, because an expensive turn is an event
-        /// rather than a line that stays crossed: every turn that qualifies is worth saying
-        /// once, and each of them ends at its own context size.
-        case expensiveTurn(atContextTokens: Int)
-
         /// A subscription limit window crossed a configured mark.
         case limitUsage(window: LimitWindow.Kind, percent: Double)
     }

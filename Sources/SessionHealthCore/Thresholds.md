@@ -95,10 +95,9 @@ case, and it is covered by a test.
 
 ```json
 {
-  "version": 5,
+  "version": 6,
   "context": {
-    "window_fill_percent": { "notice": 40, "elevated": 60, "high": 90, "rationale": "…" },
-    "expensive_turn": { "window_share_percent": 10, "tokens": 20000, "rationale": "…" }
+    "window_fill_percent": { "notice": 40, "elevated": 60, "high": 90, "rationale": "…" }
   },
   "limits": {
     "percent": { "notice": 40, "elevated": 60, "high": 90, "rationale": "…" },
@@ -124,7 +123,6 @@ case, and it is covered by a test.
 | Entry | Value | Where it comes from |
 | --- | --- | --- |
 | `context.window_fill_percent` | 40 / 60 / 90 | **Ours.** The red one is placed against a published fact rather than derived from it: Claude Code compacts at about 967K on a native 1M window and at the 200K boundary on a 200K one ([model-config](https://code.claude.com/docs/en/model-config), checked 2026-09-15), so 90% is the last point at which a warning arrives before the CLI rewrites the session itself. Codex configures its own compaction point and does not publish it. |
-| `context.expensive_turn` | 10% of the window **or** 20 000 tokens | **Not measured.** Either ceiling is enough. The absolute one is not a fallback for an unknown window: on a 1M window a tenth is 100K, so a share-only rule went quiet on exactly the longest sessions. |
 | `limits.percent` | 40 / 60 / 90 | **Not measured.** The same scale as the context, so a colour means one thing everywhere. The 60 / 80 this replaces was ours too, and the yellow mark moved 30 → 40 on 2026-09-15 together with the context scale. |
 | `limits.quiet_when_window_remaining_percent` | 5 | **Not measured.** Below this share of a window's own length, its marks stay quiet: a window about to come back on its own is not worth interrupting anyone for. A share rather than a number of minutes, because five hours and a week are not comparable in absolute time. |
 | `sessions.active_within_minutes` | 30 | **Not measured — a sensible default.** Thirty minutes is where a session being worked on stops looking like one that is finished. |

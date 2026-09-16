@@ -171,13 +171,6 @@ public enum Briefing {
                 provenance: config.limitUsage.provenance
             ),
             MarkNote(
-                title: "One expensive request",
-                value: "\(TokenDisplay.percent(config.expensiveTurn.windowSharePercent)) of the window"
-                    + " or \(TokenDisplay.short(config.expensiveTurn.tokens)) tokens",
-                unmeasuredNote: "Not measured — a starting default, to be corrected by experience. Either ceiling is enough.",
-                provenance: config.expensiveTurn.provenance
-            ),
-            MarkNote(
                 title: "A limit window about to reset",
                 value: "under \(TokenDisplay.percent(config.limitWindowNearlyReset.remainingSharePercent)) of it left to run",
                 unmeasuredNote: "Not measured. Below this the limit marks stay quiet: the window comes back before it can get in the way.",

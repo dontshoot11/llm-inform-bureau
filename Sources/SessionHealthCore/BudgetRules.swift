@@ -116,20 +116,6 @@ public struct BudgetRules: Sendable {
             }
         }
 
-        // An expensive turn says something about the last turn, not about the state of the
-        // session, so it never changes the colour — it is only worth a word.
-        if let growth = snapshot.turnGrowthTokens,
-           config.expensiveTurn.isCrossed(byGrowth: growth, inWindow: snapshot.contextWindowTokens) {
-            alerts.append(
-                BudgetAlert(
-                    kind: .expensiveTurn(atContextTokens: snapshot.contextTokens),
-                    service: snapshot.service,
-                    percent: snapshot.contextWindowTokens.map { Double(growth) / Double($0) * 100 },
-                    tokens: growth
-                )
-            )
-        }
-
         return ContextAssessment(
             sessionID: snapshot.sessionID,
             service: snapshot.service,

@@ -1,16 +1,11 @@
 {
-  "version": 5,
+  "version": 6,
   "context": {
     "window_fill_percent": {
       "notice": 40,
       "elevated": 60,
       "high": 90,
       "rationale": "Three marks on one scale, and the scale is the claim: the fuller the window, the more of it is old and no longer load-bearing, and the higher the risk that the model is working around its own history. None of the three measures that risk — no such measurement exists for the current generation, and the vendors' own position is that quality holds across the window. 40% and 60% are ours; the yellow one was 30% until 2026-09-15 and was raised because a mark that nearly every session and nearly every limit window reaches says nothing by the time it is lit. So is 90%, but it is placed against a published fact: Claude Code compacts at about 967K on a native 1M window and at the 200K boundary on a 200K one (code.claude.com/docs/en/model-config, checked 2026-09-15), so 90% is the last point at which a warning still arrives before the CLI rewrites the session itself. Codex configures its own compaction point and does not publish it."
-    },
-    "expensive_turn": {
-      "window_share_percent": 10,
-      "tokens": 20000,
-      "rationale": "Not measured. Two ceilings, either of which is enough: a turn worth a tenth of the window, or 20K tokens outright. The absolute one is not a fallback for an unknown window — on a 1M window a tenth of it is 100K, so a share-only rule would go quiet on exactly the longest sessions."
     }
   },
   "limits": {

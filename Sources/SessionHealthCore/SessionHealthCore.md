@@ -84,9 +84,12 @@ already been delivered inside a *scope*:
 - a **limit window**, identified by the moment it resets. Once it rolls over, its usage is a
   new story and may be reported again.
 
-An expensive turn is the exception that proves the rule: it is an event, not a line that
-stays crossed, so its identity carries the context size it happened at — every turn that
-qualifies is worth saying once.
+There is no exception to that rule. There used to be one — a mark for a single turn that
+grew the context a lot, an event rather than a line that stays crossed — and it was removed on
+2026-09-16 for the reason a mark is ever removed: in agent work a large read is most turns, so
+it spoke on nearly all of them. How much the last turn added is still in the panel, under the
+session it belongs to. A reading nobody is interrupted by is worth more than a mark nobody
+reads.
 
 ## Which mark made the bar that colour
 

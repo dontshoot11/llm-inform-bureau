@@ -236,8 +236,7 @@ func runClaudeAgentTests(_ suite: TestSuite, config: ThresholdConfig) {
 
         suite.test("a subagent reports no last request of its own") {
             // An agent is one request as far as the person who started it is concerned. The
-            // turns inside it are not things they asked for, so there is no growth to show —
-            // and the expensive-request mark has nothing to fire on either.
+            // turns inside it are not things they asked for, so there is no growth to show.
             let directory = sessionWithAgent(
                 root, "no-growth",
                 agentLines: [
@@ -255,10 +254,6 @@ func runClaudeAgentTests(_ suite: TestSuite, config: ThresholdConfig) {
                 return
             }
             suite.expect(agent.turnGrowthTokens == nil, "growth is not reported for an agent")
-            suite.expect(
-                !rules.assess(agent).alerts.contains { if case .expensiveTurn = $0.kind { true } else { false } },
-                "so nothing calls one of its steps an expensive request"
-            )
         }
 
         // MARK: Which window an agent is measured against

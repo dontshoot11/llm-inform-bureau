@@ -22,15 +22,6 @@ func runNotificationTextTests(_ suite: TestSuite, config: ThresholdConfig) {
         )
     }
 
-    func expensiveTurn(_ service: AgentService) -> BudgetAlert {
-        BudgetAlert(
-            kind: .expensiveTurn(atContextTokens: 96_000),
-            service: service,
-            percent: 18,
-            tokens: 34_000
-        )
-    }
-
     func limitAlert(_ service: AgentService, _ window: LimitWindow.Kind, resetsAt: Date? = nil) -> BudgetAlert {
         BudgetAlert(
             kind: .limitUsage(window: window, percent: config.limitUsage.high),
@@ -42,7 +33,6 @@ func runNotificationTextTests(_ suite: TestSuite, config: ThresholdConfig) {
 
     let everyAlert = [
         windowFill(.claude), windowFill(.codex),
-        expensiveTurn(.claude), expensiveTurn(.codex),
         limitAlert(.claude, .short, resetsAt: reset), limitAlert(.codex, .weekly, resetsAt: reset)
     ]
 
@@ -59,8 +49,6 @@ func runNotificationTextTests(_ suite: TestSuite, config: ThresholdConfig) {
     suite.test("a context notification ends with the command of its own service") {
         suite.expect(text(windowFill(.claude)).body.hasSuffix("/context"), "Claude window: \(text(windowFill(.claude)).body)")
         suite.expect(text(windowFill(.codex)).body.hasSuffix("/status"), "Codex window: \(text(windowFill(.codex)).body)")
-        suite.expect(text(expensiveTurn(.claude)).body.hasSuffix("/context"), "Claude turn")
-        suite.expect(text(expensiveTurn(.codex)).body.hasSuffix("/status"), "Codex turn")
     }
 
     suite.test("a limit notification ends with /usage for both services") {
@@ -85,12 +73,6 @@ func runNotificationTextTests(_ suite: TestSuite, config: ThresholdConfig) {
             )
         )
         suite.expect(higher.title != said.title, "both marks read as the same notification: \(said.title)")
-    }
-
-    suite.test("an expensive turn notification carries how much the turn added") {
-        let said = text(expensiveTurn(.codex))
-        suite.expect(said.title.contains("34K"), "title: \(said.title)")
-        suite.expect(said.body.contains("96K"), "the context it ended at: \(said.body)")
     }
 
     suite.test("a limit notification names the window, the mark and when it resets") {

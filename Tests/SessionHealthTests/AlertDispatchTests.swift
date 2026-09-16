@@ -122,9 +122,9 @@ func runAlertDispatchTests(_ suite: TestSuite, config: ThresholdConfig) {
         suite.expect(Set(crossed.map(\.service)) == [.claude, .codex], "got \(crossed.map(\.service))")
     }
 
-    // An expensive turn is an event rather than a line that stays crossed, so each one is
-    // worth saying once — and the next one is a different event.
-    suite.test("every expensive turn is announced, each one once") {
+    // Whatever one turn added, it is a reading in the panel and never a notification: in
+    // agent work a large read is most turns, and a mark lit on most of them says nothing.
+    suite.test("a turn's growth alone never reaches the notifications") {
         func turn(growth: Int, held: Int) -> ContextAssessment {
             rules.assess(
                 SessionSnapshot(
@@ -136,18 +136,15 @@ func runAlertDispatchTests(_ suite: TestSuite, config: ThresholdConfig) {
                 )
             )
         }
-        let big = Int(Double(window) * config.expensiveTurn.windowSharePercent / 100) + 1_000
 
         var dispatch = AlertDispatch()
         _ = dispatch.pending(limits: [], sessions: [turn(growth: 10, held: 1_000)])
-
-        let first = dispatch.pending(limits: [], sessions: [turn(growth: big, held: 20_000)])
-        suite.expectEqual(first.count, 1, "the first expensive turn")
-        suite.expectEqual(first.first?.tokens, big, "the growth the notification reports")
-        suite.expectEqual(dispatch.pending(limits: [], sessions: [turn(growth: big, held: 20_000)]).count, 0, "the same turn re-read")
-
-        let next = dispatch.pending(limits: [], sessions: [turn(growth: big, held: 40_000)])
-        suite.expectEqual(next.count, 1, "the next expensive turn")
+        let huge = Int(Double(window) * 0.3)
+        suite.expectEqual(
+            dispatch.pending(limits: [], sessions: [turn(growth: huge, held: 20_000)]).count,
+            0,
+            "a turn worth a third of the window, and still nothing to say"
+        )
     }
 
     suite.test("a session that ended is forgotten rather than remembered forever") {

@@ -113,8 +113,6 @@ public struct AlertDispatch: Sendable {
             ("window:\(alert.service.rawValue)", mark)
         case .limitUsage(let window, let mark):
             ("limit:\(alert.service.rawValue):\(window.rawValue)", mark)
-        case .expensiveTurn:
-            nil
         }
     }
 

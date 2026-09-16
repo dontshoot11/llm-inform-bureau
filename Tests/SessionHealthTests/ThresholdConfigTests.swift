@@ -16,7 +16,6 @@ func runThresholdConfigTests(_ suite: TestSuite, config: ThresholdConfig) {
     suite.test("every number explains itself, and every measured one names a dated source") {
         let measured: [(String, ThresholdProvenance?, String)] = [
             ("context.window_fill_percent", config.windowFill.provenance, config.windowFill.rationale),
-            ("context.expensive_turn", config.expensiveTurn.provenance, config.expensiveTurn.rationale),
             ("limits.percent", config.limitUsage.provenance, config.limitUsage.rationale),
             ("limits.quiet_when_window_remaining_percent", config.limitWindowNearlyReset.provenance, config.limitWindowNearlyReset.rationale),
             ("sessions.active_within_minutes", config.sessionActivity.provenance, config.sessionActivity.rationale),
@@ -36,7 +35,6 @@ func runThresholdConfigTests(_ suite: TestSuite, config: ThresholdConfig) {
     suite.test("no mark claims a source, because no vendor published one") {
         suite.expectEqual(config.windowFill.isMeasured, false, "the window-fill marks")
         suite.expectEqual(config.limitUsage.isMeasured, false, "the limit marks")
-        suite.expectEqual(config.expensiveTurn.isMeasured, false, "the expensive-turn mark")
         suite.expectEqual(config.limitWindowNearlyReset.isMeasured, false, "the reset mark")
         suite.expectEqual(config.sessionActivity.isMeasured, false, "the session-activity window")
         // Waits were counted here to place this one, and counting them here is exactly why it
@@ -124,10 +122,10 @@ func runThresholdConfigTests(_ suite: TestSuite, config: ThresholdConfig) {
         let external = directory.appendingPathComponent("thresholds.json")
 
         suite.test("an installed config outside the bundle wins over the bundled copy") {
-            write(configJSON(turnTokens: 11_000), to: external, suite)
+            write(configJSON(activeMinutes: 11), to: external, suite)
             let load = ThresholdConfigLoader.load(at: external)
             suite.expectEqual(load.source, .external(external), "source")
-            suite.expectEqual(load.config.expensiveTurn.tokens, 11_000, "value from the file")
+            suite.expectEqual(load.config.sessionActivity.minutes, 11, "value from the file")
             suite.expectEqual(load.problems.count, 0, "problems: \(load.problems)")
             suite.expectEqual(load.usesFallbackValues, false, "usesFallbackValues")
         }
@@ -158,9 +156,9 @@ func runThresholdConfigTests(_ suite: TestSuite, config: ThresholdConfig) {
         }
 
         suite.test("an incomplete config keeps the values it does have") {
-            write(configJSON(turnTokens: 11_000, includeWindowFill: false), to: external, suite)
+            write(configJSON(activeMinutes: 11, includeWindowFill: false), to: external, suite)
             let load = ThresholdConfigLoader.load(at: external)
-            suite.expectEqual(load.config.expensiveTurn.tokens, 11_000, "the value that was there")
+            suite.expectEqual(load.config.sessionActivity.minutes, 11, "the value that was there")
             suite.expectEqual(load.config.windowFill, config.windowFill, "the missing one falls back")
             suite.expectEqual(load.problems.count, 1, "problems: \(load.problems)")
             suite.expect(
@@ -225,7 +223,7 @@ func runThresholdConfigTests(_ suite: TestSuite, config: ThresholdConfig) {
 /// A valid config of the current version, with one thing at a time knocked out of it.
 private func configJSON(
     version: Int = ThresholdConfig.currentVersion,
-    turnTokens: Int = 20_000,
+    activeMinutes: Int = 30,
     windowFill: (notice: Int, elevated: Int, high: Int) = (25, 50, 75),
     includeWindowFill: Bool = true,
     includeRationale: Bool = true,
@@ -243,7 +241,7 @@ private func configJSON(
             "high": \(windowFill.high),
             \(rationale)
             \(measurement)
-          },
+          }
         """
         : ""
     return """
@@ -251,12 +249,6 @@ private func configJSON(
       "version": \(version),
       "context": {
         \(fill)
-        "expensive_turn": {
-          "window_share_percent": 10,
-          "tokens": \(turnTokens),
-          \(rationale)
-          "measurement": null
-        }
       },
       "limits": {
         "percent": {
@@ -274,7 +266,7 @@ private func configJSON(
       },
       "sessions": {
         "active_within_minutes": {
-          "minutes": 30,
+          "minutes": \(activeMinutes),
           \(rationale)
           "measurement": null
         },

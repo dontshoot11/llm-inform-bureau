@@ -189,12 +189,6 @@ enum ThresholdConfigParser {
                 fallback: fallback.windowFill,
                 problems: &problems
             ),
-            expensiveTurn: turnGrowth(
-                context?["expensive_turn"],
-                at: "context.expensive_turn",
-                fallback: fallback.expensiveTurn,
-                problems: &problems
-            ),
             limitUsage: percentMarks(
                 limits?["percent"],
                 at: "limits.percent",
@@ -274,31 +268,6 @@ enum ThresholdConfigParser {
         }
         return WindowResetThreshold(
             remainingSharePercent: share,
-            rationale: rationale(entry, at: path, problems: &problems),
-            provenance: provenance(entry["measurement"], at: path, problems: &problems)
-        )
-    }
-
-    private static func turnGrowth(
-        _ value: Any?,
-        at path: String,
-        fallback: TurnGrowthThreshold,
-        problems: inout [String]
-    ) -> TurnGrowthThreshold {
-        guard let entry = object(value, at: path, problems: &problems) else { return fallback }
-        guard
-            let share = number(entry["window_share_percent"], at: "\(path).window_share_percent", problems: &problems),
-            let tokens = number(entry["tokens"], at: "\(path).tokens", problems: &problems),
-            share > 0, share <= 100, tokens > 0
-        else {
-            problems.append(
-                "\(path): the defaults \(fallback.windowSharePercent)% / \(fallback.tokens) tokens are in use"
-            )
-            return fallback
-        }
-        return TurnGrowthThreshold(
-            windowSharePercent: share,
-            tokens: Int(tokens),
             rationale: rationale(entry, at: path, problems: &problems),
             provenance: provenance(entry["measurement"], at: path, problems: &problems)
         )

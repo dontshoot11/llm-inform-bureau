@@ -72,8 +72,6 @@ public enum Wording {
         switch kind {
         case .windowFill(let percent):
             "\(self.service(service)) context window past \(TokenDisplay.percent(percent))"
-        case .expensiveTurn:
-            "\(self.service(service)) grew sharply in one request"
         case .limitUsage(let window, let percent):
             "\(self.service(service)) \(limitWindow(window, minutes: nil)) past \(TokenDisplay.percent(percent))"
         }
@@ -105,7 +103,7 @@ public enum Wording {
         switch kind {
         case .limitUsage:
             limitsCommand(service)
-        case .windowFill, .expensiveTurn:
+        case .windowFill:
             contextCommand(service)
         }
     }

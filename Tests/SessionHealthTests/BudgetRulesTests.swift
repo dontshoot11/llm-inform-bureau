@@ -115,79 +115,15 @@ func runBudgetRulesTests(_ suite: TestSuite, config: ThresholdConfig) {
         }
     }
 
-    // MARK: An expensive turn
+    // MARK: A turn's growth is shown, never announced
 
-    let turn = config.expensiveTurn
-
-    suite.test("a turn exactly at the configured share of the window is not expensive yet") {
-        let growth = tokens(turn.windowSharePercent, of: window)
+    // The mark that fired on one big turn is gone: in agent work almost every turn is a large
+    // read, so it spoke on nearly all of them and said nothing by being lit. What a turn added
+    // is still in the panel, under the session it belongs to — a reading, not an interruption.
+    suite.test("a turn that adds a lot of context raises no alert of its own") {
+        let growth = tokens(fill.high, of: window)
         let assessment = rules.assess(session(.codex, tokens: growth, window: window, growth: growth))
-        suite.expectEqual(assessment.alerts.count, 0, "alerts")
-    }
-
-    suite.test("a turn above that share alerts with how much it added") {
-        let growth = tokens(turn.windowSharePercent, of: window) + 1
-        let held = tokens(fill.elevated, of: window)
-        let assessment = rules.assess(session(.codex, tokens: held, window: window, growth: growth))
-        suite.expect(
-            assessment.alerts.map(\.kind) == [.expensiveTurn(atContextTokens: held)],
-            "got \(assessment.alerts.map(\.kind))"
-        )
-        suite.expectEqual(assessment.alerts.first?.tokens, growth, "reported growth")
-        suite.expectClose(assessment.alerts.first?.percent, Double(growth) / Double(window) * 100, "growth as a share")
-    }
-
-    suite.test("an expensive turn does not change the level — it is news about one turn") {
-        let growth = tokens(turn.windowSharePercent, of: window) + 1
-        let assessment = rules.assess(session(.codex, tokens: growth, window: window, growth: growth))
-        suite.expectEqual(assessment.level, .normal, "level")
-    }
-
-    suite.test("without a window size an expensive turn is measured in absolute tokens") {
-        let atMark = rules.assess(session(.codex, tokens: 40_000, window: nil, growth: turn.tokens))
-        suite.expectEqual(atMark.alerts.count, 0, "alerts at the mark")
-
-        let above = rules.assess(session(.codex, tokens: 40_000, window: nil, growth: turn.tokens + 1))
-        suite.expect(
-            above.alerts.map(\.kind) == [.expensiveTurn(atContextTokens: 40_000)],
-            "got \(above.alerts.map(\.kind))"
-        )
-        suite.expect(above.alerts.first?.percent == nil, "no share of a window nobody knows the size of")
-    }
-
-    // The case the share-only rule got wrong: on a 1M window a tenth of it is 100K, so the
-    // share alone went quiet on exactly the longest sessions. Either ceiling is enough now.
-    suite.test("on a very large window the absolute ceiling catches what the share misses") {
-        let huge = 1_000_000
-        let growth = turn.tokens + 1
-        suite.expect(
-            Double(growth) / Double(huge) * 100 < turn.windowSharePercent,
-            "this case is only meaningful while \(growth) tokens is under \(turn.windowSharePercent)% of \(huge)"
-        )
-        let assessment = rules.assess(session(.claude, tokens: 300_000, window: huge, growth: growth))
-        suite.expect(
-            assessment.alerts.map(\.kind) == [.expensiveTurn(atContextTokens: 300_000)],
-            "got \(assessment.alerts.map(\.kind))"
-        )
-        suite.expectEqual(assessment.alerts.first?.tokens, growth, "reported growth")
-    }
-
-    suite.test("on a small window the share still catches what the absolute ceiling misses") {
-        let growth = tokens(turn.windowSharePercent, of: window) + 1
-        suite.expect(growth < turn.tokens, "this case is only meaningful while \(growth) is under \(turn.tokens)")
-        let assessment = rules.assess(session(.codex, tokens: 50_000, window: window, growth: growth))
-        suite.expect(
-            assessment.alerts.map(\.kind) == [.expensiveTurn(atContextTokens: 50_000)],
-            "got \(assessment.alerts.map(\.kind))"
-        )
-    }
-
-    suite.test("a first reading has no turn growth to judge and says nothing about it") {
-        let assessment = rules.assess(session(.codex, tokens: 90_000, window: window, growth: nil))
-        suite.expect(
-            !assessment.alerts.contains { if case .expensiveTurn = $0.kind { true } else { false } },
-            "got \(assessment.alerts.map(\.kind))"
-        )
+        suite.expectEqual(assessment.alerts.map(\.kind), [.windowFill(percent: fill.elevated)], "alerts")
     }
 
     // MARK: An unknown window size is a fact, not an error

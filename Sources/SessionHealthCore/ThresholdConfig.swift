@@ -76,41 +76,6 @@ public struct PercentMarks: Equatable, Sendable {
     }
 }
 
-/// How big a single turn has to be to count as expensive.
-public struct TurnGrowthThreshold: Equatable, Sendable {
-    /// Growth as a share of the context window.
-    public let windowSharePercent: Double
-    /// Growth in absolute tokens.
-    public let tokens: Int
-    public let rationale: String
-    public let provenance: ThresholdProvenance?
-
-    public var isMeasured: Bool { provenance != nil }
-
-    public init(
-        windowSharePercent: Double,
-        tokens: Int,
-        rationale: String,
-        provenance: ThresholdProvenance?
-    ) {
-        self.windowSharePercent = windowSharePercent
-        self.tokens = tokens
-        self.rationale = rationale
-        self.provenance = provenance
-    }
-
-    /// `true` when this much growth over one turn is worth a word.
-    ///
-    /// Either ceiling is enough, and the absolute one is not a stand-in for an unknown window:
-    /// on a 1M window a tenth of it is 100K, so a share-only rule would go quiet on exactly
-    /// the longest sessions, where a jump of that size matters most.
-    public func isCrossed(byGrowth growth: Int, inWindow window: Int?) -> Bool {
-        if growth > tokens { return true }
-        guard let window, window > 0 else { return false }
-        return Double(growth) / Double(window) * 100 > windowSharePercent
-    }
-}
-
 /// How little of a limit window may be left before its marks stop speaking.
 public struct WindowResetThreshold: Equatable, Sendable {
     /// Share of the window's own length still to run, below which its marks stay quiet.
@@ -162,15 +127,12 @@ public struct DurationThreshold: Equatable, Sendable {
 /// Format, current values and how to change them: `Thresholds.md` next to this file.
 public struct ThresholdConfig: Equatable, Sendable {
     /// Format version, so a changed schema is detected rather than mis-read.
-    public static let currentVersion = 5
+    public static let currentVersion = 6
 
     public let version: Int
 
     /// Share of the context window in use. Both services.
     public let windowFill: PercentMarks
-
-    /// Growth over a single turn.
-    public let expensiveTurn: TurnGrowthThreshold
 
     /// Share of a subscription limit window spent. Both services, same scale as the context.
     public let limitUsage: PercentMarks
@@ -189,7 +151,6 @@ public struct ThresholdConfig: Equatable, Sendable {
     public init(
         version: Int,
         windowFill: PercentMarks,
-        expensiveTurn: TurnGrowthThreshold,
         limitUsage: PercentMarks,
         limitWindowNearlyReset: WindowResetThreshold,
         sessionActivity: DurationThreshold,
@@ -197,7 +158,6 @@ public struct ThresholdConfig: Equatable, Sendable {
     ) {
         self.version = version
         self.windowFill = windowFill
-        self.expensiveTurn = expensiveTurn
         self.limitUsage = limitUsage
         self.limitWindowNearlyReset = limitWindowNearlyReset
         self.sessionActivity = sessionActivity
@@ -226,17 +186,6 @@ public struct ThresholdConfig: Equatable, Sendable {
                 (code.claude.com/docs/en/model-config, checked 2026-09-15), so 90% is the last \
                 point at which a warning still arrives before the CLI rewrites the session \
                 itself. Codex configures its own compaction point and does not publish it.
-                """,
-            provenance: nil
-        ),
-        expensiveTurn: TurnGrowthThreshold(
-            windowSharePercent: 10,
-            tokens: 20_000,
-            rationale: """
-                Not measured. Two ceilings, either of which is enough: a turn worth a tenth of \
-                the window, or 20K tokens outright. The absolute one is not a fallback for an \
-                unknown window — on a 1M window a tenth of it is 100K, so a share-only rule \
-                would go quiet on exactly the longest sessions.
                 """,
             provenance: nil
         ),

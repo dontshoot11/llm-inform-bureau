@@ -56,20 +56,6 @@ public enum AlertPhrasing {
                 )
             )
 
-        case .expensiveTurn(let atContextTokens):
-            return NotificationText(
-                title: "\(service) grew \(TokenDisplay.growth(alert.tokens ?? 0)) in one request",
-                body: detail(
-                    [
-                        "Context is now \(TokenDisplay.short(atContextTokens)) tokens"
-                            + (alert.percent.map { ", and that request was \(percent($0)) of the window" } ?? "")
-                            + ".",
-                        "One request costing this much is usually a large file or a wide search."
-                    ],
-                    command: command
-                )
-            )
-
         case .limitUsage(let window, let mark):
             return NotificationText(
                 title: "\(service) \(Wording.limitName(window)) past \(TokenDisplay.percent(mark))",

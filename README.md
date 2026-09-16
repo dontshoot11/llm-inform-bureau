@@ -74,13 +74,12 @@ here it may rewrite the session, and what it drops first is the detail in the mi
 /context
 ```
 
-Four marks, all of them in an editable config file:
+Three marks, all of them shipped inside the app:
 
 | Mark | Fires for | Default |
 | --- | --- | --- |
 | Context window filled | both services | 60%, then 90% |
 | Subscription limit spent | both services | 60%, then 90% |
-| One expensive request | both services | +10% of the window, or +20K tokens, in a single request |
 | A limit window about to reset | both services | under 5% of the window's length left — its marks stay quiet |
 
 **Yellow never notifies.** Nearly every session and nearly every limit window passes 40%, so it

@@ -97,7 +97,7 @@ Three shapes in a transcript the reader has to know about:
   in the agent's own file, below, they are the only thing there is.
 - **A `tool_result` is a user line.** Turns are separated by user *prompts*, and a tool result
   is the middle of the turn already running. Growth over "the last turn" is measured from the
-  last real prompt, which is what makes an expensive turn mean a single expensive request.
+  last real prompt, so what the panel shows is what one request of the person's cost.
 - **`cwd` moves during a session.** A command run deeper in the tree changes it, and every
   line after that carries the new path — so the project is read from the *first* `cwd` in the
   file, the one the session started in and the one Claude Code named the transcript's own
@@ -258,8 +258,8 @@ appended to right now ends in half a line rather than in a broken one.
 
 Each reader widens once when the first window did not answer: 8 MB for a rollout, 16 MB for a
 transcript, and only for the number that was missing. The tokens held are always on the last
-line; it is the beginning of a long turn that can be far back — and a long turn is exactly the
-one worth calling expensive. `FileTail.headLines` reads the other end for Codex's
+line; it is the beginning of a long turn that can be far back, and a long turn is exactly the
+one whose growth is worth showing. `FileTail.headLines` reads the other end for Codex's
 `session_meta`, which carries the whole system prompt and runs to tens of kilobytes on its own.
 
 Which files are opened at all is the activity rule's decision, applied to the modification date
