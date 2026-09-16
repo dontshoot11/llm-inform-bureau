@@ -35,8 +35,9 @@ ring stays, because a sentence explaining the absence stands next to it.
 context light in the bar and on the row of the session that moved in the panel — both on the
 same phase, so they go out together. It fires when a session's held tokens or its last-request
 growth change, which is the same number the panel prints and the agent's own status line
-prints. In practice that marks both ends of a wait: the transcript is written when a question
-is sent and again when the answer lands.
+prints. Of the two ends of a wait it now marks only the far one: the transcript is written
+when a question is sent and again when the answer lands, but by the time the question is
+written the session is already waiting, and a waiting light does not flash — see below.
 
 **And it goes on blinking while a session waits on its agent.** The same light, the same beat,
 for as long as the agent owes an answer: a question was asked, or a tool was called, and
@@ -48,6 +49,23 @@ three blinks and steady again is "the reading moved", blinking that does not sto
 still working". A second rhythm was the alternative and was rejected — 200ms against 400ms is
 not a difference an eye catches sideways, and two beats laid over one light are a ripple in
 which neither is legible.
+
+**So the two never run at once: while a light is waiting, its flash is suppressed.** They
+would otherwise collide constantly rather than rarely — the numbers move several times inside
+a single turn, measured here at anything from a tenth of a second to three quarters of a
+minute apart, and every one of them would restart the beat. What that looks like is not two
+signals but one broken one: series of three blinks with gaps between them, which reads as a
+light dithering rather than as a process running. Suppressed is the right word and not
+"dropped" — the flash means "the reading moved", the wait already means "something is
+happening here", and during a wait the first says nothing the second has not. Outside a wait
+it works exactly as it did, which includes the flash that fires the moment an answer lands and
+the wait ends.
+
+The beat itself is placed on a fixed grid rather than slept through a frame at a time. A sleep
+lasts at least its length and the drawing after it takes its own; frame by frame that drifts,
+and a blink that runs for minutes has to look at its end the way it looked at its start. The
+wakeups ask for no tolerance for the same reason — a frame stretched to suit the scheduler is
+the unevenness this is avoiding.
 
 Waiting is **derived, not observed**, and nothing this app can read would observe it: measured,
 while a turn is being worked on neither the statusLine payload nor the transcript is written at

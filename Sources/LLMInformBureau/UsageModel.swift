@@ -100,6 +100,12 @@ final class UsageModel: ObservableObject {
     /// two apart is how long they last: three blinks and steady again is "the reading moved",
     /// blinking that does not stop is "it is still working".
     ///
+    /// Which is why they never run at once: while a light is waiting, its flash is suppressed
+    /// (`startPulses`). One light cannot carry both, and the wait is the one that would lose —
+    /// a flash restarting the beat every time the numbers move turns "still working" into
+    /// series of three with gaps between them, which reads as a light dithering rather than as
+    /// a process running.
+    ///
     /// **Waiting is derived, not observed.** Measured: while a turn is being worked on, neither
     /// the statusLine payload nor the transcript is written — both move only when a step lands.
     /// So the blink rests on what the last thing written leaves owed
@@ -295,6 +301,14 @@ final class UsageModel: ObservableObject {
 
     /// Starts a pulse for every service whose sessions are holding different numbers than they
     /// were on the last pass — a session's count moving, one appearing, one dropping off.
+    ///
+    /// A light already blinking its wait is left out. The two signals share one light on
+    /// purpose, and while the wait is running the flash has nothing left to say: a blink that
+    /// does not stop already means "something is happening here". Firing it anyway would be
+    /// worse than redundant — the numbers move several times a turn, measured on this machine
+    /// at anything from a tenth of a second to three quarters of a minute apart, and each one
+    /// would restart the beat and cut the wait into series of three. Outside a wait the flash
+    /// is exactly what it was.
     private func startPulses(for sessions: [SessionView]) {
         var held: [AgentService: [String: SessionNumbers]] = [:]
         for view in sessions {
@@ -312,23 +326,46 @@ final class UsageModel: ObservableObject {
 
         let moved = held.filter { $0.value != previous[$0.key] }
         guard !moved.isEmpty else { return }
+
+        var flashed = false
         for (service, numbers) in moved {
-            pulse[service] = 0
+            if !waitingServices.contains(service) {
+                pulse[service] = 0
+                flashed = true
+            }
             let before = previous[service] ?? [:]
-            for (sessionID, current) in numbers where current != before[sessionID] {
+            for (sessionID, current) in numbers
+            where current != before[sessionID] && !waitingSessions.contains(sessionID) {
                 sessionPulse[sessionID] = 0
+                flashed = true
             }
         }
+        guard flashed else { return }
         animatePulses()
     }
 
     /// Advances every running pulse frame by frame, and stops the moment none is left.
+    ///
+    /// Frames are placed on a fixed grid rather than slept through one length at a time. A
+    /// sleep lasts *at least* what it was asked for, and the work after it takes its own time
+    /// on top; beat after beat that adds up, and a blink that has to look the same at the end
+    /// of a minute-long wait as it did at its start cannot afford to drift. On the grid a late
+    /// frame is late once and the next one lands where it always would. `tolerance: .zero`
+    /// is part of the same thing: left to itself the system is free to coalesce a wakeup with
+    /// whatever else it is doing, and a frame stretched to suit the scheduler is exactly the
+    /// unevenness this is here to avoid.
+    ///
+    /// After a real stall — a sleeping machine, a long freeze — the grid is picked up from now
+    /// rather than caught up to, because a burst of frames drawn back to back is a stutter and
+    /// not a blink.
     private func animatePulses() {
         guard pulsing == nil else { return }
         let frame = Self.pulseDuration / Self.pulseFrames
         pulsing = Task { [weak self] in
+            var deadline = ContinuousClock.now
             while !Task.isCancelled {
-                try? await Task.sleep(for: frame)
+                deadline = max(deadline, ContinuousClock.now).advanced(by: frame)
+                try? await Task.sleep(until: deadline, tolerance: .zero, clock: .continuous)
                 guard let self, !Task.isCancelled else { return }
                 var next: [AgentService: Double] = [:]
                 for (service, phase) in self.pulse {
