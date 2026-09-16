@@ -115,9 +115,8 @@ Four steps, each printed before it happens:
    exactly as it is.
 3. **Connect the statusLine wrapper** (see below) — the one step that touches a file of
    Claude Code's. It prints the change, keeps a timestamped backup, and preserves whatever
-   command was there before. The wrapper does not travel on the image yet, so from a mounted
-   image this step says it is skipping; connect it from the clone instead:
-   `Scripts/install-statusline.sh --apply`.
+   command was there before. The wrapper travels inside the app, so this works with no clone
+   and no Command Line Tools.
 4. **Start the app.**
 
 ### Step 3 — The first run
@@ -156,11 +155,23 @@ Claude Code ──payload──▶ wrapper ──┬──▶ ~/Library/Applicat
                                    └──▶ the command that was there before ──▶ the status line
 ```
 
-`Scripts/install-statusline.sh` shows exactly what it will change in `~/.claude/settings.json`
-before changing it, keeps a timestamped backup, and can be undone with `--uninstall`. One
-consequence it says out loud: **with any statusLine configured, Claude Code stops showing most
-footer hints**, `esc to interrupt` among them. That is Claude Code's behaviour and the real
-cost of connecting the wrapper.
+The installer shows exactly what it will change in `~/.claude/settings.json` before changing
+it, keeps a timestamped backup, and can be undone with `--uninstall`. One consequence it says
+out loud: **with any statusLine configured, Claude Code stops showing most footer hints**,
+`esc to interrupt` among them. That is Claude Code's behaviour and the real cost of connecting
+the wrapper.
+
+Step 3 of the installation runs it, and it can be run on its own at any time afterwards. It
+lives inside the installed app, which is the whole copy of this repository a recipient needs:
+
+```sh
+sh /Applications/LLMInformBureau.app/Contents/Resources/install-statusline.sh            # the plan
+sh /Applications/LLMInformBureau.app/Contents/Resources/install-statusline.sh --apply
+sh /Applications/LLMInformBureau.app/Contents/Resources/install-statusline.sh --uninstall
+```
+
+From a clone the same script is `Scripts/install-statusline.sh`; both copies behave the same,
+because each one takes the wrapper from beside itself.
 
 Without it the app still shows Codex in full and Claude's context from the transcripts — and
 says "no data" for Claude's limits rather than showing them as 0%.
@@ -179,14 +190,15 @@ and the panel says "default thresholds applied"; one `cp` fixes it, and
 
 ### Removing it
 
-Untick **Open at login**, quit from the panel, then:
+Untick **Open at login**, quit from the panel, then, in this order:
 
 ```sh
-Scripts/install-statusline.sh --uninstall
+sh /Applications/LLMInformBureau.app/Contents/Resources/install-statusline.sh --uninstall
 rm -rf /Applications/LLMInformBureau.app ~/Library/Application\ Support/LLMInformBureau
 ```
 
-The uninstall step puts your previous statusLine command back where it was.
+The first line puts your previous statusLine command back where it was, and it has to run
+before the second: the script it names lives inside the bundle that the second line deletes.
 
 ## Where the data comes from
 

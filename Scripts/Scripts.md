@@ -7,7 +7,7 @@ the app bundle, two connect it to Claude Code.
 | --- | --- | --- |
 | `build-dmg.sh` | the author | Builds the disk image that is handed out: the app, the installer and the instructions |
 | `install.sh` | a person | Shows the installation of the bundle beside it as a plan, and with `--apply` carries it out |
-| `build-app.sh` | the author | Builds the `.app` bundle, and with `--run` restarts it |
+| `build-app.sh` | the author | Builds the `.app` bundle — with the two scripts below inside it — and with `--run` restarts it |
 | `install-statusline.sh` | a person | Shows what connecting the wrapper would change, and with `--apply` does it |
 | `statusline-wrapper.sh` | Claude Code | Saves each statusLine payload for the app, and calls whatever command was there before |
 
@@ -56,9 +56,13 @@ is no second installation path in the repository to keep working.
 run directly off the mounted image is blocked by Gatekeeper with a dialog and no output;
 handed to an interpreter, it runs.
 
-The statusLine step runs `install-statusline.sh` from beside the script or from inside the
-bundle. Neither is on the image yet — the wrapper still lives only in the repository — so from
-a downloaded image that step says it is skipping and the rest of the installation finishes.
+The statusLine step runs `install-statusline.sh` from beside the script — the repository
+layout — or from inside the bundle, where `build-app.sh` puts it next to the wrapper. On a
+downloaded image the second is the one that exists, which is what makes connecting the wrapper
+part of the recipient's path rather than a step "for developers only".
+
+It is run through `sh` for the same reason this script is: a file executed straight off a
+mounted image is stopped by Gatekeeper with a dialog and no output.
 
 Two of the steps refuse to repeat themselves: an existing `thresholds.json` is left exactly as
 it is — it is the one the app reads, and overwriting someone's edited marks during an update
@@ -96,6 +100,17 @@ Scripts/install-statusline.sh --apply    # carries it out
 Scripts/install-statusline.sh --uninstall
 ```
 
+The same script ships inside the app, beside the wrapper, and someone who never had the
+repository runs that copy instead:
+
+```sh
+sh /Applications/LLMInformBureau.app/Contents/Resources/install-statusline.sh --apply
+```
+
+There is one script and not two because it looks for the wrapper **next to itself**: in the
+repository that is `Scripts/`, in the installed app it is `Contents/Resources/`, and neither
+layout is named anywhere in it.
+
 The preview is the point: the script edits `~/.claude/settings.json`, which is the user's file
 and holds much more than this one key, so it says what it will copy where, what the current
 command is, and where that command will be saved — before doing any of it. `--apply` keeps a
@@ -110,9 +125,13 @@ Two things the preview says out loud because they surprise people:
   moving or deleting the working copy does not break the status line. Re-run `--apply` after
   changing the wrapper.
 
-`settings.json` is edited through `python3` — the file is the user's, and a regex edit of
-someone else's config is how a working setup breaks silently. The command is written
-shell-quoted, because Claude Code runs it through a shell and its path contains a space.
+`settings.json` is edited through `osascript -l JavaScript` — the file is the user's, and a
+regex edit of someone else's config is how a working setup breaks silently, so it is parsed,
+changed and written back whole. It used to be `python3`, and that is exactly the kind of
+dependency the disk image cannot have: `/usr/bin/python3` is a Command Line Tools shim, and on
+a Mac without them it opens an installer dialog instead of working. `osascript` is part of
+macOS. The command is written shell-quoted, because Claude Code runs it through a shell and its
+path contains a space.
 
 ## What the wrapper writes
 
@@ -137,6 +156,10 @@ SwiftPM produces a bare executable; a menu bar app needs a bundle with an `Info.
 thresholds into it, and re-signs it ad-hoc with the identifier from that plist — the
 notification centre ignores a bundle whose signing identifier does not match its
 `CFBundleIdentifier`.
+
+`statusline-wrapper.sh` and `install-statusline.sh` are copied into `Contents/Resources` on the
+way, because on the receiving Mac the bundle is the only copy of this repository there is. They
+go in **before** the signature, which covers `Resources`: adding them afterwards would break it.
 
 **The binary is universal**, `arm64` and `x86_64`, because the image goes to a Mac that may be
 an Intel one and there is no Intel Mac here to find that out on. It is built twice, once per

@@ -6,33 +6,49 @@
 # saved and the wrapper keeps calling it with the same payload, so nothing is taken away. This
 # script never changes anything without showing it first: run it to see the plan, run it with
 # --apply to carry the plan out, and with --uninstall to put things back.
+#
+# It ships in two places and works the same in both: beside the wrapper in Scripts/, and beside
+# the wrapper inside the installed app's Resources. Whoever downloaded the disk image and has
+# no repository connects the wrapper from the bundle — that is why everything here is found
+# next to this script and nothing is looked for in a repository layout.
 set -eu
 
-root=$(cd "$(dirname "$0")/.." && pwd)
+here=$(cd "$(dirname "$0")" && pwd)
+wrapper="$here/statusline-wrapper.sh"
 support="$HOME/Library/Application Support/LLMInformBureau"
 installed="$support/statusline-wrapper.sh"
 previous="$support/previous-statusline"
 settings="$HOME/.claude/settings.json"
 mode="${1:-preview}"
 
-python=$(command -v python3 || true)
-if [ -z "$python" ]; then
-	echo "python3 is needed to edit $settings without rewriting the rest of it." >&2
-	echo "It ships with the Xcode Command Line Tools, which this project already needs." >&2
+if [ ! -f "$wrapper" ]; then
+	echo "There is no statusline-wrapper.sh next to this script." >&2
+	echo "  looked in: $here" >&2
+	echo "" >&2
+	echo "The wrapper is the thing being installed, so there is nothing to connect without" >&2
+	echo "it. Inside the installed app both files sit together:" >&2
+	echo "  sh /Applications/LLMInformBureau.app/Contents/Resources/install-statusline.sh --apply" >&2
 	exit 1
 fi
 
-# Reading and writing settings.json goes through python3 rather than through sed: the file is
-# the user's, it holds far more than this one key, and a regex edit of someone else's config
-# is how a working setup gets broken silently.
-current=$("$python" - "$settings" <<'PY'
-import json, sys
-try:
-    with open(sys.argv[1]) as handle:
-        print((json.load(handle).get("statusLine") or {}).get("command", ""))
-except (OSError, ValueError):
-    print("")
-PY
+# Reading and writing settings.json goes through osascript's JavaScript rather than through
+# sed: the file is the user's, it holds far more than this one key, and a regex edit of someone
+# else's config is how a working setup gets broken silently. Not python3, which did this job
+# before: it arrives with the Xcode Command Line Tools, and on the Mac this app is handed to
+# there are none — /usr/bin/python3 there opens an installer dialog instead of working.
+# osascript is part of macOS itself.
+current=$(osascript -l JavaScript - "$settings" <<'JS'
+ObjC.import('Foundation');
+function run(argv) {
+	const text = $.NSString.stringWithContentsOfFileEncodingError($(argv[0]), $.NSUTF8StringEncoding, $());
+	if (text.isNil()) return "";
+	try {
+		return (JSON.parse(ObjC.unwrap(text)).statusLine || {}).command || "";
+	} catch (error) {
+		return "";
+	}
+}
+JS
 )
 
 saved=""
@@ -42,7 +58,7 @@ case "$mode" in
 preview | --preview | --apply)
 	echo "statusLine wrapper"
 	echo
-	echo "  copy   $root/Scripts/statusline-wrapper.sh"
+	echo "  copy   $wrapper"
 	echo "      to $installed"
 	echo
 	echo "  set    statusLine.command in $settings"
@@ -69,8 +85,7 @@ preview | --preview | --apply)
 	fi
 	echo
 	;;
---uninstall)
-	;;
+--uninstall) ;;
 *)
 	echo "usage: $0 [--apply | --uninstall]" >&2
 	exit 1
@@ -86,27 +101,31 @@ if [ "$mode" = "--uninstall" ]; then
 	restore="$saved"
 	echo "Restoring the statusLine that was there before:"
 	echo "      ${restore:-(none — the key will be removed)}"
-	"$python" - "$settings" "$restore" <<'PY'
-import json, sys
-path, restore = sys.argv[1], sys.argv[2]
-try:
-    with open(path) as handle:
-        settings = json.load(handle)
-except (OSError, ValueError):
-    settings = {}
-status = settings.get("statusLine")
-if restore:
-    settings["statusLine"] = {
-        **(status if isinstance(status, dict) else {}),
-        "type": "command",
-        "command": restore,
-    }
-else:
-    settings.pop("statusLine", None)
-with open(path, "w") as handle:
-    json.dump(settings, handle, indent=2)
-    handle.write("\n")
-PY
+	osascript -l JavaScript - "$settings" "$restore" <<'JS'
+ObjC.import('Foundation');
+function run(argv) {
+	const path = argv[0];
+	const restore = argv.length > 1 ? argv[1] : "";
+	const text = $.NSString.stringWithContentsOfFileEncodingError($(path), $.NSUTF8StringEncoding, $());
+	let settings = {};
+	if (!text.isNil()) {
+		try {
+			settings = JSON.parse(ObjC.unwrap(text)) || {};
+		} catch (error) {
+			settings = {};
+		}
+	}
+	if (restore) {
+		const status = (settings.statusLine && typeof settings.statusLine === "object") ? settings.statusLine : {};
+		settings.statusLine = Object.assign({}, status, { type: "command", command: restore });
+	} else {
+		delete settings.statusLine;
+	}
+	$(JSON.stringify(settings, null, 2) + "\n")
+		.writeToFileAtomicallyEncodingError($(path), true, $.NSUTF8StringEncoding, $());
+	return "";
+}
+JS
 	rm -f "$previous"
 	echo "Done. The payload files under $support/claude-status are left alone."
 	exit 0
@@ -120,30 +139,35 @@ if [ -n "$current" ] && [ "$current" != "$installed" ] && [ "$current" != "'$ins
 	printf '%s' "$current" >"$previous"
 fi
 
-cp "$root/Scripts/statusline-wrapper.sh" "$installed"
+cp "$wrapper" "$installed"
 chmod +x "$installed"
 
 [ -f "$settings" ] && cp "$settings" "$settings.backup-$(date +%Y%m%d%H%M%S)"
 
-"$python" - "$settings" "$installed" <<'PY'
-import json, shlex, sys
-path, wrapper = sys.argv[1], sys.argv[2]
-try:
-    with open(path) as handle:
-        settings = json.load(handle)
-except (OSError, ValueError):
-    settings = {}
-status = settings.get("statusLine")
-settings["statusLine"] = {
-    # Anything else the user had set here — padding, refreshInterval — is theirs and stays.
-    **(status if isinstance(status, dict) else {}),
-    "type": "command",
-    # Claude Code runs this through a shell, and the path contains "Application Support".
-    "command": shlex.quote(wrapper),
+osascript -l JavaScript - "$settings" "$installed" <<'JS'
+ObjC.import('Foundation');
+// Claude Code runs the command through a shell, and its path contains "Application Support".
+function quote(value) {
+	return "'" + value.replace(/'/g, "'\\''") + "'";
 }
-with open(path, "w") as handle:
-    json.dump(settings, handle, indent=2)
-    handle.write("\n")
-PY
+function run(argv) {
+	const path = argv[0], wrapper = argv[1];
+	const text = $.NSString.stringWithContentsOfFileEncodingError($(path), $.NSUTF8StringEncoding, $());
+	let settings = {};
+	if (!text.isNil()) {
+		try {
+			settings = JSON.parse(ObjC.unwrap(text)) || {};
+		} catch (error) {
+			settings = {};
+		}
+	}
+	// Anything else the user had set here — padding, refreshInterval — is theirs and stays.
+	const status = (settings.statusLine && typeof settings.statusLine === "object") ? settings.statusLine : {};
+	settings.statusLine = Object.assign({}, status, { type: "command", command: quote(wrapper) });
+	$(JSON.stringify(settings, null, 2) + "\n")
+		.writeToFileAtomicallyEncodingError($(path), true, $.NSUTF8StringEncoding, $());
+	return "";
+}
+JS
 
 echo "Connected. The next answer in any Claude session fills in its limits and window size."

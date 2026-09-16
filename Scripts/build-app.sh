@@ -2,7 +2,8 @@
 # Builds the menu bar app into a .app bundle and, with --run, restarts it.
 #
 # SwiftPM produces a bare executable; a menu bar app needs a bundle with an Info.plist
-# (LSUIElement, so it has no Dock icon).
+# (LSUIElement, so it has no Dock icon). The statusLine wrapper and its installer go inside it
+# too: on the receiving Mac the bundle is the only copy of this repository there is.
 #
 # The binary inside is universal. The bundle built here is the one that travels on the disk
 # image to another Mac, and that Mac may be an Intel one — a fact nobody discovers on this
@@ -46,6 +47,12 @@ for resources in "$arch_build"/arm64/release/*.bundle; do
 done
 cp "$root/Scripts/Info.plist" "$app/Contents/Info.plist"
 plutil -lint "$app/Contents/Info.plist" >/dev/null
+
+# The statusLine wrapper and its installer travel inside the bundle, side by side, because the
+# person who gets the disk image has no repository to take them from. Copied before the
+# signature, which covers Resources: adding them afterwards would invalidate it.
+cp "$root/Scripts/statusline-wrapper.sh" "$root/Scripts/install-statusline.sh" "$app/Contents/Resources/"
+chmod +x "$app/Contents/Resources/statusline-wrapper.sh" "$app/Contents/Resources/install-statusline.sh"
 
 codesign --force --sign - --identifier "$bundle_id" "$app" 2>/dev/null
 

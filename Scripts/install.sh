@@ -44,7 +44,9 @@ fi
 
 # The statusLine installer travels with the app, not with this script: on a downloaded image
 # there is no repository to take it from. Beside this script is the repository layout; inside
-# the bundle is the installed one.
+# the bundle is the installed one. It is run through sh for the same reason this script is:
+# a file executed straight off a mounted image is stopped by Gatekeeper with a dialog and no
+# output.
 statusline=""
 for candidate in "$here/install-statusline.sh" "$bundle/Contents/Resources/install-statusline.sh"; do
 	if [ -f "$candidate" ]; then
@@ -108,7 +110,7 @@ if [ -n "$statusline" ]; then
 	echo ""
 	# Its closing "run with --apply" line is dropped: this script says that once, at the end,
 	# and the sub-command is not run separately.
-	"$statusline" --preview | grep -v "^This was a preview" | sed 's/^/   /'
+	sh "$statusline" --preview | grep -v "^This was a preview" | sed 's/^/   /'
 else
 	echo "   SKIPPED: install-statusline.sh is not beside this script or inside the bundle,"
 	echo "   so Claude's subscription limits cannot be connected from here. Everything else"
@@ -163,7 +165,7 @@ fi
 echo ""
 echo "3. statusLine wrapper."
 if [ -n "$statusline" ]; then
-	"$statusline" --apply | sed 's/^/   /'
+	sh "$statusline" --apply | sed 's/^/   /'
 else
 	echo "   Skipped: install-statusline.sh is not here. Claude's limits stay unconnected."
 fi
