@@ -26,6 +26,13 @@ public enum Wording {
     /// beside it is already saying most of it.
     public static let spentLabel = "spent"
 
+    /// The shortest name a limit window has, for a row that has room for a number and little
+    /// else. The opened-out rows say "5-hour window" and "Weekly window"; folded away, next to
+    /// its own percentage, the only question left is which of the two windows this is.
+    public static func limitWindowShort(_ kind: LimitWindow.Kind) -> String {
+        kind == .short ? "5h" : "7d"
+    }
+
     /// A limit window inside a sentence about it: "Claude weekly limit 62% used".
     public static func limitName(_ kind: LimitWindow.Kind) -> String {
         kind == .short ? "5-hour limit" : "weekly limit"

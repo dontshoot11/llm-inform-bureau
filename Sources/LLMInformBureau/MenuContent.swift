@@ -22,7 +22,7 @@ struct MenuContent: View {
             // two subjects and nothing else says which is which. They are also built by the
             // same two helpers below, so neither half can drift into looking more important
             // than the other.
-            limitsCaption
+            caption("Subscription limits")
             ForEach(AgentService.allCases, id: \.self) { service in
                 if showsLimitsInFull {
                     limitsEntry(service)
@@ -30,6 +30,7 @@ struct MenuContent: View {
                     limitsSummary(service)
                 }
             }
+            limitsDisclosure
 
             Divider()
             caption("Active sessions — context")
@@ -99,33 +100,40 @@ struct MenuContent: View {
                     .keyboardShortcut(.cancelAction)
             }
             Spacer()
-            // Shown only while there is something to disconnect. An icon that is always there
-            // and does nothing four times out of five is a control a person learns to ignore.
-            if model.slot.isOurs {
+            // Their own row within the row, tight: each icon carries its own plate under the
+            // pointer, and the gap between two plates is what would otherwise read as a gap
+            // between two groups.
+            HStack(spacing: 0) {
+                // Shown only while there is something to disconnect. An icon that is always
+                // there and does nothing four times out of five is a control a person learns
+                // to ignore.
+                if model.slot.isOurs {
+                    Button {
+                        model.propose(.disconnect)
+                    } label: {
+                        Image(systemName: "bolt.slash").modifier(Hoverable())
+                    }
+                    .buttonStyle(.borderless)
+                    .help(SlotPhrasing.disconnectHelp)
+                }
+
                 Button {
-                    model.propose(.disconnect)
+                    Welcome.show()
                 } label: {
-                    Image(systemName: "bolt.slash")
+                    Image(systemName: "questionmark.circle").modifier(Hoverable())
                 }
                 .buttonStyle(.borderless)
-                .help(SlotPhrasing.disconnectHelp)
-            }
+                .help("Where the numbers come from, and whether to open at login")
 
-            Button {
-                Welcome.show()
-            } label: {
-                Image(systemName: "questionmark.circle")
+                Button {
+                    confirmingTerminate.toggle()
+                } label: {
+                    Image(systemName: "power").modifier(Hoverable())
+                }
+                .buttonStyle(.borderless)
+                .help("Terminate the widget")
             }
-            .buttonStyle(.borderless)
-            .help("Where the numbers come from, and whether to open at login")
-
-            Button {
-                confirmingTerminate.toggle()
-            } label: {
-                Image(systemName: "power")
-            }
-            .buttonStyle(.borderless)
-            .help("Terminate the widget")
+            .padding(.trailing, -4)
         }
         // A question left hanging expires when the panel closes: reopening it should not find
         // a half-pressed decision from an hour ago. The same goes for a settings.json change
@@ -153,28 +161,38 @@ struct MenuContent: View {
         model.limitsExpanded || model.pendingChange != nil || model.slotProblem != nil
     }
 
-    /// The section's name, and the one control that folds it.
+    /// The one control that folds the limits away, at the foot of the half it folds.
     ///
-    /// The whole caption is the target rather than the triangle alone: the triangle is eight
-    /// points wide, and a row of text that reacts to being clicked is what a person tries
-    /// first anyway.
-    private var limitsCaption: some View {
-        Button {
-            model.limitsExpanded.toggle()
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: showsLimitsInFull ? "chevron.down" : "chevron.right")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                caption("Subscription limits")
+    /// Under the readings rather than on the section's name, and saying what it gives rather
+    /// than wearing a triangle and hoping. A caption in this panel is a label — every other one
+    /// is — so a caption that was secretly a button was a control nobody would find. At the
+    /// bottom, in the words of what it opens, it reads as the next line of the section and not
+    /// as decoration.
+    ///
+    /// It goes away while a change to `settings.json` is waiting for an answer: that question
+    /// is what the half is about at that moment, and folding it is not on offer.
+    @ViewBuilder
+    private var limitsDisclosure: some View {
+        if model.pendingChange == nil {
+            Button {
+                model.limitsExpanded.toggle()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: showsLimitsInFull ? "chevron.down" : "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                    Text(
+                        showsLimitsInFull
+                            ? "Show less"
+                            : "Show both windows and when they reset"
+                    )
+                    .font(.caption)
+                }
+                .foregroundStyle(.secondary)
+                .modifier(Hoverable())
             }
+            .buttonStyle(.plain)
+            .padding(.leading, -4)
         }
-        .buttonStyle(.plain)
-        .help(
-            showsLimitsInFull
-                ? "Fold the limits away — the two dots in the menu bar go on watching them"
-                : "Open the limits out: both windows, when each resets, and how old the reading is"
-        )
     }
 
     /// One service folded into a line: its light, its name, and the most spent of its windows.
@@ -198,21 +216,46 @@ struct MenuContent: View {
                 Button(SlotPhrasing.connect) { model.propose(.connect) }
                     .controlSize(.small)
                     .help(SlotPhrasing.connectHelp)
-            } else if let value = summary(of: service) {
-                Text(value)
+            } else if let summary = summary(of: service) {
+                // The window is named because two of them are being chosen between: a bare
+                // percentage in a folded row is a number whose question is missing.
+                Text(summary.window)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                Text(summary.value)
                     .font(.callout.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
         }
     }
 
-    /// What a folded service says on the right: how much of its worst window is gone, or that
-    /// the window has nothing left. Nothing at all when nobody has reported.
-    private func summary(of service: AgentService) -> String? {
+    /// What a folded service says on the right: which window, and how much of it is gone.
+    /// Nothing at all when nobody has reported — never a zero.
+    ///
+    /// The five-hour window by default. It is the one that runs out during a working day, and
+    /// it is the one a glance is asking about; the weekly one is a question people ask
+    /// deliberately, which is what opening the section out is for.
+    ///
+    /// Two exceptions, and both are the same rule: the row must not disagree with the dot
+    /// beside it. A window with nothing left is what the cross stands for, and a weekly window
+    /// that has crossed a mark the five-hour one has not is the reason the dot is that
+    /// colour — so each of those is the window shown.
+    private func summary(of service: AgentService) -> (window: String, value: String)? {
         guard let assessment = model.limits[service] else { return nil }
-        if assessment.isExhausted { return Wording.spentLabel }
-        guard let worst = assessment.worstUsedPercent else { return nil }
-        return "\(TokenDisplay.percent(worst)) used"
+        if let spent = assessment.spentWindow {
+            return (Wording.limitWindowShort(spent.kind), Wording.spentLabel)
+        }
+        guard let snapshot = model.usage?.limits(of: service).value else { return nil }
+
+        var kind = LimitWindow.Kind.short
+        if case .limitUsage(let lit, _) = assessment.levelSource, lit == .weekly {
+            kind = .weekly
+        }
+        guard let window = snapshot.window(kind) ?? snapshot.windows.first else { return nil }
+        return (
+            Wording.limitWindowShort(window.kind),
+            "\(TokenDisplay.percent(window.usedPercent)) used"
+        )
     }
 
     // MARK: The two halves
@@ -566,6 +609,30 @@ struct MenuContent: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// A control that says it is one when the pointer is over it.
+///
+/// Everything else in this panel is a reading, and nothing here is styled to be clicked: a
+/// caption looks like a caption and an icon like an icon. So the few things that do something
+/// say so the only way a panel of text can — a plate behind them while the pointer is there,
+/// and nothing at all the rest of the time, which is how the panel stays a page of numbers.
+struct Hoverable: ViewModifier {
+    @State private var hovering = false
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(Color.primary.opacity(hovering ? 0.12 : 0))
+            )
+            // Animated, because the plate appearing instantly under a pointer that is only
+            // passing through reads as the panel flickering rather than as an answer.
+            .animation(.easeOut(duration: 0.12), value: hovering)
+            .onHover { hovering = $0 }
     }
 }
 

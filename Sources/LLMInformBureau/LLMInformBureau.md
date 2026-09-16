@@ -153,8 +153,17 @@ menu bar they are in.
 The panel carries, in order, its two halves named after the two dots in the bar:
 
 1. **Subscription limits**, folded away — each service on one line: its light, its name, and
-   the most spent of its windows. Opening it out gives every window with its percentage, its
-   reset time, the plan, and how old the reading is.
+   the five-hour window, named, with how much of it is gone. Opening it out gives both windows
+   with their percentages, their reset times, the plan, and how old the reading is.
+   The five-hour window and not the worst of the two, because it is the one that runs out
+   during a working day and the one a glance is asking about — the weekly one is a question
+   people ask deliberately, which is what opening the section out is for. Two exceptions, and
+   both are one rule: a window with nothing left, and a weekly window that has crossed a mark
+   the five-hour one has not. Each of those is the reason the dot is the colour it is, and a
+   row showing the other window would leave the two disagreeing.
+   The control that folds it stands under the readings, above the divider, saying what it
+   opens. Not on the section's name: every other caption in this panel is a label, and a
+   caption that was secretly a button was a control nobody found.
    Folded, because the two halves are not alike. A session's context moves several times a
    turn and is what the panel is opened for; a limit window creeps, and the question it
    answers — "have I got room today" — is asked once in a while. In full it is sixteen lines
@@ -193,6 +202,12 @@ The panel carries, in order, its two halves named after the two dots in the bar:
 5. **The icons**: disconnecting the status line slot, while it is the app's; the way back to
    the first-run explanation; and the way out. Terminating asks once — the panel is opened to
    read something, and the icon sits where a thumb lands.
+
+Nothing in the panel is styled to be clicked — a caption looks like a caption, an icon like an
+icon — so the few things that do something say so under the pointer, and only then: a plate
+appears behind them and nothing else changes. That is `Hoverable`, and it is on the fold
+control and on the three icons at the foot of the panel. A reading never gets one; lighting up
+under a pointer would promise something it does not do.
 
 Under every reading stands the command that shows the rest of it — `/usage` under a service's
 limits, `/context` or `/status` under a session. It is the same command its notification ends
