@@ -6,7 +6,7 @@ out. Nothing here is run by the person who receives the app — they drag a bund
 
 | Script | Run by | Does |
 | --- | --- | --- |
-| `build-dmg.sh` | the author | Builds the disk image that is handed out: the app and the instructions |
+| `build-dmg.sh` | the author | Builds the disk image that is handed out: the app, the shortcut to drag it onto, and the instructions |
 | `build-app.sh` | the author | Builds the `.app` bundle and, with `--run`, restarts it |
 
 There used to be three more — an installer, a statusLine installer and a shell wrapper Claude
@@ -27,10 +27,10 @@ shown before it happens.
 Scripts/build-dmg.sh    # prints the path of the image it built
 ```
 
-It builds the app, puts it on a disk image beside an `INSTALL.txt`, and writes
-`.build/LLMInformBureau-<version>.dmg`. The version is read from `Scripts/Info.plist` —
-`CFBundleShortVersionString` — so the number in the file name and the number in the app are one
-number, and there is no second place to remember to change.
+It builds the app, puts it on a disk image beside an `INSTALL.txt` and a shortcut to
+`/Applications`, and writes `.build/LLMInformBureau-<version>.dmg`. The version is read from
+`Scripts/Info.plist` — `CFBundleShortVersionString` — so the number in the file name and the
+number in the app are one number, and there is no second place to remember to change.
 
 `INSTALL.txt` is written here, as a heredoc, rather than kept as a file to copy: it carries the
 version it was built with, and a copy sitting in the repository is a copy that goes out of step
@@ -46,6 +46,12 @@ and not the one on the image, and after it nobody has started the app, so the te
 
 The volume is called `LLMInformBureau`, without spaces, because it is named in the instructions
 and has to survive being retyped.
+
+The symlink is the drag's other end. `ln -s /Applications` survives `hdiutil create` and mounts
+as a folder the Finder drops into like the real one, so the instruction is "drag it onto the
+shortcut next to it" rather than "find your Applications folder and arrange two windows". There
+is no `.DS_Store` with a background and icon positions to go with it: that is an AppleScript
+conversation with the Finder, and a window listing three things is clear enough without one.
 
 What the image cannot carry is the step that opens it: a person holding a `.dmg` has nowhere to
 read "mount this first". That part travels in the message with the link, and the text to paste

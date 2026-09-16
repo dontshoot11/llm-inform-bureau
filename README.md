@@ -118,8 +118,10 @@ rather than something depending on where your browser puts downloads.
 
 ### Step 2 — Drag the app into Applications
 
-Out of the window that opened, into your Applications folder. Replacing an older copy is the
-same gesture; quit the running one from its panel first.
+The window that opened holds the app, a shortcut to your Applications folder and `INSTALL.txt`.
+Drag the app onto the shortcut — both ends of the gesture are in the one window, so there is no
+second one to find and arrange. Replacing an older copy is the same drag; quit the running one
+from its panel first.
 
 ### Step 3 — One command
 
@@ -344,7 +346,7 @@ carries the first steps too:
 Download the image, then:
 
   1. Open ~/Downloads/LLMInformBureau-<version>.dmg
-  2. Drag LLMInformBureau.app into your Applications folder
+  2. Drag LLMInformBureau.app onto the Applications shortcut beside it
   3. In Terminal:
        xattr -d -r com.apple.quarantine /Applications/LLMInformBureau.app
   4. Open it from Launchpad

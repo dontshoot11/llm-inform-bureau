@@ -47,6 +47,12 @@ mkdir -p "$staging"
 # extended attributes across intact.
 ditto "$app" "$staging/LLMInformBureau.app"
 
+# The other half of the drag. Without it the instructions ask somebody to find their own
+# Applications folder and arrange two windows; with it both ends of the gesture are in the one
+# window that opened. A symlink survives hdiutil and mounts as a folder the Finder treats as
+# the real /Applications — checked on an image built this way.
+ln -s /Applications "$staging/Applications"
+
 # The whole of what the recipient is given in writing. It lives here, in the script that packs
 # the image, because it has to be right for the version being packed and there is nowhere else
 # on the image to keep it. It answers why there is a command at all after a drag, because a
@@ -75,8 +81,9 @@ named $volume. The same from the terminal:
 
 THEN DRAG IT IN, AND RUN ONE COMMAND
 
-Drag LLMInformBureau.app out of the window that opened and into your Applications folder —
-the same gesture as for any other app. Then paste this into Terminal:
+The window that opened holds LLMInformBureau.app, a shortcut to your Applications folder, and
+this file. Drag the app onto that shortcut — the same gesture as for any other app, with both
+ends of it in the one window. Then paste this into Terminal:
 
   xattr -d -r com.apple.quarantine /Applications/LLMInformBureau.app
 
@@ -156,8 +163,8 @@ Every version uses the same volume name, and macOS mounts a second one alongside
 "$volume 1" — so a window you thought was the new image can be the old one. The version
 is on the first line of this file, on the image you actually opened.
 
-Then download the new image, drag the app in over the old one and let the Finder replace it.
-Quit the running copy from its panel first. The command above is needed again: the mark is on
+Then download the new image and drag the app onto the Applications shortcut again, over the
+old one, letting the Finder replace it. Quit the running copy from its panel first. The command above is needed again: the mark is on
 the new copy too.
 
 Nothing of yours is carried across because nothing of yours is involved: the app brings its own

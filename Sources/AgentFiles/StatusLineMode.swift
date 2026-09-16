@@ -9,9 +9,9 @@ import SessionHealthCore
 /// what it is handed where `ClaudeStatusStore` reads it, and hands the same payload on to
 /// whatever command was in the slot before, printing that command's output unchanged.
 ///
-/// This is the contract `Scripts/statusline-wrapper.sh` had, moved into the app itself: one
-/// thing to install instead of two, and measured at a fifth of the shell script's startup,
-/// which matters for something that runs after every answer.
+/// This is the contract the shell wrapper an earlier release installed had, moved into the app
+/// itself: one thing to install instead of two, and measured at a fifth of that script's
+/// startup, which matters for something that runs after every answer.
 ///
 /// Nothing here throws and nothing here fails. Whatever the payload turns out to be, Claude
 /// Code has to get a status line back and an exit code of zero — a status line command that
