@@ -97,7 +97,7 @@ public struct ClaudeTranscriptStore: Sendable {
                         fromWorkingDirectory: Self.home(of: file.url) ?? reading.workingDirectory
                     ),
                     lastActivityAt: file.modified,
-                    isAwaitingReply: reading.isAwaitingReply
+                    isAwaitingReply: activity.isStillWaiting(since: reading.awaitingSince, now: now)
                 )
                 snapshots.append(session)
                 snapshots.append(
@@ -144,7 +144,7 @@ public struct ClaudeTranscriptStore: Sendable {
                     turnGrowthTokens: nil,
                     project: snapshot.project,
                     lastActivityAt: file.modified,
-                    isAwaitingReply: reading.isAwaitingReply,
+                    isAwaitingReply: activity.isStillWaiting(since: reading.awaitingSince, now: now),
                     subagent: SubagentOrigin(
                         parentSessionID: snapshot.sessionID,
                         type: meta?.type,
@@ -191,7 +191,10 @@ public struct ClaudeTranscriptStore: Sendable {
     private struct Reading: Equatable, Sendable {
         let contextTokens: Int
         let turnGrowthTokens: Int?
-        let isAwaitingReply: Bool
+        /// When the entry that still owes an answer was written, or `nil` when nothing is
+        /// owed. A moment rather than a flag: how long a wait has been silent is what decides
+        /// whether it is still a wait, and that threshold belongs to the rule and not here.
+        let awaitingSince: Date?
         let workingDirectory: String?
         /// The model on the last answer. A session's is what its agents inherit from; an
         /// agent's is what tells the inheritance to stop.
@@ -224,7 +227,7 @@ public struct ClaudeTranscriptStore: Sendable {
                 Reading(
                     contextTokens: held,
                     turnGrowthTokens: growth,
-                    isAwaitingReply: Self.isAwaitingReply(entries, role: role),
+                    awaitingSince: Self.awaitingSince(entries, role: role, writtenBy: file.modified),
                     workingDirectory: lastAnswer.workingDirectory,
                     model: lastAnswer.model
                 )
@@ -316,8 +319,24 @@ public struct ClaudeTranscriptStore: Sendable {
     /// break the wait in two; `stop_reason` reads it as the middle, which is what it is.
     /// Anything other than `tool_use` — `end_turn`, `stop_sequence`, `max_tokens`, or none at
     /// all — is the turn over: whatever happens next waits on the person, not on the agent.
-    private static func isAwaitingReply(_ entries: [TranscriptLine], role: Role) -> Bool {
-        entries.last { $0.isTurnEntry(sidechain: role.countsSidechain) }?.owesAnAnswer ?? false
+    ///
+    /// The answer is a moment and not a yes: an entry that owes an answer says the agent was
+    /// working when it was written, not that it still is. A terminal closed mid-turn leaves a
+    /// transcript owing an answer forever — 34 files on this machine — so how long ago that
+    /// entry was written is the other half of the question, and `SessionActivity` holds the
+    /// threshold that answers it.
+    private static func awaitingSince(
+        _ entries: [TranscriptLine],
+        role: Role,
+        writtenBy modified: Date
+    ) -> Date? {
+        guard let last = entries.last(where: { $0.isTurnEntry(sidechain: role.countsSidechain) }),
+              last.owesAnAnswer
+        else { return nil }
+        // Every entry of a conversation carries a timestamp — the housekeeping around them is
+        // what does not, and that is skipped above. The file's own date stands in for the one
+        // entry in a format that stopped carrying one.
+        return last.writtenAt ?? modified
     }
 
     /// Growth over the turn in progress, or `nil` when its beginning is not in what was read.
@@ -394,12 +413,45 @@ private struct TranscriptLine {
     var owesAnAnswer: Bool {
         switch json?["type"] as? String {
         case "user":
-            return true
+            return !isInterruption
         case "assistant":
             return (json?["message"] as? [String: Any])?["stop_reason"] as? String == "tool_use"
         default:
             return false
         }
+    }
+
+    /// The moment this entry was written, as it says itself. Housekeeping lines carry no
+    /// timestamp; the entries of the conversation do.
+    var writtenAt: Date? {
+        guard let text = json?["timestamp"] as? String else { return nil }
+        return Timestamps.date(fromISO8601: text)
+    }
+
+    /// Whether this is the line Claude Code writes when the person stops the agent mid-turn.
+    ///
+    /// It is an ordinary user entry, so the rule above would read it as a question waiting to
+    /// be answered — and it is the opposite: the agent has been told to stop, and what happens
+    /// next waits on the person. Measured here: of 73 such entries, 69 are followed by the
+    /// person typing again rather than by an answer, a median of 16 seconds later. Both
+    /// wordings are matched by their common beginning — the second names the tool the stop
+    /// landed on. A rejected tool call is *not* one of these: the agent is handed the refusal
+    /// and answers it, which is why only this marker is read.
+    ///
+    /// The words rather than the `interruptedMessageId` beside them, because that field is on
+    /// 61 of those 73 and the words are on all of them: the older entries predate it.
+    var isInterruption: Bool {
+        guard json?["type"] as? String == "user" else { return false }
+        return text.contains("[Request interrupted by user")
+    }
+
+    /// What the entry says in words, whichever shape its content takes: a bare string for a
+    /// typed question, a list of blocks for everything else.
+    private var text: String {
+        let content = (json?["message"] as? [String: Any])?["content"]
+        if let text = content as? String { return text }
+        guard let blocks = content as? [[String: Any]] else { return "" }
+        return blocks.compactMap { $0["text"] as? String }.joined(separator: " ")
     }
 
     /// An answer that ended its turn rather than asking for a tool. For a subagent, whose

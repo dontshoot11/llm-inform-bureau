@@ -162,7 +162,7 @@ public struct DurationThreshold: Equatable, Sendable {
 /// Format, current values and how to change them: `Thresholds.md` next to this file.
 public struct ThresholdConfig: Equatable, Sendable {
     /// Format version, so a changed schema is detected rather than mis-read.
-    public static let currentVersion = 4
+    public static let currentVersion = 5
 
     public let version: Int
 
@@ -182,13 +182,18 @@ public struct ThresholdConfig: Equatable, Sendable {
     /// Not a budget mark — it decides what the widget shows rather than what it warns about.
     public let sessionActivity: DurationThreshold
 
+    /// How long a session may owe an answer in silence before nobody is taken to be waiting
+    /// on it. The fuse under the blinking light — `SessionActivity.isStillWaiting`.
+    public let abandonedWait: DurationThreshold
+
     public init(
         version: Int,
         windowFill: PercentMarks,
         expensiveTurn: TurnGrowthThreshold,
         limitUsage: PercentMarks,
         limitWindowNearlyReset: WindowResetThreshold,
-        sessionActivity: DurationThreshold
+        sessionActivity: DurationThreshold,
+        abandonedWait: DurationThreshold
     ) {
         self.version = version
         self.windowFill = windowFill
@@ -196,6 +201,7 @@ public struct ThresholdConfig: Equatable, Sendable {
         self.limitUsage = limitUsage
         self.limitWindowNearlyReset = limitWindowNearlyReset
         self.sessionActivity = sessionActivity
+        self.abandonedWait = abandonedWait
     }
 
     /// The floor under the floor: the values compiled into the app, used when even the
@@ -268,6 +274,23 @@ public struct ThresholdConfig: Equatable, Sendable {
                 rather than derived, and any number in the same neighbourhood lists the same \
                 sessions. Correct it if running sessions drop off the list, or finished ones \
                 linger on it.
+                """,
+            provenance: nil
+        ),
+        abandonedWait: DurationThreshold(
+            minutes: 10,
+            rationale: """
+                Not measured — a sensible default, and the app is handed to people whose \
+                sessions are not the ones it was written on. Nothing on disk says a session \
+                died: a closed terminal, a killed process and an agent hard at work all look \
+                like an entry that owes an answer and nothing after it. So a wait that has \
+                gone this long without a word is presumed abandoned and its light stops \
+                blinking, while the session itself stays listed for its own half hour. The \
+                number only has to be longer than the longest silence inside a turn that is \
+                really running — a working turn writes an entry every few seconds — and \
+                short enough that nobody watches a dead session blink. Raise it if a long \
+                tool call stops the light while you are still waiting; lower it if a closed \
+                terminal keeps blinking too long afterwards.
                 """,
             provenance: nil
         )

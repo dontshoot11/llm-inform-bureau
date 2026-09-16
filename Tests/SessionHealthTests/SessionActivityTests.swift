@@ -34,6 +34,28 @@ func runSessionActivityTests(_ suite: TestSuite, config: ThresholdConfig) {
         suite.expectEqual(activity.isActive(lastActivityAt: now.addingTimeInterval(600), now: now), true, "ahead of now")
     }
 
+    // The fuse under the blinking light. Nothing on disk says a session died, so a wait that
+    // has gone this long without a word is presumed abandoned — and the session goes on being
+    // listed for its own, much longer, window: quiet is not the same as finished.
+    suite.test("a wait that has just started is one somebody is waiting on") {
+        suite.expectEqual(activity.isStillWaiting(since: now.addingTimeInterval(-5), now: now), true, "5 seconds in")
+    }
+
+    suite.test("the edge of the fuse still waits, just past it does not") {
+        let fuse = config.abandonedWait.seconds
+        suite.expectEqual(activity.isStillWaiting(since: now.addingTimeInterval(-fuse), now: now), true, "exactly at the mark")
+        suite.expectEqual(activity.isStillWaiting(since: now.addingTimeInterval(-fuse - 1), now: now), false, "a second past it")
+        suite.expect(fuse < window, "the fuse must be shorter than the window the session itself gets")
+    }
+
+    suite.test("nothing owed is not a wait at all") {
+        suite.expectEqual(activity.isStillWaiting(since: nil, now: now), false, "no answer owed")
+    }
+
+    suite.test("an entry written in the future is a wait rather than an abandoned one") {
+        suite.expectEqual(activity.isStillWaiting(since: now.addingTimeInterval(600), now: now), true, "ahead of now")
+    }
+
     suite.test("filtering keeps the active sessions and puts the freshest first") {
         let sessions = [
             session("old", ago: 86_400, from: now),

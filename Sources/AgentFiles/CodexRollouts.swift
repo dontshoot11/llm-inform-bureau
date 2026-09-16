@@ -105,7 +105,7 @@ public struct CodexRolloutStore: Sendable {
         ].compactMap { $0 }
         guard !windows.isEmpty else { return nil }
 
-        let timestamp = (root["timestamp"] as? String).flatMap(date(fromISO8601:)) ?? fileModified
+        let timestamp = (root["timestamp"] as? String).flatMap(Timestamps.date(fromISO8601:)) ?? fileModified
         return LimitsSnapshot(
             service: .codex,
             observedAt: timestamp,
@@ -127,13 +127,6 @@ public struct CodexRolloutStore: Sendable {
         )
     }
 
-    private static func date(fromISO8601 text: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: text) { return date }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: text)
-    }
 }
 
 // MARK: Session context

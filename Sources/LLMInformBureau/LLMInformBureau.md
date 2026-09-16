@@ -72,6 +72,13 @@ while a turn is being worked on neither the statusLine payload nor the transcrip
 all. What the app reads is what the last thing written leaves owed — the rule, and what it
 cannot cover, are in `AgentFiles.md`.
 
+**And a wait is given up on rather than kept forever.** A closed terminal, a killed process and
+an agent hard at work leave the same thing on disk, so what ends the blinking when no answer is
+ever coming is time: past `sessions.abandoned_wait_after_minutes` of silence the reader stops
+calling it a wait, the light goes steady, and the row stays — quiet is not finished, and a
+session keeps its line for the full activity window. Stopping the agent on purpose needs no
+fuse at all: the interrupt is written down, and the light goes steady on the next pass.
+
 Why blinking and not a glow: a halo fading in alpha over a point or two was drawn first and
 was simply invisible in a menu bar — the eye gets nothing from a gradient that small. A light
 being absent for 200ms is unmistakable, and it is the same kind of change as a light changing

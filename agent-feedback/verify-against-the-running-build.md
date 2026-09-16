@@ -10,4 +10,5 @@ source is explaining the wrong thing. Rebuild, restart, look again, then investi
 Why: `Scripts/build-app.sh` replaces the bundle while the running copy keeps its own code, and
 nothing in the menu bar says which of the two you are looking at.
 
-Date: 2026-09-16 · Source: user's report (task session-waiting-indicator, phase 2)
+Date: 2026-09-16 · Source: user's reports (task session-waiting-indicator, phases 2 and 3 —
+the same trap twice: a screenshot of lights not blinking came from a process two builds old)

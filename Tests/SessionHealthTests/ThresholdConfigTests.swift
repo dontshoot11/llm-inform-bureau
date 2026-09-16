@@ -19,7 +19,8 @@ func runThresholdConfigTests(_ suite: TestSuite, config: ThresholdConfig) {
             ("context.expensive_turn", config.expensiveTurn.provenance, config.expensiveTurn.rationale),
             ("limits.percent", config.limitUsage.provenance, config.limitUsage.rationale),
             ("limits.quiet_when_window_remaining_percent", config.limitWindowNearlyReset.provenance, config.limitWindowNearlyReset.rationale),
-            ("sessions.active_within_minutes", config.sessionActivity.provenance, config.sessionActivity.rationale)
+            ("sessions.active_within_minutes", config.sessionActivity.provenance, config.sessionActivity.rationale),
+            ("sessions.abandoned_wait_after_minutes", config.abandonedWait.provenance, config.abandonedWait.rationale)
         ]
         for (path, provenance, rationale) in measured {
             suite.expect(!rationale.isEmpty, "\(path): a number without a rationale is a guess")
@@ -38,6 +39,9 @@ func runThresholdConfigTests(_ suite: TestSuite, config: ThresholdConfig) {
         suite.expectEqual(config.expensiveTurn.isMeasured, false, "the expensive-turn mark")
         suite.expectEqual(config.limitWindowNearlyReset.isMeasured, false, "the reset mark")
         suite.expectEqual(config.sessionActivity.isMeasured, false, "the session-activity window")
+        // Waits were counted here to place this one, and counting them here is exactly why it
+        // ships unmeasured: one machine's sessions are not the sessions it will be read on.
+        suite.expectEqual(config.abandonedWait.isMeasured, false, "the abandoned-wait fuse")
     }
 
     // The red mark is the one number placed against something published, and the rationale is
@@ -244,6 +248,11 @@ private func configJSON(
       "sessions": {
         "active_within_minutes": {
           "minutes": 30,
+          \(rationale)
+          "measurement": null
+        },
+        "abandoned_wait_after_minutes": {
+          "minutes": 10,
           \(rationale)
           "measurement": null
         }

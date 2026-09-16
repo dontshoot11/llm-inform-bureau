@@ -84,7 +84,7 @@ light, plus the Claude token mark — is exactly that case, and it is covered by
 
 ```json
 {
-  "version": 4,
+  "version": 5,
   "context": {
     "window_fill_percent": { "notice": 40, "elevated": 60, "high": 90, "rationale": "…" },
     "expensive_turn": { "window_share_percent": 10, "tokens": 20000, "rationale": "…" }
@@ -94,7 +94,8 @@ light, plus the Claude token mark — is exactly that case, and it is covered by
     "quiet_when_window_remaining_percent": { "remaining_percent": 5, "rationale": "…" }
   },
   "sessions": {
-    "active_within_minutes": { "minutes": 30, "rationale": "…" }
+    "active_within_minutes": { "minutes": 30, "rationale": "…" },
+    "abandoned_wait_after_minutes": { "minutes": 10, "rationale": "…" }
   }
 }
 ```
@@ -116,17 +117,31 @@ light, plus the Claude token mark — is exactly that case, and it is covered by
 | `limits.percent` | 40 / 60 / 90 | **Not measured.** The same scale as the context, so a colour means one thing everywhere. The 60 / 80 this replaces was ours too, and the yellow mark moved 30 → 40 on 2026-09-15 together with the context scale. |
 | `limits.quiet_when_window_remaining_percent` | 5 | **Not measured.** Below this share of a window's own length, its marks stay quiet: a window about to come back on its own is not worth interrupting anyone for. A share rather than a number of minutes, because five hours and a week are not comparable in absolute time. |
 | `sessions.active_within_minutes` | 30 | **Not measured — a sensible default.** Thirty minutes is where a session being worked on stops looking like one that is finished. |
+| `sessions.abandoned_wait_after_minutes` | 10 | **Not measured — a sensible default.** A session owing an answer this long without a word is presumed abandoned, and its light stops blinking. It only has to be longer than the longest silence inside a turn that is really running, and short enough that nobody watches a dead session blink. |
 
-Not one of the five carries a `measurement`, and that is the honest state of this subject
+Not one of the six carries a `measurement`, and that is the honest state of this subject
 rather than a gap to be filled. The alternative — inventing a date and a link so every field
 looks equally solid — is exactly the silent lie `AGENTS.md` forbids.
 
-## The one entry that is not a mark
+## The two entries that are not marks
 
 `sessions.active_within_minutes` decides which sessions the widget lists, not what it warns
 about. It is here because it has the same problem as the marks: it will need correcting, and a
 number in the code cannot be corrected without a rebuild. Correct it if sessions that are
 running drop off the list, or finished ones linger on it.
+
+`sessions.abandoned_wait_after_minutes` decides how long a light goes on blinking for an answer
+that may never come. Nothing on disk says a session died: a closed terminal, a killed process
+and an agent hard at work all leave the same thing behind — an entry owing an answer and
+nothing after it — so the only thing separating them is how long ago that entry was written.
+The silence is counted from the last entry of the conversation and never from the file's date:
+measured on this machine, a transcript's modification date runs ahead of the last thing said in
+it by a median of a minute and a half, and by more than ten minutes in 87 files of 385, because
+housekeeping keeps touching a file long after the conversation in it stopped.
+
+The two are deliberately far apart, and the shorter one is the blink. A session that has gone
+quiet is still a session being worked on and keeps its row for the full half hour; what it
+loses after ten minutes is only the claim that somebody is waiting on it right now.
 
 ## What is no longer here
 

@@ -136,6 +136,108 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
             )
         }
 
+        // The fuse. A terminal closed mid-turn and a killed process leave exactly what a
+        // working agent leaves — an entry owing an answer and nothing after it — so how long
+        // ago it was written is the only thing that separates them.
+        suite.test("a wait older than the fuse stops being a wait") {
+            let longAgo = now.addingTimeInterval(-config.abandonedWait.seconds - 60)
+            expectWaiting(
+                root, "abandoned",
+                [
+                    userPrompt("do the thing", at: longAgo.addingTimeInterval(-30)),
+                    assistant(
+                        input: 1, cacheCreation: 0, cacheRead: 40_000,
+                        stopReason: "tool_use", blocks: ["tool_use"], at: longAgo
+                    )
+                ],
+                false, "the answer is not coming"
+            )
+        }
+
+        suite.test("a wait inside the fuse is still a wait") {
+            let recently = now.addingTimeInterval(-config.abandonedWait.seconds + 60)
+            expectWaiting(
+                root, "still-going",
+                [
+                    userPrompt("do the thing", at: recently.addingTimeInterval(-30)),
+                    assistant(
+                        input: 1, cacheCreation: 0, cacheRead: 40_000,
+                        stopReason: "tool_use", blocks: ["tool_use"], at: recently
+                    )
+                ],
+                true, "a long tool call is still somebody waiting"
+            )
+        }
+
+        // The fuse takes the blink away and nothing else: the session is still one being
+        // worked on, and a row that vanished would say it was over.
+        suite.test("a session whose wait gave up keeps its row") {
+            let longAgo = now.addingTimeInterval(-config.abandonedWait.seconds - 60)
+            guard let snapshot = session(
+                root, "abandoned-row",
+                [
+                    userPrompt("do the thing", at: longAgo.addingTimeInterval(-30)),
+                    assistant(
+                        input: 1, cacheCreation: 0, cacheRead: 40_000,
+                        stopReason: "tool_use", blocks: ["tool_use"], at: longAgo
+                    )
+                ]
+            ) else { return }
+            suite.expectEqual(snapshot.contextTokens, 40_001, "the row still carries what the session holds")
+        }
+
+        // Pressing Esc writes an ordinary user entry, which the rule above would read as a
+        // question waiting to be answered. It is the opposite: the agent was told to stop, and
+        // whatever happens next waits on the person.
+        suite.test("a turn the person stopped is not a wait") {
+            expectWaiting(
+                root, "interrupted",
+                [
+                    userPrompt("do the thing", at: now.addingTimeInterval(-60)),
+                    assistant(
+                        input: 1, cacheCreation: 0, cacheRead: 40_000,
+                        stopReason: "tool_use", blocks: ["tool_use"], at: now.addingTimeInterval(-40)
+                    ),
+                    interrupted(at: now.addingTimeInterval(-20))
+                ],
+                false, "stopped on purpose, not waiting"
+            )
+        }
+
+        suite.test("a tool call the person stopped is not a wait either") {
+            expectWaiting(
+                root, "interrupted-tool",
+                [
+                    userPrompt("do the thing", at: now.addingTimeInterval(-60)),
+                    assistant(
+                        input: 1, cacheCreation: 0, cacheRead: 40_000,
+                        stopReason: "tool_use", blocks: ["tool_use"], at: now.addingTimeInterval(-40)
+                    ),
+                    interrupted(forToolUse: true, at: now.addingTimeInterval(-20))
+                ],
+                false, "the second wording says the same thing"
+            )
+        }
+
+        // What the person types after stopping the agent is a question like any other, and the
+        // light goes back to blinking on it. Read the marker as "this session is done" and it
+        // would stay dark for the rest of the session.
+        suite.test("asking again after stopping the agent waits once more") {
+            expectWaiting(
+                root, "interrupted-then-asked",
+                [
+                    userPrompt("do the thing", at: now.addingTimeInterval(-60)),
+                    assistant(
+                        input: 1, cacheCreation: 0, cacheRead: 40_000,
+                        stopReason: "tool_use", blocks: ["tool_use"], at: now.addingTimeInterval(-40)
+                    ),
+                    interrupted(at: now.addingTimeInterval(-20)),
+                    userPrompt("do this instead", at: now.addingTimeInterval(-10))
+                ],
+                true, "a new question is a new wait"
+            )
+        }
+
         suite.test("a subagent's lines do not decide whether its session is waiting") {
             let directory = makeProjectDirectory(root, "sidechain", suite)
             writeTranscript(

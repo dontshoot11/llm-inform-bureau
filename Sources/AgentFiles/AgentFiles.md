@@ -113,6 +113,22 @@ Two things make that readable:
   wait in two every time the agent said something before reaching for a tool. Any stop reason
   other than `tool_use` — `end_turn`, and the handful of `stop_sequence` and `max_tokens` —
   is the turn over: whatever happens next waits on the person, not on the agent.
+- **What an interrupted turn leaves owed: nothing.** Stopping the agent mid-turn writes an
+  ordinary user entry whose text is `[Request interrupted by user]` (or `… for tool use`),
+  which the rule above would otherwise read as a question waiting to be answered — and it is
+  the opposite: the agent was told to stop, and whatever happens next waits on the person.
+  Counted here: of 73 such entries, 69 are followed by the person typing again rather than by
+  an answer, a median of 16 seconds later. The words are what is read, not the
+  `interruptedMessageId` beside them: that field is on 61 of the 73 and the words are on all
+  of them. A *rejected* tool call is not one of these — the agent is handed the refusal and
+  answers it, so the wait goes on.
+- **How long the entry has owed it.** An entry that owes an answer says the agent was working
+  when it was written, not that it still is, so the reading carries the moment rather than a
+  flag, and `SessionActivity.isStillWaiting` puts it against the configured fuse
+  (`sessions.abandoned_wait_after_minutes`). The moment is the entry's own timestamp and never
+  the file's date: measured, a transcript's modification date runs ahead of the last thing
+  said in it by a median of a minute and a half and, in 87 files of 385, by more than ten
+  minutes — housekeeping keeps touching a file long after the conversation in it stopped.
 
 Two things this rule does not do, and both are honest rather than hidden:
 
@@ -120,10 +136,14 @@ Two things this rule does not do, and both are honest rather than hidden:
   transcript carries no `usage` until the first answer, and a row with no tokens on it would
   be the zero this app does not invent. It applies to a new session and to one just cleared,
   which starts a file of its own; every turn after the first is covered.
-- **A wait that never ends is still a wait here.** Counted over 382 transcripts on this
-  machine, 34 end owing an answer that never came — a closed terminal, a killed process, an
-  interrupt. Nothing in a transcript marks that, so the reading is true to the file and it is
-  the app above that decides how long to keep showing it.
+- **A wait that never ends is given up on rather than believed.** Counted over 382 transcripts
+  on this machine, 34 end owing an answer that never came — a closed terminal, a killed
+  process, a machine that slept. Nothing in a transcript marks any of that, and nothing can:
+  a session hard at work leaves exactly the same thing behind. So the reading is true to the
+  file and the fuse is time, not a marker — past `sessions.abandoned_wait_after_minutes` of
+  silence the row stops claiming anybody is waiting on it, while staying a row for as long as
+  the activity window says. Verified on a session killed mid-turn: the transcript ends on the
+  question, the row reads as waiting, and it stops the moment the fuse is up.
 
 ### Claude: the subagents of a session
 
@@ -252,6 +272,7 @@ run against fixtures instead of against whatever the machine happens to have.
 | `ClaudeStatus.swift` | Claude limits and window sizes, out of what the wrapper leaves |
 | `SessionFiles.swift` | Finding the files a service has most recently written, and telling a session's transcript from a subagent's |
 | `FileTail.swift` | Reading the ends of a large file without loading it |
+| `Timestamps.swift` | The one way a written moment is read, shared by both readers |
 | `SourceWatcher.swift` | Noticing that one of the trees changed, which is how a finished turn is noticed |
 | `Setup.swift` | Which sources have written anything at all, and whether the first run has been explained |
 

@@ -8,6 +8,26 @@ import Foundation
 /// different ideas of what a transcript looks like.
 let workingDirectory = "/Users/nobody/petProjects/llm-inform-bureau"
 
+/// The moments a turn's lines carry, unless a test says otherwise: a question a minute ago, the
+/// tool result half a minute later, the answer after that — a turn that happened just before
+/// the clock the reader tests read it at.
+///
+/// Recent on purpose. How long an entry has gone unanswered is a fact the reader now uses: a
+/// wait silent for longer than the configured fuse is one nobody is waiting on any more. A
+/// fixture turn dated last year would be read as abandoned, and every case about the state
+/// would pass for the wrong reason. Cases about the fuse itself pass their own moments.
+let fixtureNow = Date(timeIntervalSince1970: 1_800_000_000)
+let fixtureAskedAt = fixtureNow.addingTimeInterval(-60)
+let fixtureToolResultAt = fixtureNow.addingTimeInterval(-30)
+let fixtureAnsweredAt = fixtureNow.addingTimeInterval(-10)
+
+/// A moment as Claude Code writes it: ISO 8601, to the millisecond.
+func stamp(_ moment: Date) -> String {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter.string(from: moment)
+}
+
 /// One assistant entry. `blocks` names the kinds of content block it carries, because one
 /// response is written as several of these — `thinking`, then `text`, then `tool_use` — and all
 /// of them carry the same `stop_reason`, which is the thing the waiting rule reads.
@@ -19,12 +39,13 @@ func assistant(
     cwd: String = workingDirectory,
     model: String = "claude-opus-5",
     stopReason: String = "tool_use",
-    blocks: [String] = ["text"]
+    blocks: [String] = ["text"],
+    at: Date = fixtureAnsweredAt
 ) -> String {
     let content = blocks.map { "{\"type\":\"\($0)\"}" }.joined(separator: ",")
     return """
     {"type":"assistant","isSidechain":\(sidechain),"cwd":"\(cwd)",\
-    "timestamp":"2026-09-15T16:03:08.915Z",\
+    "timestamp":"\(stamp(at))",\
     "message":{"role":"assistant","model":"\(model)","stop_reason":"\(stopReason)",\
     "content":[\(content)],\
     "usage":{"input_tokens":\(input),\
@@ -46,18 +67,31 @@ func serviceTail() -> [String] {
     ]
 }
 
-func userPrompt(_ text: String, sidechain: Bool = false) -> String {
+func userPrompt(_ text: String, sidechain: Bool = false, at: Date = fixtureAskedAt) -> String {
     """
     {"type":"user","isSidechain":\(sidechain),"cwd":"\(workingDirectory)",\
-    "timestamp":"2026-09-15T16:02:00.000Z","message":{"role":"user","content":"\(text)"}}
+    "timestamp":"\(stamp(at))","message":{"role":"user","content":"\(text)"}}
+    """
+}
+
+/// The line Claude Code writes when the person stops the agent mid-turn: an ordinary user
+/// entry whose text is the marker, carrying the id of the message it cut off. Trimmed from a
+/// real one — the content is a block list and not a bare string, which is the shape the rule
+/// has to see through.
+func interrupted(forToolUse: Bool = false, sidechain: Bool = false, at: Date = fixtureToolResultAt) -> String {
+    let marker = forToolUse ? "[Request interrupted by user for tool use]" : "[Request interrupted by user]"
+    return """
+    {"type":"user","isSidechain":\(sidechain),"cwd":"\(workingDirectory)",\
+    "timestamp":"\(stamp(at))","interruptedMessageId":"msg_1",\
+    "message":{"role":"user","content":[{"type":"text","text":"\(marker)"}]}}
     """
 }
 
 /// A tool result: a user line that continues the turn rather than starting one.
-func toolResult(sidechain: Bool = false) -> String {
+func toolResult(sidechain: Bool = false, at: Date = fixtureToolResultAt) -> String {
     """
     {"type":"user","isSidechain":\(sidechain),"cwd":"\(workingDirectory)",\
-    "timestamp":"2026-09-15T16:02:30.000Z","message":{"role":"user",\
+    "timestamp":"\(stamp(at))","message":{"role":"user",\
     "content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"ok"}]}}
     """
 }
