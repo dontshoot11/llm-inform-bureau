@@ -1,11 +1,16 @@
 import Foundation
 
-/// The one directory this app writes to.
+/// The directory this app keeps its own files in.
 ///
-/// Three things live in it and nothing else does: the payloads the status line command leaves,
-/// the editable copy of the thresholds, and the note that the first-run explanation has been
-/// shown. Neither `~/.claude` nor `~/.codex` is ever written to — the app reads another
-/// program's files and keeps its own state out of them.
+/// Four things live in it and nothing else does: the payloads the status line command leaves,
+/// the command that held the slot before this app took it, the editable copy of the thresholds,
+/// and the note that the first-run explanation has been shown.
+///
+/// `~/.codex` is never written to at all, and `~/.claude` only in one place: the
+/// `statusLine.command` key of `settings.json`, which is the only way the subscription limits
+/// can be seen on this machine. `StatusLineSlot` is what writes it, by the button in the panel
+/// and never without showing the change first. Everything else the app keeps is here, where a
+/// person can look at it and delete it.
 public enum SupportDirectory {
     /// Points the whole directory somewhere else. For the tests and for a run against a
     /// working copy — the escape hatch `LLM_INFORM_BUREAU_THRESHOLDS` is for the config, and

@@ -161,7 +161,8 @@ Nothing in the loader throws: a broken config file degrades to the values below 
 | `ThresholdConfig.swift` | The marks, and the built-in copy of them |
 | `ThresholdConfigLoader.swift` | Reading the config: installed copy, bundled copy, built-in values |
 | `SetupState.swift` | Which sources have written anything on this machine |
-| `SupportDirectory.swift` | The one directory this app writes to |
+| `StatusLineSlotState.swift` | Whose Claude Code's one status line slot is, and what taking it or giving it back would change |
+| `SupportDirectory.swift` | The directory this app keeps its own files in |
 | `Resources/thresholds.json` | The marks themselves — see `Thresholds.md` |
 
 Tests: `Tests/SessionHealthTests`, run with `swift run SessionHealthTests`.

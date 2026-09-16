@@ -39,13 +39,13 @@ public struct ClaudeStatusPayload: Equatable, Sendable {
     }
 }
 
-/// Reads what the statusLine wrapper leaves on disk.
+/// Reads what the status line command leaves on disk.
 ///
 /// Claude Code runs a status line command on every new assistant message and hands it a JSON
 /// payload carrying `rate_limits` and `context_window`. There is no file in `~/.claude` with
-/// the same numbers, so this is the only way to have them locally — and the reason the
-/// wrapper exists at all. `Scripts/install-statusline.sh` connects it while keeping whatever
-/// status line was configured before.
+/// the same numbers, so this is the only way to have them locally — and the reason the app
+/// takes that slot at all. `StatusLineSlot` is what takes it, by the button in the panel and
+/// with whatever command was there kept underneath.
 ///
 /// Usage:
 /// ```swift
@@ -56,17 +56,23 @@ public struct ClaudeStatusPayload: Equatable, Sendable {
 /// }
 /// ```
 public struct ClaudeStatusStore: Sendable {
-    /// Where the wrapper writes. Inside this app's own Application Support directory, so
-    /// nothing here writes into `~/.claude`.
+    /// Where the status line command writes. Inside this app's own Application Support
+    /// directory: the payloads are this app's, and `~/.claude` holds nothing of ours but the
+    /// one line in `settings.json` that points at the command.
     public static var defaultDirectory: URL {
         SupportDirectory.url().appendingPathComponent("claude-status", isDirectory: true)
     }
 
-    /// Said whenever the wrapper has left nothing to read. It names the fix, because at this
-    /// point the app is working correctly and the user is not.
-    static let notConnected = """
-        No Claude data yet — its limits and context window size come from the statusLine \
-        wrapper. Run Scripts/install-statusline.sh to connect it.
+    /// Said when nothing has been reported yet.
+    ///
+    /// It no longer names a fix, because there may not be one to name: whether the slot is
+    /// connected at all is `StatusLineSlot`'s answer and the panel's to act on — it puts a
+    /// button here instead of this sentence. What is left for this to say is the other case,
+    /// where the slot is the app's and the reporting has simply not started.
+    static let nothingReported = """
+        No Claude data yet — its limits and the size of its context window come from its \
+        status line, which reports with the first answer of a session. The limits themselves \
+        are Pro and Max only.
         """
 
     public let directory: URL
@@ -85,7 +91,7 @@ public struct ClaudeStatusStore: Sendable {
     /// subscription windows, so the most recently written payload is simply the most current.
     public func latestLimits() -> LimitsReading {
         let files = newestFiles()
-        guard !files.isEmpty else { return .noData(Self.notConnected) }
+        guard !files.isEmpty else { return .noData(Self.nothingReported) }
 
         var unreadable = false
         for file in files {
@@ -110,7 +116,7 @@ public struct ClaudeStatusStore: Sendable {
     /// first answer has no numbers in it, and a session with no numbers is nothing to show.
     public func sessions(activity: SessionActivity, now: Date = Date()) -> SessionsReading {
         let files = newestFiles()
-        guard !files.isEmpty else { return .noData(Self.notConnected) }
+        guard !files.isEmpty else { return .noData(Self.nothingReported) }
 
         var snapshots: [SessionSnapshot] = []
         var unreadable = false

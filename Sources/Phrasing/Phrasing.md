@@ -54,6 +54,7 @@ one: context is `/context` in Claude Code and `/status` in Codex, limits are `/u
 | `TokenDisplay.swift` | Token counts and percentages, rounded the way the widget says them |
 | `TimeDisplay.swift` | Ages, reset times and window lengths |
 | `StatusLineText.swift` | The one row the app prints when it holds Claude Code's status line and nothing was there before it |
+| `SlotPhrasing.swift` | The button that takes that slot, and what the change to `~/.claude/settings.json` is shown as before it is made |
 
 Tests: `Tests/SessionHealthTests/NotificationTextTests.swift`, `SetupTests.swift` and
 `StatusLineModeTests.swift`.

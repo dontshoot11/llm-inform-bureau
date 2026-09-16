@@ -70,6 +70,19 @@ final class UsageModel: ObservableObject {
     @Published private(set) var sessions: [SessionView] = []
     @Published private(set) var configProblems: [String] = []
 
+    /// Whose Claude Code's status line slot is. What decides whether the panel offers to take
+    /// it, and the only thing that decides whether limits can arrive at all.
+    @Published private(set) var slot: StatusLineSlotState = .free
+
+    /// The edit to `settings.json` that has been shown and not yet answered. Nothing is
+    /// written while this is anything but `nil`, and nothing is written without it having been
+    /// this first.
+    @Published private(set) var pendingChange: StatusLineChange?
+
+    /// Why the last write did not happen, in words the panel can show. Cleared by the next
+    /// attempt — a complaint about a file somebody has since fixed is worse than none.
+    @Published private(set) var slotProblem: String?
+
     /// The marks currently in force, republished on every pass along with everything they were
     /// applied to. The panel reads its own explanation of the colours out of this rather than
     /// spelling the numbers out again, so an edited config cannot leave the panel describing a
@@ -136,6 +149,7 @@ final class UsageModel: ObservableObject {
     @Published private(set) var stalledSessions: Set<String> = []
 
     private let notifier: Notifier
+    private let statusLine: StatusLineSlot
     private var dispatch = AlertDispatch()
     private var watcher: SourceWatcher?
     private var heartbeat: Task<Void, Never>?
@@ -162,8 +176,13 @@ final class UsageModel: ObservableObject {
     private var waitingServices: Set<AgentService> = []
     private var waitingSessions: Set<String> = []
 
-    init(paths: [URL] = SourceWatcher.defaultPaths, notifier: Notifier = Notifier()) {
+    init(
+        paths: [URL] = SourceWatcher.defaultPaths,
+        notifier: Notifier = Notifier(),
+        statusLine: StatusLineSlot = StatusLineSlot()
+    ) {
         self.notifier = notifier
+        self.statusLine = statusLine
 
         heartbeat = Task { [weak self] in
             while !Task.isCancelled {
@@ -247,6 +266,7 @@ final class UsageModel: ObservableObject {
         let load = ThresholdConfigLoader.load()
         let rules = BudgetRules(config: load.config)
         let reading = await Self.read(config: load.config)
+        let slot = await Self.readSlot(statusLine)
 
         var limits: [AgentService: LimitsAssessment] = [:]
         for service in AgentService.allCases {
@@ -263,6 +283,7 @@ final class UsageModel: ObservableObject {
         let worst = Self.worst(of: limits, and: sessions, config: load.config)
 
         self.usage = reading
+        self.slot = slot
         self.limits = limits
         self.sessions = sessions
         self.configProblems = load.problems
@@ -496,6 +517,58 @@ final class UsageModel: ObservableObject {
     /// the panel stutter.
     private nonisolated static func read(config: ThresholdConfig) async -> UsageReading {
         UsageReader().read(config: config)
+    }
+
+    /// Off the main actor for the same reason, and re-read on every pass rather than once at
+    /// launch: the slot is a file somebody can edit while this app is running, and a panel
+    /// offering to connect something that is already connected is the app talking about a
+    /// machine that no longer exists.
+    private nonisolated static func readSlot(_ slot: StatusLineSlot) async -> StatusLineSlotState {
+        slot.state()
+    }
+
+    // MARK: Taking the slot, and giving it back
+
+    /// Works out what the button would change and puts it in front of the user. Writes nothing.
+    ///
+    /// A change that comes back `nil` means the file already looks the way the button would
+    /// leave it — somebody edited it by hand, or another copy of this app got there first — so
+    /// the answer is to re-read rather than to offer anything.
+    func propose(_ kind: StatusLineChange.Kind) {
+        slotProblem = nil
+        pendingChange = statusLine.change(for: kind)
+        if pendingChange == nil {
+            Task { await refresh() }
+        }
+    }
+
+    /// The other answer. Nothing has been written at this point, so there is nothing to undo.
+    func cancelChange() {
+        pendingChange = nil
+    }
+
+    /// Carries out the change that was shown, and says so if it did not happen.
+    func applyChange() {
+        guard let change = pendingChange else { return }
+        pendingChange = nil
+        do {
+            try statusLine.apply(change)
+            slotProblem = nil
+        } catch let failure as ClaudeSettings.Failure {
+            slotProblem = Self.explain(failure)
+        } catch {
+            slotProblem = SlotPhrasing.failed(error.localizedDescription)
+        }
+        // Whether it worked or not, what the panel shows next comes from the file rather than
+        // from what this method believes it did.
+        Task { await refresh() }
+    }
+
+    private static func explain(_ failure: ClaudeSettings.Failure) -> String {
+        switch failure {
+        case .unreadable(let path): SlotPhrasing.unreadable(path)
+        case .notWritten(let reason): SlotPhrasing.failed(reason)
+        }
     }
 }
 

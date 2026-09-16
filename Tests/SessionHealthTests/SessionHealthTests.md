@@ -41,6 +41,7 @@ the cases are plain functions and would port to swift-testing mechanically.
 | `CodexRolloutTests` | Reading limits and sessions out of rollout fixtures, including the shapes that mean "no data" and "source changed" |
 | `SetupTests` | Which sources read as connected, what the first run says about the ones that do not, and showing that explanation once |
 | `StatuslineInstallerTests` | What `Scripts/install-statusline.sh` does to the user's `settings.json`: the slot filled and emptied, a command that was already there surviving both, and every branch that must not write |
+| `StatusLineSlotTests` | The same file edited from Swift: the key set and removed, every other byte of a hand-used `settings.json` where it was, a command already in the slot saved and put back, and the two branches that refuse to write |
 | `OfflineTests` | That no source file reaches for a network API — the reason the app works with the network off |
 
 ## Writing a case
@@ -81,11 +82,17 @@ not fail them, and an event that never arrives still does.
 
 **A shell script is tested by running it.** `StatuslineInstallerTests` starts the real
 `Scripts/install-statusline.sh` against a throwaway `HOME` rather than re-implementing its
-branching in Swift. It is the only file this project writes that belongs to somebody else, and
-the failure worth catching is not a crash but a silent removal — the wrapper's `--uninstall`
-used to take the user's own statusLine command away on a second run. A second test runner just
-for shell was not worth having: this suite already is the one runner, and `Process` starts a
-script as well as anything else would.
+branching in Swift. A second test runner just for shell was not worth having: this suite
+already is the one runner, and `Process` starts a script as well as anything else would. The
+script is on its way out — `StatusLineSlotTests` covers the Swift that replaces it — and both
+sets of cases exist while both do.
+
+**The file that belongs to somebody else is checked byte for byte.** `settings.json` is the one
+file this project writes that is not its own, and the failure worth catching there is not a
+crash but a silent change: a key reordered, a slash escaped, a setting dropped, a command
+removed that nobody can get back. So `StatusLineSlotTests` compares the whole file against the
+text it should be, rather than parsing it and checking the one key — parsing is exactly what
+would not notice the other four.
 
 **A fixture's modification date is part of it.** What the widget shows depends on when a file
 was last written, so the fixtures set it explicitly instead of relying on the order they were

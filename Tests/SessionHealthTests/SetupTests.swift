@@ -90,19 +90,19 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
         }
     }
 
-    // The one source that needs a person, and the only sentence in the app that asks for
-    // something to be run. If it stops naming the script, the first run stops being useful.
-    suite.test("the missing Claude limits name the command that connects them") {
+    // The one source that needs a person, and the only sentence in the app that sends them
+    // somewhere. If it stops naming the button, the first run stops being useful.
+    suite.test("the missing Claude limits name what connects them") {
         let limits = Briefing.items(for: nothing).first { $0.source == .claudeLimits }
         suite.expect(limits?.isConnected == false, "must read as not connected")
-        suite.expect(limits?.detail.contains(Briefing.statusLineCommand) == true, "detail: \(limits?.detail ?? "—")")
+        suite.expect(limits?.detail.contains(Briefing.connectAction) == true, "detail: \(limits?.detail ?? "—")")
     }
 
-    suite.test("the sources that connect themselves never ask for anything to be run") {
+    suite.test("the sources that connect themselves never send anybody anywhere") {
         for item in Briefing.items(for: nothing) where item.source != .claudeLimits {
             suite.expect(
-                !item.detail.contains(Briefing.statusLineCommand),
-                "\(item.title) asks for a command it does not need: \(item.detail)"
+                !item.detail.contains(Briefing.connectAction),
+                "\(item.title) offers a button it does not need: \(item.detail)"
             )
         }
     }
@@ -111,8 +111,8 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
         for item in Briefing.items(for: everything) {
             suite.expect(item.isConnected, "\(item.title) reads as missing on a complete machine")
             suite.expect(
-                !item.detail.contains(Briefing.statusLineCommand),
-                "\(item.title) still asks for the installer: \(item.detail)"
+                !item.detail.contains(Briefing.connectAction),
+                "\(item.title) still says how to connect itself: \(item.detail)"
             )
         }
     }

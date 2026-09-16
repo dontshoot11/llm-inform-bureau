@@ -177,8 +177,9 @@ The panel carries, in order, its two halves named after the two dots in the bar:
 3. **Why the bar is that colour** — the one reading that set it, named.
 4. **"Default thresholds applied"**, with what was wrong, when the config file could not be
    used as written.
-5. **Two icons**: the way back to the first-run explanation, and the way out. Terminating asks
-   once — the panel is opened to read something, and the icon sits where a thumb lands.
+5. **The icons**: disconnecting the status line slot, while it is the app's; the way back to
+   the first-run explanation; and the way out. Terminating asks once — the panel is opened to
+   read something, and the icon sits where a thumb lands.
 
 Under every reading stands the command that shows the rest of it — `/usage` under a service's
 limits, `/context` or `/status` under a session. It is the same command its notification ends
@@ -244,13 +245,34 @@ The state found at launch is recorded rather than announced. The app starts at l
 whatever the day has already spent; a handful of notifications about the past every morning is
 how a user learns to dismiss the one that matters.
 
+## Connecting the limits, from the panel
+
+Two of the three sources connect themselves the first time their CLI answers. The third —
+Claude's subscription limits — exists only in what Claude Code hands its status line command,
+so somebody has to put this app in that slot.
+
+**The button for it stands where the limits would be.** The place a person looks for a figure
+is the place that should say how to get one, so while the slot is not the app's, the Claude
+limits entry holds a button and not a sentence about missing data. It goes as soon as the slot
+is taken: what stands there afterwards is the reading itself, or — until the first answer of a
+session arrives — the one sentence saying nothing has reported yet.
+
+**Pressing it shows the change and writes nothing.** `UsageModel.propose` asks `StatusLineSlot`
+what the edit to `~/.claude/settings.json` would be and publishes it; the panel shows the file,
+the line going into it, and what happens to any status line command already there; and only
+"Write it" applies it. Cancelling, or simply closing the panel, leaves the file alone. This is
+the only thing in the panel that does something rather than reports something, and it is the
+reason that whole entry steps aside while the question is on screen.
+
+**Disconnecting is not there.** It is an icon in the panel's settings row, beside the `?` and
+the power button, shown only while the slot is the app's. It acts on the app rather than on a
+reading, and a control that takes a number away does not belong under that number.
+
 ## The first run, and the one window
 
-Two of the three sources connect themselves the first time their CLI answers, and one — the
-statusLine wrapper — has to be installed by hand. A first launch with no explanation is
-therefore a menu bar item showing an em dash next to "Claude" and no way to find out why. So
-the app opens one window, once, listing every source with whether it has reported and what to
-run for the one that has not. `SetupInspector` finds the facts, `Briefing` in `Phrasing` says
+A first launch with no explanation is a menu bar item showing an em dash next to "Claude" and
+no way to find out why. So the app opens one window, once, listing every source with whether it
+has reported and, for the one that has not, where the button is. `SetupInspector` finds the facts, `Briefing` in `Phrasing` says
 them, and `WelcomeRecord` is the note in Application Support that keeps it to once. Deleting
 that note brings the window back, and so does the button in the panel.
 
@@ -279,8 +301,8 @@ the app is installed to `/Applications` before the box is ticked — which is th
 | --- | --- |
 | `Entry.swift` | Where the process starts: the menu bar app, or Claude Code's status line command |
 | `LLMInformBureauApp.swift` | The `MenuBarExtra` scene |
-| `UsageModel.swift` | What is on screen, and what keeps it current: file events, the heartbeat, and the alerts that come out of a refresh |
-| `MenuContent.swift` | The panel, and the one light a section shows |
+| `UsageModel.swift` | What is on screen, and what keeps it current: file events, the heartbeat, the alerts that come out of a refresh, and the change to `settings.json` waiting for a yes or a no |
+| `MenuContent.swift` | The panel, the one light a section shows, and the button that takes Claude Code's status line slot |
 | `Notifier.swift` | Putting a notification on screen, silently, over whichever channel works |
 | `WelcomeWindow.swift` | The first-run explanation, and the only window this app has |
 | `LoginItem.swift` | Starting with the Mac, and the checkbox both views share |

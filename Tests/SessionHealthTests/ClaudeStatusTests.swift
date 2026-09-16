@@ -55,15 +55,23 @@ func runClaudeStatusTests(_ suite: TestSuite, config: ThresholdConfig) {
             suite.expectClose(snapshot.window(.short)?.usedPercent, 61, "five-hour window")
         }
 
-        suite.test("no wrapper directory means the wrapper is not connected, not zero percent") {
+        // The sentence says nothing has reported yet and nothing more. Whether the slot is
+        // connected at all is `StatusLineSlot`'s answer, and the panel puts a button here
+        // instead of this sentence when it is not — so naming a fix from down here would be
+        // this app telling somebody to do something it has no idea is needed.
+        suite.test("no payload directory means nothing has reported, not zero percent") {
             let absent = root.appendingPathComponent("never-installed", isDirectory: true)
             guard case .noData(let explanation) = ClaudeStatusStore(directory: absent).latestLimits() else {
                 suite.expect(false, "expected no data")
                 return
             }
             suite.expect(
-                explanation.lowercased().contains("statusline"),
-                "the sentence has to name what is missing: \(explanation)"
+                explanation.lowercased().contains("status line"),
+                "the sentence has to name where the numbers come from: \(explanation)"
+            )
+            suite.expect(
+                !explanation.contains("Scripts/"),
+                "and must not send anybody to a script: \(explanation)"
             )
         }
 

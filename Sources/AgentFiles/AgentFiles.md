@@ -4,9 +4,13 @@ Everything this app knows about where Claude Code and Codex leave their traces o
 nothing about what those traces mean. The rules live in `SessionHealthCore`; this module's
 only job is to turn files into the value types those rules take.
 
-It also writes one file, and only one. Claude hands its subscription limits to a status line
-command and to nothing else, so the app has to *be* that command to see them — and what it is
-handed has to be put somewhere the panel can read it. That is `StatusLineMode`, below.
+It also writes, and it is the only module that does. Claude hands its subscription limits to a
+status line command and to nothing else, so the app has to *be* that command to see them — and
+what it is handed has to be put somewhere the panel can read it. That is `StatusLineMode`.
+Getting into that slot in the first place means editing a file that belongs to somebody else,
+`~/.claude/settings.json`, and that is `StatusLineSlot`. Both are below; the second is the only
+place in this project where another program's configuration is written to, and everything about
+it is built around that.
 
 ## Why the two halves are separate
 
@@ -319,13 +323,48 @@ Three rules hold it together, and each one is somebody else's problem if it brea
 The line the app prints for itself is `StatusLineText`, in `Phrasing` — this module decides
 what happened, that one decides what English it is said in.
 
+## Taking the slot, and giving it back
+
+`StatusLineSlot` is the other half: what puts the command above into
+`~/.claude/settings.json` and what takes it out again. It is the one file this project writes
+that belongs to somebody else, and three things follow from that.
+
+**Nothing is written without being shown first.** `change(for:)` returns a `StatusLineChange` —
+the file, the line going in, the command being displaced — and writes nothing. The panel puts
+that in front of the person, and only `apply` writes. There is no path here that edits the file
+and reports afterwards.
+
+**The file is edited as text, not re-serialised.** Reading it back out through
+`JSONSerialization` changes three things nobody asked to change — it loses the order of the
+keys, escapes every slash in every path, and puts a space before every colon. Measured on the
+real file on this machine: a one-key edit came back as a diff across two hundred lines. So
+`JSONText` scans for where the value of the key sits and replaces those bytes; everything
+around them is copied across untouched, including anything else inside `statusLine` such as
+`padding`. A file that does not parse is refused outright — replacing somebody's configuration
+with a guess about what they meant is worse than saying so and stopping — and a copy is kept
+beside the file before every write, the way the shell installer this replaces did it.
+
+**The slot is one and it was theirs first.** A command found in it is saved to
+`previous-statusline`, which is the same file `StatusLineMode` reads to know whom to pass the
+payload on to; disconnecting puts it back and forgets it. Disconnecting a slot that is *not*
+the app's does nothing at all: without that guard, an empty saved file would read as "put
+nothing back" and take somebody's own status line away.
+
+The command written into the slot ends in `|| true`. It names a binary inside the app bundle,
+and the day that bundle goes to the trash without being disconnected first, the alternative is
+an error at the bottom of every turn instead of an empty status line.
+
+The state and the change are `SessionHealthCore`'s types (`StatusLineSlotState`,
+`StatusLineChange`) and the English is `Phrasing`'s (`SlotPhrasing`), for the reason everything
+else here is split that way.
+
 ## Before there is anything to read
 
 `SetupInspector` answers the one question that comes before every reading: has each source
 written anything at all. It is not a fourth reader — it opens nothing and parses nothing, it
 only looks for one file of each kind. The difference it draws is the one a person needs on the
 first day: a source that has never written is either waiting for the CLI to be used, or waiting
-for the wrapper to be installed, and those call for different reactions. What that turns into
+for the slot to be connected, and those call for different reactions. What that turns into
 on screen is the first-run window; the words are `Briefing`'s, in `Phrasing`.
 
 `WelcomeRecord` sits next to it for the same reason — it is the other question about the
@@ -338,7 +377,7 @@ let reading = UsageReader().read(config: load.config)
 
 switch reading.claudeLimits {
 case .value(let snapshot):     show(snapshot)           // snapshot.observedAt is its age
-case .noData(let explanation): show(explanation)        // e.g. the wrapper is not connected
+case .noData(let explanation): show(explanation)        // e.g. nothing has reported yet
 case .unavailable(let reason): show(reason)
 }
 
@@ -358,14 +397,16 @@ run against fixtures instead of against whatever the machine happens to have.
 | `ClaudeTranscripts.swift` | Claude sessions and the subagents running inside them, out of the transcripts — including whether one is waiting on its agent |
 | `ClaudeStatus.swift` | Claude limits and window sizes, out of the payloads the status line command leaves |
 | `StatusLineMode.swift` | The app run as that command: the payload saved, and the command that held the slot before called |
+| `StatusLineSlot.swift` | Getting into Claude Code's one status line slot and back out of it, keeping whatever was there |
+| `ClaudeSettings.swift` | `~/.claude/settings.json`: what it says about the slot, and the only writes this app makes to it |
+| `JSONText.swift` | Setting one key of a JSON file without rewriting the rest of it |
 | `SessionFiles.swift` | Finding the files a service has most recently written, and telling a session's transcript from a subagent's |
 | `FileTail.swift` | Reading the ends of a large file without loading it |
 | `Timestamps.swift` | The one way a written moment is read, shared by both readers |
 | `SourceWatcher.swift` | Noticing that one of the trees changed, which is how a finished turn is noticed |
 | `Setup.swift` | Which sources have written anything at all, and whether the first run has been explained |
 
-Which command sits in Claude Code's slot, and how it gets there, is `Scripts/Scripts.md` for
-now — `Scripts/install-statusline.sh` still puts the shell wrapper there, and the app replaces
-it from its own panel in a later phase.
+`Scripts/install-statusline.sh` still exists and still works on a machine set up with it; it is
+removed, along with the shell wrapper, in a later phase. Nothing in this module needs it.
 
 Tests: `Tests/SessionHealthTests/`, run with `swift run SessionHealthTests`.

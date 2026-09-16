@@ -75,11 +75,14 @@ struct MenuContent: View {
 
     // MARK: Settings
 
-    /// One quiet row of two icons: the way back to the explanation, and the way out.
+    /// One quiet row of icons: the way out of the status line slot, the way back to the
+    /// explanation, and the way out of the app.
     ///
-    /// The setting itself lives in the window behind the first icon, where it was already
+    /// The setting itself lives in the window behind the question mark, where it was already
     /// being offered during setup — a panel of readings is not where a checkbox belongs, and
-    /// one copy of a control cannot disagree with another.
+    /// one copy of a control cannot disagree with another. Disconnecting is here for the same
+    /// reason: it acts on the app rather than on a reading, and putting it under the limits
+    /// would leave the place a person reads a number carrying a way to take that number away.
     private var settings: some View {
         HStack(spacing: 8) {
             if confirmingTerminate {
@@ -96,6 +99,18 @@ struct MenuContent: View {
                     .keyboardShortcut(.cancelAction)
             }
             Spacer()
+            // Shown only while there is something to disconnect. An icon that is always there
+            // and does nothing four times out of five is a control a person learns to ignore.
+            if model.slot.isOurs {
+                Button {
+                    model.propose(.disconnect)
+                } label: {
+                    Image(systemName: "bolt.slash")
+                }
+                .buttonStyle(.borderless)
+                .help(SlotPhrasing.disconnectHelp)
+            }
+
             Button {
                 Welcome.show()
             } label: {
@@ -113,8 +128,12 @@ struct MenuContent: View {
             .help("Terminate the widget")
         }
         // A question left hanging expires when the panel closes: reopening it should not find
-        // a half-pressed decision from an hour ago.
-        .onDisappear { confirmingTerminate = false }
+        // a half-pressed decision from an hour ago. The same goes for a settings.json change
+        // that was offered and neither taken nor refused.
+        .onDisappear {
+            confirmingTerminate = false
+            model.cancelChange()
+        }
     }
 
     // MARK: The two halves
@@ -135,6 +154,12 @@ struct MenuContent: View {
         ) {
             if model.usage?.isInstalled(service) == false {
                 explanation(Wording.notInstalled)
+            } else if service == .claude, let change = model.pendingChange {
+                // Everything else about this reading steps aside while a change to somebody's
+                // settings.json is on the table: it is the one thing in this panel that does
+                // something rather than reports something, and it is read before it is agreed
+                // to or not at all.
+                changePreview(change)
             } else if let snapshot = reading.value {
                 ForEach(snapshot.windows, id: \.kind) { window in
                     row(
@@ -145,8 +170,77 @@ struct MenuContent: View {
                 }
                 explanation("Reported \(TimeDisplay.age(of: snapshot.observedAt))")
                 hint(Wording.limitsCommand(service))
+                if service == .claude { slotOffer }
+            } else if service == .claude, model.usage != nil {
+                // No numbers and none coming: the button is the whole of what this place says.
+                // A sentence explaining the absence would be the third thing in a row that
+                // says "nothing here" and the only one of them that cannot be acted on.
+                //
+                // Not before the first reading has landed, though: at that point nothing has
+                // looked at the slot yet, and a button offering to connect something that is
+                // already connected would flash up on every launch.
+                slotOffer
             } else {
                 explanation(reading.explanation ?? "")
+            }
+        }
+    }
+
+    /// What the Claude limits entry offers about the one thing on this Mac that has to be
+    /// connected by hand.
+    ///
+    /// It stands where the numbers would be, and that is the point: the place a person looks
+    /// for a figure is the place that should tell them how to get one. While the slot is the
+    /// app's there is nothing to offer here — the way back out is a control among the panel's
+    /// other controls, not an action sitting under a reading.
+    @ViewBuilder
+    private var slotOffer: some View {
+        switch model.slot {
+        case .free, .somebodyElse:
+            Button(SlotPhrasing.connect) { model.propose(.connect) }
+                .help(SlotPhrasing.connectHelp)
+        case .unreadable(let path):
+            explanation(SlotPhrasing.unreadable(path))
+        case .ours:
+            // Nothing reported yet. `ClaudeStatusStore` has the sentence for that, and it is
+            // already above.
+            EmptyView()
+        }
+        if model.slot.isOurs, model.usage?.limits(of: .claude).value == nil {
+            explanation(model.usage?.limits(of: .claude).explanation ?? "")
+        }
+        if let problem = model.slotProblem {
+            explanation(problem)
+        }
+    }
+
+    /// The edit to `settings.json`, before it is made: the file, the line going into it, and
+    /// what happens to what is already there. Then the two answers.
+    ///
+    /// Both buttons are on screen for the same reason the quit confirmation has two: a
+    /// question with one button leaves saying no to guesswork about where to click.
+    private func changePreview(_ change: StatusLineChange) -> some View {
+        let preview = SlotPhrasing.preview(change)
+
+        return VStack(alignment: .leading, spacing: 6) {
+            explanation(preview.title)
+            Text(preview.path)
+                .font(.caption.monospaced())
+                .fixedSize(horizontal: false, vertical: true)
+            if let command = preview.command {
+                Text(command)
+                    .font(.caption.monospaced())
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            ForEach(preview.notes, id: \.self) { note in
+                explanation(note)
+            }
+            HStack {
+                Button(SlotPhrasing.apply) { model.applyChange() }
+                    .keyboardShortcut(.defaultAction)
+                Button(SlotPhrasing.cancel) { model.cancelChange() }
+                    .keyboardShortcut(.cancelAction)
             }
         }
     }

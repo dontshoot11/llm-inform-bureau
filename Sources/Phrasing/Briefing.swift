@@ -6,7 +6,7 @@ public struct BriefingItem: Equatable, Sendable {
     public let source: SetupState.Source
     /// What this source gives, not what file it is.
     public let title: String
-    /// Where it comes from, and — when it is not connected — what to run.
+    /// Where it comes from, and — when it is not connected — how to connect it.
     public let detail: String
     public let isConnected: Bool
 
@@ -98,8 +98,8 @@ public struct Reading: Equatable, Sendable {
 ///
 /// Two of its three sources connect themselves and one does not, and a person cannot tell
 /// which is which from a panel of em dashes. So the first launch says where every number comes
-/// from and names the one command that has to be run — and says it again in the panel for as
-/// long as something is still missing.
+/// from and names the one thing that has to be connected by hand — and says it again in the
+/// panel, where the button to do it stands, for as long as it is missing.
 ///
 /// The claim about the network is in the first sentence on purpose: an app that reads the
 /// transcripts of two coding agents should say what it does with them before it is asked.
@@ -107,8 +107,10 @@ public enum Briefing {
     public static let title = "Where the numbers come from"
 
     public static let intro = """
-        Everything is read from files this Mac already has. The app makes no network calls, \
-        holds no credentials, and writes nothing outside its own folder in Application Support.
+        Everything is read from files this Mac already has. The app makes no network calls and \
+        holds no credentials. It keeps its own files in Application Support, and the one thing \
+        it writes anywhere else is a single key in ~/.claude/settings.json — only if you \
+        connect the limits, and never without showing the change first.
         """
 
     /// Said at the end, because the alternative — a zero — is what every other widget shows
@@ -118,9 +120,11 @@ public enum Briefing {
         it as zero.
         """
 
-    /// The one command a person has to run, named in one place so the window, the panel and
-    /// the README cannot drift apart.
-    public static let statusLineCommand = "Scripts/install-statusline.sh"
+    /// How the one source that has to be connected is connected, named in one place so the
+    /// window, the panel and the README cannot drift apart. The button itself is
+    /// `SlotPhrasing.connect`, so the sentence and the thing it tells you to press cannot come
+    /// to disagree.
+    public static let connectAction = "the \"\(SlotPhrasing.connect)\" button in the panel"
 
     public static let marksTitle = "The marks it watches"
 
@@ -251,7 +255,7 @@ public enum Briefing {
     private static func connectedDetail(of source: SetupState.Source) -> String {
         switch source {
         case .claudeLimits:
-            "Connected. The statusLine wrapper is reporting for every Claude session."
+            "Connected. The app holds Claude Code's status line slot and reports for every session."
         case .claudeSessions:
             "Read from ~/.claude/projects, which Claude Code writes as it answers."
         case .codex:
@@ -264,8 +268,9 @@ public enum Briefing {
         case .claudeLimits:
             """
             Claude hands these to its status line and to nothing else — no file under \
-            ~/.claude carries them. Run \(statusLineCommand) to connect the wrapper: it shows \
-            what it will change before changing it, and keeps any status line you already have.
+            ~/.claude carries them. Press \(connectAction) to connect: it shows what it will \
+            change in ~/.claude/settings.json before changing it, and keeps any status line \
+            you already have.
             """
         case .claudeSessions:
             """
