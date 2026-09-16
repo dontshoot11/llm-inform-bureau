@@ -186,7 +186,7 @@ that tells you how to get one. Pressing it shows the exact line it would write i
 `~/.claude/settings.json` and changes nothing until you say yes; a timestamped copy of that
 file is kept beside it first.
 
-The app then *is* the status line command, and it is a wrapper rather than a replacement.
+The app then *is* the status line command, and it wraps what was there rather than replacing it.
 Whatever command was configured before is saved, called with the same payload, and its output
 printed unchanged:
 

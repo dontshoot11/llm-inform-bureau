@@ -27,8 +27,8 @@ struct SessionView: Identifiable, Equatable {
 /// different things and mean three different things. `unknown` never collapses into green:
 /// nothing reported is not the same as nothing wrong.
 enum Light: Equatable {
-    /// Nothing has been reported. Claude's limits until the wrapper is connected; a service's
-    /// context while nothing of its is running.
+    /// Nothing has been reported. Claude's limits until the status line slot is connected;
+    /// a service's context while nothing of its is running.
     case unknown
     /// A reading, at the level the rules put it.
     case level(BudgetLevel)
@@ -172,8 +172,8 @@ final class UsageModel: ObservableObject {
     /// shows and the same one the agent's own status line shows.
     ///
     /// Deliberately the reading and not the file: a file can be rewritten with what was already
-    /// in it — the wrapper does exactly that when a turn ends without the count moving — and a
-    /// light that flashed for that would be announcing nothing.
+    /// in it — the status line does exactly that when a turn ends without the count moving —
+    /// and a light that flashed for that would be announcing nothing.
     private var lastHeld: [AgentService: [String: SessionNumbers]] = [:]
     private var pulsing: Task<Void, Never>?
 

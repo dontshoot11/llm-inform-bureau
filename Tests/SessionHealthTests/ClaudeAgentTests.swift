@@ -298,7 +298,7 @@ func runClaudeAgentTests(_ suite: TestSuite, config: ThresholdConfig) {
         }
     }
 
-    // MARK: The window, once the wrapper has said how big the session's is
+    // MARK: The window, once the status line has said how big the session's is
 
     let session = SessionSnapshot(
         sessionID: "s1",

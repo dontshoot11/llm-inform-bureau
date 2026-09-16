@@ -12,7 +12,7 @@ public struct SetupState: Equatable, Sendable {
     /// The sources, named by what they give rather than by the file they come from.
     public enum Source: String, CaseIterable, Sendable {
         /// Claude's subscription limits and the size of its context window, from the
-        /// statusLine wrapper. The one source a person has to connect.
+        /// status line. The one source a person has to connect.
         case claudeLimits
         /// Claude's context budget, from the transcripts.
         case claudeSessions

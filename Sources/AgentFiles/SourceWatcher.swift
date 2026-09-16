@@ -4,7 +4,7 @@ import Foundation
 /// Watches the directory trees the readers read, and says when something in them changed.
 ///
 /// This is what makes a finished turn show up at once. Both CLIs append to a file as the turn
-/// ends — the transcript, the rollout, the file the statusLine wrapper writes — so the end of
+/// ends — the transcript, the rollout, the file the status line writes — so the end of
 /// a turn is a file system event, and the widget does not have to poll for it. Polling was the
 /// previous arrangement and it had the two faults polling always has: a notification that
 /// arrives late enough to be about the past, and a machine re-reading files that nobody
@@ -25,7 +25,7 @@ import Foundation
 /// ```
 public final class SourceWatcher: @unchecked Sendable {
     /// The three trees the readers read: Claude's transcripts, Codex's rollouts, and what the
-    /// statusLine wrapper leaves for this app.
+    /// status line leaves for this app.
     public static var defaultPaths: [URL] {
         [
             ClaudeTranscriptStore.defaultProjectsDirectory,

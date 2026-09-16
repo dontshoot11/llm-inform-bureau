@@ -4,8 +4,8 @@ import SessionHealthCore
 /// Everything the widget shows, read once.
 ///
 /// Each half is its own reading, so one source going quiet says so in its own words instead of
-/// blanking the other: a machine with no Codex still shows Claude, and a Claude without the
-/// statusLine wrapper still shows its sessions from the transcripts.
+/// blanking the other: a machine with no Codex still shows Claude, and a Claude whose status
+/// line slot is not connected still shows its sessions from the transcripts.
 public struct UsageReading: Equatable, Sendable {
     public let claudeLimits: LimitsReading
     public let codexLimits: LimitsReading
@@ -40,8 +40,8 @@ public struct UsageReading: Equatable, Sendable {
 /// Reads both services and hands back one picture of them.
 ///
 /// The one thing that happens here and nowhere else is the join between the two Claude
-/// sources. A transcript is always there and knows the tokens held; the statusLine wrapper is
-/// there only once it is installed and knows the size of the window. Neither is complete, so a
+/// sources. A transcript is always there and knows the tokens held; the status line is there
+/// only once the slot is connected and knows the size of the window. Neither is complete, so a
 /// Claude session is read from the transcript and then told how big its window is, when
 /// something knows.
 ///
@@ -91,8 +91,8 @@ public struct UsageReader: Sendable {
 
     /// Fills in what a transcript cannot say.
     ///
-    /// Only the window size is taken from the wrapper. The tokens held come from the
-    /// transcript either way, so a session whose wrapper payload is a few seconds behind still
+    /// Only the window size is taken from the status line. The tokens held come from the
+    /// transcript either way, so a session whose payload is a few seconds behind still
     /// reads correctly — and a session with no payload at all loses nothing but the percentage.
     ///
     /// A subagent has no payload of its own and never will: nothing it writes names the size

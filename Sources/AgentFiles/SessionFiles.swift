@@ -13,7 +13,7 @@ enum SessionFiles {
     /// The most recently written matching files under `directory`, newest first.
     ///
     /// Returns an empty list for a directory that does not exist: a machine without Codex, or
-    /// a wrapper that has never been installed, is a fact about the machine and not an error.
+    /// a status line slot never connected, is a fact about the machine and not an error.
     static func newest(
         in directory: URL,
         limit: Int,

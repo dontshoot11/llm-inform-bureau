@@ -7,8 +7,8 @@ import SessionHealthCore
 /// line carries the `usage` of the response that produced it. The tokens held in the context
 /// are the input side of that: `input_tokens + cache_creation_input_tokens +
 /// cache_read_input_tokens`, the same sum the status line's `used_percentage` is calculated
-/// from. This works with nothing installed, which is why it is the base reading and the
-/// statusLine wrapper is the layer that adds what a transcript cannot know.
+/// from. This works with nothing connected, which is why it is the base reading and the
+/// status line is the layer that adds what a transcript cannot know.
 ///
 /// What a transcript does not carry is the size of the context window. That stays `nil` here
 /// rather than being guessed from the model name: the interface shows absolute tokens and no

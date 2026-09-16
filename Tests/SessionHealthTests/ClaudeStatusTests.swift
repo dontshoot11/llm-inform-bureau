@@ -2,10 +2,10 @@ import Foundation
 import AgentFiles
 import SessionHealthCore
 
-/// Reading what the statusLine wrapper leaves on disk.
+/// Reading what the status line leaves on disk.
 ///
 /// The fixtures are trimmed copies of the documented statusLine payload — the same field
-/// names and nesting Claude Code puts on the wrapper's stdin, including the parts that are
+/// names and nesting Claude Code puts on the status line's stdin, including the parts that are
 /// documented as sometimes absent (`rate_limits` before the first answer, `context_window`
 /// values that are null early in a session).
 func runClaudeStatusTests(_ suite: TestSuite, config: ThresholdConfig) {
@@ -21,7 +21,7 @@ func runClaudeStatusTests(_ suite: TestSuite, config: ThresholdConfig) {
             )
 
             guard case .value(let snapshot) = ClaudeStatusStore(directory: directory).latestLimits() else {
-                suite.expect(false, "expected limits from the wrapper payload")
+                suite.expect(false, "expected limits from the status line payload")
                 return
             }
             suite.expectEqual(snapshot.service, .claude, "service")
@@ -32,7 +32,7 @@ func runClaudeStatusTests(_ suite: TestSuite, config: ThresholdConfig) {
             suite.expectClose(
                 snapshot.observedAt.timeIntervalSince1970,
                 now.addingTimeInterval(-120).timeIntervalSince1970,
-                "the age of the reading is when the wrapper last ran",
+                "the age of the reading is when the status line last ran",
                 tolerance: 1.5
             )
         }
@@ -193,9 +193,9 @@ private func writeStatus(
 
 /// The join between the two Claude sources.
 ///
-/// A transcript always knows the tokens held and never the size of the window; the wrapper
-/// knows the size and is only there once it is installed. Neither is complete on its own, and
-/// what the widget shows for a Claude session depends on which of them answered.
+/// A transcript always knows the tokens held and never the size of the window; the status
+/// line knows the size and is only there once the slot is connected. Neither is complete on
+/// its own, and what the widget shows for a Claude session depends on which of them answered.
 func runClaudeSourceJoinTests(_ suite: TestSuite, config: ThresholdConfig) {
     let transcriptSession = SessionSnapshot(
         sessionID: "s1",
@@ -205,10 +205,10 @@ func runClaudeSourceJoinTests(_ suite: TestSuite, config: ThresholdConfig) {
         project: "llm-inform-bureau"
     )
 
-    // Without the wrapper there is no window size, and every mark is a share of the window —
+    // Without the status line there is no window size, and every mark is a share of the window —
     // so there is nothing to place. The session is still listed with its tokens; what it must
     // not do is come out looking judged.
-    suite.test("without the wrapper a Claude session is tokens alone, with nothing to place on the scale") {
+    suite.test("without the status line a Claude session is tokens alone, nothing to place on the scale") {
         let joined = UsageReader.withWindowSizes(.value([transcriptSession]), from: [])
         guard let session = joined.value?.first else {
             suite.expect(false, "expected the session through unchanged")
@@ -223,7 +223,7 @@ func runClaudeSourceJoinTests(_ suite: TestSuite, config: ThresholdConfig) {
         suite.expect(assessment.levelSource == nil, "and nothing claims to have set a level")
     }
 
-    suite.test("with the wrapper the same session is measured against its real window") {
+    suite.test("with the status line the same session is measured against its real window") {
         let payload = ClaudeStatusPayload(
             sessionID: "s1",
             project: "llm-inform-bureau",
@@ -237,7 +237,7 @@ func runClaudeSourceJoinTests(_ suite: TestSuite, config: ThresholdConfig) {
             suite.expect(false, "expected the session")
             return
         }
-        suite.expectEqual(session.contextWindowTokens, 1_000_000, "window size from the wrapper")
+        suite.expectEqual(session.contextWindowTokens, 1_000_000, "window size from the status line")
         suite.expectClose(session.windowFillPercent, 16, "window fill")
         suite.expectEqual(session.contextTokens, 160_000, "the tokens still come from the transcript")
     }

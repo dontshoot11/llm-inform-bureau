@@ -1,7 +1,7 @@
 import Foundation
 import SessionHealthCore
 
-/// One statusLine payload, as the wrapper last saw it for a session.
+/// One statusLine payload, as the status line last saw it for a session.
 ///
 /// The statusLine contract is the only local source of Claude's subscription limits, and the
 /// only one that knows the size of the context window — a transcript carries neither.
@@ -19,7 +19,7 @@ public struct ClaudeStatusPayload: Equatable, Sendable {
     /// first answer of a session.
     public let limits: LimitsSnapshot?
 
-    /// When the wrapper last ran for this session, which is the age of everything above.
+    /// When the status line last ran for this session, which is the age of everything above.
     public let writtenAt: Date
 
     public init(
@@ -117,7 +117,7 @@ public struct ClaudeStatusStore: Sendable {
             """)
     }
 
-    /// The sessions the wrapper has seen that are still being worked on.
+    /// The sessions the status line has seen that are still being worked on.
     ///
     /// Only sessions whose context the payload actually carried: a payload written before the
     /// first answer has no numbers in it, and a session with no numbers is nothing to show.

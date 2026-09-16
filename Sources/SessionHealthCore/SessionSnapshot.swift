@@ -62,7 +62,7 @@ public enum ReplyWait: String, Equatable, Sendable {
 /// One reading of a coding-agent session, as it was found on disk.
 ///
 /// Everything the budget rules need and nothing else. Where the numbers come from
-/// (Claude transcripts and the statusLine wrapper, Codex rollouts) is the data layer's
+/// (Claude transcripts and the status line, Codex rollouts) is the data layer's
 /// business, not this type's.
 public struct SessionSnapshot: Equatable, Sendable {
     /// Identifies the session for as long as it lives. A `/clear` starts a new session file
@@ -92,7 +92,7 @@ public struct SessionSnapshot: Equatable, Sendable {
     public let contextTokens: Int
 
     /// Size of the context window, or `nil` when it is unknown.
-    /// Codex rollouts carry it; a Claude transcript does not, only the statusLine wrapper does.
+    /// Codex rollouts carry it; a Claude transcript does not, only the status line does.
     public let contextWindowTokens: Int?
 
     /// How much the context grew over the last completed turn, or `nil` when this is the
@@ -143,7 +143,7 @@ public struct SessionSnapshot: Equatable, Sendable {
     /// The same reading, told how big its window is.
     ///
     /// The one thing a Claude transcript never carries, and the one thing that arrives from
-    /// somewhere else: the statusLine wrapper for a session, the session itself for a subagent.
+    /// somewhere else: the status line for a session, the session itself for a subagent.
     public func withWindow(_ tokens: Int?) -> SessionSnapshot {
         SessionSnapshot(
             sessionID: sessionID,

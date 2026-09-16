@@ -43,10 +43,10 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
             write("{}\n", to: project.appendingPathComponent("a-session.jsonl"), suite)
 
             suite.expect(inspect().isConnected(.claudeSessions), "Claude sessions must be connected")
-            suite.expect(!inspect().isConnected(.claudeLimits), "the wrapper is still not installed")
+            suite.expect(!inspect().isConnected(.claudeLimits), "the slot is still not connected")
         }
 
-        suite.test("a payload from the wrapper is what connects the Claude limits") {
+        suite.test("a payload from the status line is what connects the Claude limits") {
             write("{}\n", to: status.appendingPathComponent("a-session.json"), suite)
 
             let state = inspect()
