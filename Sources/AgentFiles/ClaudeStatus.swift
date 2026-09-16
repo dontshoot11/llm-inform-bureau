@@ -75,6 +75,13 @@ public struct ClaudeStatusStore: Sendable {
         are Pro and Max only.
         """
 
+    /// The status line is this app itself, so an unreadable payload is this app failing to read
+    /// back what it wrote — the shape Claude Code puts on stdin is the part that can change.
+    static let unreadablePayload = """
+        The status line wrote something this app cannot read — the payload format may have \
+        changed.
+        """
+
     public let directory: URL
 
     /// How many session payloads to read. More than a person has sessions open at once.
@@ -102,7 +109,7 @@ public struct ClaudeStatusStore: Sendable {
             if let limits = payload.limits { return .value(limits) }
         }
         if unreadable {
-            return .unavailable("The statusLine wrapper wrote something this app cannot read — the payload format may have changed.")
+            return .unavailable(Self.unreadablePayload)
         }
         return .noData("""
             Claude reported no limits: the rate_limits field is for Pro and Max subscriptions \
@@ -138,7 +145,7 @@ public struct ClaudeStatusStore: Sendable {
             )
         }
         if snapshots.isEmpty, unreadable {
-            return .unavailable("The statusLine wrapper wrote something this app cannot read — the payload format may have changed.")
+            return .unavailable(Self.unreadablePayload)
         }
         return .value(activity.active(snapshots, now: now))
     }

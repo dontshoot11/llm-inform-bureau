@@ -74,16 +74,18 @@ the head of the file, which is why this reader reads both ends of a rollout.
 ### Claude: two sources, neither complete
 
 A transcript (`~/.claude/projects/**/*.jsonl`) is always there and never knows the size of the
-context window. The statusLine wrapper knows the size and the subscription limits, and is only
-there once it has been installed. So:
+context window. The status line knows the size and the subscription limits, and is only there
+once the slot has been connected — and the status line is this app itself, run by Claude Code
+in `--status-line` mode. So:
 
 - **tokens held** always come from the transcript: `input_tokens +
   cache_creation_input_tokens + cache_read_input_tokens` of the last assistant line, the same
   sum the status line's own `used_percentage` is calculated from;
-- **the window size** is filled in from the wrapper payload for the same session id, when
+- **the window size** is filled in from the status line payload for the same session id, when
   there is one. `UsageReader.withWindowSizes` is the whole of that join;
-- **the limits** come from the wrapper alone. There is no file under `~/.claude` that carries
-  them, so without the wrapper the panel says "no data" — which is the truth, not a gap;
+- **the limits** come from the status line alone. There is no file under `~/.claude` that
+  carries them, so until the slot is connected the panel offers to connect it instead of
+  showing a number — the absence is the truth, not a gap;
 - **the model** comes from the transcript, off the same last answer the tokens do
   (`message.model`). The payload names it too, and more exactly — it carries the variant,
   `claude-opus-5[1m]` against the transcript's `claude-opus-5` — but reading it from there
