@@ -7,7 +7,9 @@ import SessionHealthCore
 ///
 /// `LSUIElement` in the bundle's Info.plist is what keeps it out of the Dock and out of the
 /// app switcher; `Scripts/build-app.sh` is what turns the SwiftPM executable into that bundle.
-@main
+///
+/// Not the entry point: the same binary is also Claude Code's status line command, and which
+/// of the two it is has to be decided before this scene starts anything. See `Entry.swift`.
 struct LLMInformBureauApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var model = UsageModel()

@@ -4,6 +4,10 @@ Everything this app knows about where Claude Code and Codex leave their traces o
 nothing about what those traces mean. The rules live in `SessionHealthCore`; this module's
 only job is to turn files into the value types those rules take.
 
+It also writes one file, and only one. Claude hands its subscription limits to a status line
+command and to nothing else, so the app has to *be* that command to see them — and what it is
+handed has to be put somewhere the panel can read it. That is `StatusLineMode`, below.
+
 ## Why the two halves are separate
 
 File formats change with a CLI release; rules change when we learn something. Keeping them
@@ -29,7 +33,7 @@ empty list of sessions is a `.value`, not an absence — "nothing is running" is
 | --- | --- | --- |
 | Codex rollouts | Codex limits **and** Codex sessions, window size included | no |
 | Claude transcripts | Claude sessions: tokens held, project, turn growth — and the subagents running inside them | no |
-| statusLine wrapper | Claude limits, and the size of a Claude context window | **yes** |
+| the status line slot | Claude limits, and the size of a Claude context window | **yes** |
 
 Three readers, because Codex says everything in one file and Claude says it in two places —
 neither of which is complete on its own.
@@ -277,6 +281,33 @@ An empty tree is deliberately *installed*: telling someone to install what they 
 the worse of the two mistakes. The readers themselves do not draw this line — for them both are
 `.noData`, because the difference is about the machine and not about a file.
 
+## Being the status line command
+
+The only source on the list that has to be connected, and the only place this app writes into
+something another program will run. Claude Code calls the status line command after every
+answer with a JSON payload on stdin; `rate_limits` and the size of the context window exist
+there and in no file on the machine.
+
+`StatusLineMode` is the app in that role. It saves the payload under `claude-status/`, one file
+per session, written through a temporary file because the panel reads the directory whenever it
+likes and half a payload would read as a format that changed. Then it answers what should be
+printed — either the output of the command that held the slot before, byte for byte, or a
+`Reading` for the app's own line.
+
+Three rules hold it together, and each one is somebody else's problem if it breaks:
+
+- **The slot is one, and it was theirs first.** A command found in `previous-statusline` is run
+  with the same payload and its output is passed on unchanged. Taking the slot takes nothing
+  away.
+- **Nothing here fails.** Claude Code takes the exit code and the stdout of this command on
+  every turn, so a payload that will not parse is simply not written — rather than written
+  broken, which the panel would go on to report as a source that changed format.
+- **The session id is checked, not trusted.** It becomes a file name and it comes from outside;
+  anything that is not a plain name is filed under `unknown-session`.
+
+The line the app prints for itself is `StatusLineText`, in `Phrasing` — this module decides
+what happened, that one decides what English it is said in.
+
 ## Before there is anything to read
 
 `SetupInspector` answers the one question that comes before every reading: has each source
@@ -314,13 +345,16 @@ run against fixtures instead of against whatever the machine happens to have.
 | `UsageReader.swift` | Both services read at once, and the join between the two Claude sources |
 | `CodexRollouts.swift` | Codex limits and Codex sessions, out of the rollouts — including whether one is waiting on its agent |
 | `ClaudeTranscripts.swift` | Claude sessions and the subagents running inside them, out of the transcripts — including whether one is waiting on its agent |
-| `ClaudeStatus.swift` | Claude limits and window sizes, out of what the wrapper leaves |
+| `ClaudeStatus.swift` | Claude limits and window sizes, out of the payloads the status line command leaves |
+| `StatusLineMode.swift` | The app run as that command: the payload saved, and the command that held the slot before called |
 | `SessionFiles.swift` | Finding the files a service has most recently written, and telling a session's transcript from a subagent's |
 | `FileTail.swift` | Reading the ends of a large file without loading it |
 | `Timestamps.swift` | The one way a written moment is read, shared by both readers |
 | `SourceWatcher.swift` | Noticing that one of the trees changed, which is how a finished turn is noticed |
 | `Setup.swift` | Which sources have written anything at all, and whether the first run has been explained |
 
-The wrapper itself is `Scripts/statusline-wrapper.sh`; see `Scripts/Scripts.md`.
+Which command sits in Claude Code's slot, and how it gets there, is `Scripts/Scripts.md` for
+now — `Scripts/install-statusline.sh` still puts the shell wrapper there, and the app replaces
+it from its own panel in a later phase.
 
 Tests: `Tests/SessionHealthTests/`, run with `swift run SessionHealthTests`.

@@ -2,14 +2,35 @@ import Foundation
 
 /// The one directory this app writes to.
 ///
-/// Three things live in it and nothing else does: the payloads the statusLine wrapper leaves,
+/// Three things live in it and nothing else does: the payloads the status line command leaves,
 /// the editable copy of the thresholds, and the note that the first-run explanation has been
 /// shown. Neither `~/.claude` nor `~/.codex` is ever written to — the app reads another
 /// program's files and keeps its own state out of them.
 public enum SupportDirectory {
-    /// `home` is a parameter so the tests can point the whole app at a temporary directory
-    /// rather than at the machine's real one.
-    public static func url(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
+    /// Points the whole directory somewhere else. For the tests and for a run against a
+    /// working copy — the escape hatch `LLM_INFORM_BUREAU_THRESHOLDS` is for the config, and
+    /// this is the same idea for everything around it.
+    ///
+    /// It exists because `$HOME` cannot do the job: `homeDirectoryForCurrentUser` asks the
+    /// system for the account's home and ignores the variable, so a test that runs the built
+    /// binary with a borrowed `HOME` would still write into the real Application Support.
+    public static let environmentOverrideKey = "LLM_INFORM_BUREAU_SUPPORT"
+
+    /// Where this app's own files go: the override if one is set, otherwise the usual place
+    /// under this account's home.
+    public static func url(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL {
+        if let override = environment[environmentOverrideKey], !override.isEmpty {
+            return URL(fileURLWithPath: override, isDirectory: true)
+        }
+        return url(home: FileManager.default.homeDirectoryForCurrentUser)
+    }
+
+    /// The same directory under a home named by the caller. Naming one means meaning it: the
+    /// environment override is not consulted, so a test that points the app at a temporary
+    /// home gets that home and nothing else.
+    public static func url(home: URL) -> URL {
         home.appendingPathComponent("Library/Application Support/LLMInformBureau", isDirectory: true)
     }
 }

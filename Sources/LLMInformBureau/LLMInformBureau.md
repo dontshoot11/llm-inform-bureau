@@ -2,6 +2,13 @@
 
 The menu bar app: four lights in the bar, a panel behind them, and one window it opens once.
 
+The same binary is also something else. Run with `--status-line`, it is the command Claude Code
+calls after every answer — the only way the subscription limits and the size of the context
+window can be seen on this machine at all. `Entry.swift` is the fork between the two, and it
+comes before anything AppKit does: in that mode there is no bar, no panel and no event loop,
+just a program that reads stdin, prints a row and exits. What it does there is `StatusLineMode`
+in `AgentFiles`; the row it prints is `StatusLineText` in `Phrasing`.
+
 ## Build and run
 
 ```sh
@@ -262,6 +269,7 @@ the app is installed to `/Applications` before the box is ticked — which is th
 
 | File | Holds |
 | --- | --- |
+| `Entry.swift` | Where the process starts: the menu bar app, or Claude Code's status line command |
 | `LLMInformBureauApp.swift` | The `MenuBarExtra` scene |
 | `UsageModel.swift` | What is on screen, and what keeps it current: file events, the heartbeat, and the alerts that come out of a refresh |
 | `MenuContent.swift` | The panel, and the one light a section shows |
