@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import AgentFiles
 import Phrasing
@@ -22,7 +23,41 @@ enum Entry {
         if CommandLine.arguments.dropFirst().contains(StatusLineMode.argument) {
             exit(printStatusLine())
         }
+        endOtherCopies()
         LLMInformBureauApp.main()
+    }
+
+    /// Leaves exactly one menu bar item behind: this one.
+    ///
+    /// Two copies of this app are easy to end up with — a build beside an installed bundle, an
+    /// app dragged to a new place, a login item starting one while another is already up — and
+    /// two copies are not a cosmetic problem. They put two identical lights in the bar, say
+    /// every notification twice, and offer the status line slot from two panels that disagree
+    /// about who holds it. Nothing on screen says which copy is which.
+    ///
+    /// The copy that starts last wins, deliberately: launching an app is how a person asks for
+    /// it, and a newly built or newly installed bundle is the one they mean. The others are
+    /// asked to quit the ordinary way — they are the same app and have nothing unsaved — and
+    /// this one waits a moment so the bar is not briefly showing both.
+    ///
+    /// Only the menu bar app does this. The status line mode is a command that Claude Code may
+    /// run at any moment, several at once, and it exits on its own.
+    private static func endOtherCopies() {
+        guard let identifier = Bundle.main.bundleIdentifier else { return }
+        let mine = ProcessInfo.processInfo.processIdentifier
+        let others = NSRunningApplication.runningApplications(withBundleIdentifier: identifier)
+            .filter { $0.processIdentifier != mine }
+        guard !others.isEmpty else { return }
+
+        for copy in others {
+            copy.terminate()
+        }
+        // A short wait, not a guarantee: a copy that will not go is left alone rather than
+        // killed. Whatever is holding it up, ending it by force is not this app's call.
+        let deadline = Date().addingTimeInterval(2)
+        while Date() < deadline, others.contains(where: { !$0.isTerminated }) {
+            usleep(50_000)
+        }
     }
 
     /// Reads the payload, saves it, and prints whatever the status line should say.

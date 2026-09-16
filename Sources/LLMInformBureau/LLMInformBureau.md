@@ -9,6 +9,16 @@ comes before anything AppKit does: in that mode there is no bar, no panel and no
 just a program that reads stdin, prints a row and exits. What it does there is `StatusLineMode`
 in `AgentFiles`; the row it prints is `StatusLineText` in `Phrasing`.
 
+**One menu bar item, always.** Before the app starts, `Entry.endOtherCopies()` asks any other
+running copy of this bundle to quit, and the copy that started last is the one that stays. Two
+copies are easy to end up with — a build beside an installed bundle, an app dragged somewhere
+new, a login item starting one while another is up — and they are not a cosmetic problem: two
+identical lights in the bar, every notification said twice, and the status line slot offered
+from two panels that disagree about who holds it, with nothing on screen saying which copy is
+which. The last one launched wins because launching an app is how a person asks for it. Only
+the menu bar app does this; the status line command may run several at once and exits on its
+own.
+
 ## Build and run
 
 ```sh
