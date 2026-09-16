@@ -155,8 +155,16 @@ The panel carries, in order, its two halves named after the two dots in the bar:
 1. **Subscription limits** — each service under one light of its own: every window with its
    percentage, its reset time, the plan, and how old the reading is.
 2. **Active sessions — context** — the running sessions of both services, laid out by the same
-   two builders as the half above it: service and project on the lit line, "Context window"
-   against how much of it is gone, and tokens held plus what the last request added underneath.
+   two builders as the half above it: service, the model it is answering on and the project on
+   the lit line, "Context window" against how much of it is gone, and tokens held plus what the
+   last request added underneath.
+   The model is the identifier its own CLI uses — `claude-opus-5`, `gpt-5.6-sol` — set in the
+   font the command hints are set in, because that is what it is: something you would type,
+   not prose about the session. It sits against the service name rather than off to the right,
+   since it says what this "Claude" currently *is*; the right edge belongs to the project and
+   is the first thing a narrow panel truncates. A session whose source never named a model
+   simply has no tag — no table of prettier names is kept here, and one would go stale the week
+   a model ships.
    A limit window and a session read the same way on purpose — both are something being spent.
    A session's subagents are indented under it, each with its own light, its kind, its task and
    the tokens it holds: an agent fills a window of its own, so it is a consumer in its own

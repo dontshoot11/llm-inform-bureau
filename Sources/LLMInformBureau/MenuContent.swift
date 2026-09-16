@@ -161,6 +161,7 @@ struct MenuContent: View {
             blinkedOut: blinkedOut(model.pulse(ofSession: snapshot.sessionID)),
             stalled: model.isStalled(session: snapshot.sessionID),
             name: Wording.service(snapshot.service),
+            tag: snapshot.model,
             badge: snapshot.project,
             help: "The context this session holds — the second of its service's two dots in the menu bar. "
                 + Briefing.scaleHelp(model.thresholds)
@@ -291,6 +292,7 @@ struct MenuContent: View {
         blinkedOut: Bool = false,
         stalled: Bool = false,
         name: String,
+        tag: String? = nil,
         badge: String?,
         help: String,
         @ViewBuilder rows: () -> some View
@@ -304,6 +306,17 @@ struct MenuContent: View {
                     .help(help)
                 Text(name)
                     .font(.headline)
+                if let tag {
+                    // In the font the command hints are set in, and for the same reason: it is
+                    // the identifier the CLI itself uses, not prose about the session. Set
+                    // against the name rather than off to the right, because it says what this
+                    // "Claude" currently is — the right edge belongs to the project, and is the
+                    // first thing to be truncated on a narrow panel.
+                    Text(tag)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
                 Spacer()
                 if let badge {
                     Text(badge)

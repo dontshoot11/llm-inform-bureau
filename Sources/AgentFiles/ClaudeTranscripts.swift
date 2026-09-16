@@ -93,6 +93,7 @@ public struct ClaudeTranscriptStore: Sendable {
                     contextTokens: reading.contextTokens,
                     contextWindowTokens: nil,
                     turnGrowthTokens: reading.turnGrowthTokens,
+                    model: reading.model,
                     project: SessionFiles.projectName(
                         fromWorkingDirectory: Self.home(of: file.url) ?? reading.workingDirectory
                     ),

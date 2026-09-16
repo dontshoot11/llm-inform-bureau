@@ -217,6 +217,41 @@ func runCodexSessionTests(_ suite: TestSuite, config: ThresholdConfig) {
             suite.expectClose(session.windowFillPercent, 7.98, "window fill", tolerance: 0.01)
         }
 
+        // Codex writes the model on the line that opens a turn, so a session that switched
+        // models mid-flight reports the one it is on now.
+        suite.test("the model comes from the turn that opened last") {
+            let directory = makeRolloutDirectory(root, "model", suite)
+            write(
+                lines: [
+                    sessionMeta(),
+                    turnContext(model: "gpt-5.6-thinking"), taskStarted(),
+                    tokenCount(held: 20_000, window: 258_400), taskComplete(),
+                    turnContext(model: "gpt-5.6-sol"), taskStarted(),
+                    tokenCount(held: 30_000, window: 258_400), taskComplete()
+                ],
+                to: directory, named: "rollout-2026-09-15T17-59-45-aaa.jsonl",
+                modified: now, suite
+            )
+
+            let session = CodexRolloutStore(sessionsDirectory: directory)
+                .activeSessions(activity: activity, now: now).value?.first
+            suite.expectEqual(session?.model, "gpt-5.6-sol", "model")
+        }
+
+        suite.test("a rollout whose turn context is out of reach leaves the model unsaid") {
+            let directory = makeRolloutDirectory(root, "no-model", suite)
+            write(
+                lines: [sessionMeta(), taskStarted(), tokenCount(held: 20_000, window: 258_400), taskComplete()],
+                to: directory, named: "rollout-2026-09-15T17-59-45-aaa.jsonl",
+                modified: now, suite
+            )
+
+            let session = CodexRolloutStore(sessionsDirectory: directory)
+                .activeSessions(activity: activity, now: now).value?.first
+            suite.expectEqual(session?.contextTokens, 20_000, "the reading is still read")
+            suite.expect(session?.model == nil, "nothing is invented for a model nobody named")
+        }
+
         suite.test("growth is measured over the last turn") {
             let directory = makeRolloutDirectory(root, "growth", suite)
             write(
@@ -538,6 +573,12 @@ private func sessionMeta(padding: Int = 0) -> String {
 /// The moments default to the same turn the Claude fixtures describe: asked a minute before
 /// the clock the tests read at, answered ten seconds before it. A fixture turn dated last year
 /// would read as abandoned and every case about the state would pass for the wrong reason.
+/// The line that opens a turn with the settings it runs on — a line of its own, not an
+/// `event_msg`, which is what makes the model readable from one place instead of four.
+private func turnContext(model: String, at moment: Date = fixtureAskedAt) -> String {
+    "{\"timestamp\":\"\(stamp(moment))\",\"type\":\"turn_context\",\"payload\":{\"model\":\"\(model)\"}}"
+}
+
 private func taskStarted(at moment: Date = fixtureAskedAt) -> String {
     "{\"timestamp\":\"\(stamp(moment))\",\"type\":\"event_msg\",\"payload\":{\"type\":\"task_started\"}}"
 }

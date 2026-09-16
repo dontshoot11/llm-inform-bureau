@@ -58,6 +58,12 @@ Three things found on disk that the reader has to know about:
   second only ever grows and is not a budget; on a long session it runs into the millions
   against a 258K window.
 
+The model is in none of those either. It is on the `turn_context` line that opens each turn,
+which is where this reads it from — the same name also appears in a `world_state` line and
+three times over inside `session_meta`, and one place to read it from is what keeps the reader
+from disagreeing with itself. Per turn rather than per session on purpose: Codex lets the model
+be changed mid-session, and the row should say the one it is on now.
+
 The session's working directory is not in any of that — it is in the `session_meta` line at
 the head of the file, which is why this reader reads both ends of a rollout.
 
@@ -73,7 +79,12 @@ there once it has been installed. So:
 - **the window size** is filled in from the wrapper payload for the same session id, when
   there is one. `UsageReader.withWindowSizes` is the whole of that join;
 - **the limits** come from the wrapper alone. There is no file under `~/.claude` that carries
-  them, so without the wrapper the panel says "no data" — which is the truth, not a gap.
+  them, so without the wrapper the panel says "no data" — which is the truth, not a gap;
+- **the model** comes from the transcript, off the same last answer the tokens do
+  (`message.model`). The payload names it too, and more exactly — it carries the variant,
+  `claude-opus-5[1m]` against the transcript's `claude-opus-5` — but reading it from there
+  would make the model appear only for whoever connected the slot, and what the variant
+  changes is the window size, which the panel already shows on its own.
 
 Three shapes in a transcript the reader has to know about:
 

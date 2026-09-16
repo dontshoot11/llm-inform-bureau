@@ -79,6 +79,15 @@ public struct SessionSnapshot: Equatable, Sendable {
     /// right now from the hundreds the machine has accumulated — the rule is `SessionActivity`.
     public let lastActivityAt: Date
 
+    /// The model that answered last, as the source names it — `claude-opus-5`,
+    /// `gpt-5.6-sol` — or `nil` when it did not say.
+    ///
+    /// The identifier and not a tidied-up name: both services write the identifier and neither
+    /// writes anything else that every session has, so a prettier name would have to be
+    /// invented here from a table that goes stale the week a model ships. It is shown as what
+    /// it is, in the font the panel keeps for things you would type.
+    public let model: String?
+
     /// Tokens currently held in the context window.
     public let contextTokens: Int
 
@@ -113,6 +122,7 @@ public struct SessionSnapshot: Equatable, Sendable {
         contextTokens: Int,
         contextWindowTokens: Int?,
         turnGrowthTokens: Int? = nil,
+        model: String? = nil,
         project: String? = nil,
         lastActivityAt: Date = Date(),
         replyWait: ReplyWait = .none,
@@ -123,6 +133,7 @@ public struct SessionSnapshot: Equatable, Sendable {
         self.contextTokens = contextTokens
         self.contextWindowTokens = contextWindowTokens
         self.turnGrowthTokens = turnGrowthTokens
+        self.model = model
         self.project = project
         self.lastActivityAt = lastActivityAt
         self.replyWait = replyWait
@@ -140,6 +151,7 @@ public struct SessionSnapshot: Equatable, Sendable {
             contextTokens: contextTokens,
             contextWindowTokens: tokens,
             turnGrowthTokens: turnGrowthTokens,
+            model: model,
             project: project,
             lastActivityAt: lastActivityAt,
             replyWait: replyWait,

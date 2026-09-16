@@ -204,6 +204,9 @@ extension CodexRolloutStore {
                 contextTokens: held,
                 contextWindowTokens: last.element.contextWindow,
                 turnGrowthTokens: growth,
+                // The last turn's, not the session's: Codex lets the model be changed mid
+                // session, and every turn says which one it opened on.
+                model: events.last { $0.isTurnContext }?.model,
                 project: SessionFiles.projectName(fromWorkingDirectory: meta(of: rollout.url)?.workingDirectory),
                 lastActivityAt: rollout.modified,
                 replyWait: activity.replyWait(
@@ -294,6 +297,16 @@ private struct RolloutLine {
     /// Codex starts every turn with this event, which is what makes a turn a thing this app
     /// can measure growth over.
     var isTurnStart: Bool { payload?["type"] as? String == "task_started" }
+
+    /// The line that opens a turn with the settings it runs on. It is a line of its own rather
+    /// than an `event_msg`, so it has no `type` inside the payload — the one on the envelope is
+    /// what names it.
+    var isTurnContext: Bool { json?["type"] as? String == "turn_context" }
+
+    /// The model this turn opened on. Read from `turn_context` alone: the same name appears in
+    /// a `world_state` line and three times inside the session's own metadata, and one place to
+    /// read it from is what keeps this reader from disagreeing with itself.
+    var model: String? { isTurnContext ? payload?["model"] as? String : nil }
 
     /// And ends every turn with one of these: the answer landed, or the person cut the turn
     /// short. Either way nobody is waiting on the agent any more.

@@ -32,6 +32,48 @@ func runClaudeTranscriptTests(_ suite: TestSuite, config: ThresholdConfig) {
             suite.expectEqual(session.project, "llm-inform-bureau", "project, from the session's working directory")
         }
 
+        // Which model a session runs on can be changed mid session, so it is a fact about the
+        // last answer and not about the file. The identifier is shown as written: the transcript
+        // is the only source every Claude session has, and it names nothing else.
+        suite.test("the model comes from the last answer, not the first") {
+            let directory = makeProjectDirectory(root, "model", suite)
+            writeTranscript(
+                [
+                    userPrompt("start"),
+                    assistant(input: 2, cacheCreation: 800, cacheRead: 10_000, model: "claude-sonnet-5"),
+                    userPrompt("switched"),
+                    assistant(input: 2, cacheCreation: 800, cacheRead: 40_000, model: "claude-opus-5")
+                ],
+                to: directory, named: "abc.jsonl", modified: now, suite
+            )
+
+            let session = ClaudeTranscriptStore(projectsDirectory: directory)
+                .activeSessions(activity: activity, now: now).value?.first
+            suite.expectEqual(session?.model, "claude-opus-5", "model")
+        }
+
+        suite.test("a transcript that never named a model leaves it unsaid, not guessed") {
+            let directory = makeProjectDirectory(root, "no-model", suite)
+            writeTranscript(
+                [
+                    userPrompt("start"),
+                    """
+                    {"type":"assistant","isSidechain":false,"cwd":"\(workingDirectory)",\
+                    "timestamp":"\(stamp(fixtureAnsweredAt))",\
+                    "message":{"role":"assistant","stop_reason":"end_turn","content":[{"type":"text"}],\
+                    "usage":{"input_tokens":2,"cache_creation_input_tokens":0,\
+                    "cache_read_input_tokens":10000,"output_tokens":10}}}
+                    """
+                ],
+                to: directory, named: "abc.jsonl", modified: now, suite
+            )
+
+            let session = ClaudeTranscriptStore(projectsDirectory: directory)
+                .activeSessions(activity: activity, now: now).value?.first
+            suite.expectEqual(session?.contextTokens, 10_002, "the reading is still read")
+            suite.expect(session?.model == nil, "nothing is invented for a model nobody named")
+        }
+
         suite.test("a transcript does not know the window size, and says nothing rather than guessing") {
             let directory = makeProjectDirectory(root, "no-window", suite)
             writeTranscript(
