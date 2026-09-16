@@ -30,6 +30,11 @@ number in the app are one number, and there is no second place to remember to ch
 The volume is called `LLMInformBureau`, without spaces, because the recipient's first command
 names the mount point and has to survive being retyped.
 
+Before anything is packed the script checks the bundle it was given: the binary carries both
+architectures, and the signature verifies. Both of those are only ever wrong on the other
+side — an Intel Mac, or a notification centre that quietly refuses — so the check belongs on
+the last line where a Mac to test on is still this one.
+
 ## Installing it
 
 ```sh
@@ -132,3 +137,23 @@ SwiftPM produces a bare executable; a menu bar app needs a bundle with an `Info.
 thresholds into it, and re-signs it ad-hoc with the identifier from that plist — the
 notification centre ignores a bundle whose signing identifier does not match its
 `CFBundleIdentifier`.
+
+**The binary is universal**, `arm64` and `x86_64`, because the image goes to a Mac that may be
+an Intel one and there is no Intel Mac here to find that out on. It is built twice, once per
+triple into a scratch path of its own, and the two are joined with `lipo`. Not
+`swift build --arch arm64 --arch x86_64`: that flag drives xcbuild and fails on the Command
+Line Tools with `xcbuild executable ... does not exist`, and the Command Line Tools are all
+this package asks for. A build takes about twice as long as it used to, which is the price.
+
+The Intel half has an expiry date, and macOS says so. Running it on Apple Silicon — which only
+happens if it is forced, with `arch -x86_64` — brings up "Support Ending for Intel-based Apps",
+because Apple has announced the end of Rosetta. Nobody on Apple Silicon sees that in ordinary
+use: the `arm64` half runs and Rosetta is not involved. Someone on an Intel Mac will, and
+fairly. When Rosetta goes, `x86_64` goes out of the image with it.
+
+Two orderings inside the script are load-bearing:
+
+- **Signing comes after `lipo`.** `lipo` writes a new binary; a signature applied before it is
+  simply gone, and `codesign -v` stops passing.
+- **The resource bundle is copied from the `arm64` build.** It holds no code, so the two builds
+  produce the same one — the choice is arbitrary, not meaningful.

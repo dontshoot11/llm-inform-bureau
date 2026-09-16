@@ -23,6 +23,23 @@ echo "Building $volume $version" >&2
 
 app=$("$root/Scripts/build-app.sh")
 
+# Checked here, before anything is packed, because both of these are only ever wrong on the
+# other side: a single-architecture binary fails on an Intel Mac, and a signature broken by
+# lipo takes the notification centre down with it. Neither shows up on the machine that built
+# it.
+archs=$(lipo -archs "$app/Contents/MacOS/LLMInformBureau")
+for arch in arm64 x86_64; do
+	case " $archs " in
+	*" $arch "*) ;;
+	*)
+		echo "The binary is $archs, not universal — it would not run on every Mac" >&2
+		exit 1
+		;;
+	esac
+done
+codesign --verify --strict "$app"
+echo "Universal: $archs, signature valid" >&2
+
 rm -rf "$root/.build/dmg"
 mkdir -p "$staging"
 # ditto, not cp: it is the tool for bundles, and it carries the ad-hoc signature and the

@@ -272,7 +272,20 @@ change.
 swift build                  # the library targets and the executable
 swift run SessionHealthTests # the test suite: one line per case, exit code 0 or 1
 Scripts/build-app.sh --run   # rebuild the bundle and restart it
+Scripts/build-dmg.sh         # the whole disk image, version and all — one command
 ```
+
+`Scripts/build-dmg.sh` is the release: it builds the app, checks it, and writes
+`.build/LLMInformBureau-<version>.dmg`, the single file that is handed to anybody else. The
+version in the file name is `CFBundleShortVersionString` from `Scripts/Info.plist`, so there is
+no second place to remember.
+
+**The app is built as a universal binary**, `arm64` and `x86_64`, so the image runs on an Intel
+Mac as well — that is a thing to be sure of before handing the file over, not after. It is two
+builds joined with `lipo` rather than `swift build --arch`, whose xcbuild path needs the full
+Xcode; the Command Line Tools stay the only requirement, and a build takes about twice as long.
+`build-dmg.sh` refuses to pack a bundle that is not universal or whose signature does not
+verify. Details and the orderings that matter: [Scripts/Scripts.md](Scripts/Scripts.md).
 
 `swift test` does not work here: both Swift test frameworks ship inside Xcode, and this package
 is built with the Command Line Tools alone. The suite is an executable target with a small
