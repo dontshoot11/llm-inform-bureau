@@ -20,7 +20,7 @@ struct LLMInformBureauApp: App {
             // renders only the first — the status item takes one image and one title, and
             // names and lights have to interleave, which that cannot express.
             Image(nsImage: BarLights.image(for: AgentService.allCases.map {
-                (Wording.service($0), model.lights(of: $0))
+                (Wording.serviceInBar($0), model.lights(of: $0))
             }))
         }
         // The panel style, because the panel shows readings and their age rather than a list
@@ -65,7 +65,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// The whole menu bar label, drawn: each service's name followed by its two lights, stacked.
+/// The whole menu bar label, drawn: one badge per service, holding its name and its two
+/// lights, stacked.
 ///
 /// Everything is drawn rather than composed of views because a `MenuBarExtra` label renders
 /// only its first view — the status item underneath takes one image and one title, and this
@@ -76,50 +77,72 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 /// behind them answers "how much exactly". A percentage in the bar was the previous
 /// arrangement, and it said nothing about the half of the picture that was fine.
 ///
-/// The pair is stacked rather than in a row for two reasons: it costs a third of the width,
+/// Each pair is stacked rather than in a row for two reasons: it costs a third of the width,
 /// and it puts the two in the order the panel puts its two sections in — limits above,
 /// session context below — so the bar is read the same way round as what opens behind it.
+///
+/// **Name and lights share one badge**, so the bar is two objects rather than four. Width is
+/// the whole reason: the bar is shared with every other app on this Mac, and when it runs out
+/// of room macOS stops drawing status items, this one included. Measured against the previous
+/// arrangement — names set in capitals beside their lights — the badges cost about a sixth
+/// less, and that is on top of the third saved by shortening the names themselves.
+///
+/// The badge is also what makes a name this small readable: `cld` set at 9pt straight onto the
+/// menu bar is mush, and the same letters on a tinted plate are not. Variants were drawn and
+/// compared at true size before this one was picked; the ones that lost were plain small caps,
+/// two-letter names (`cx` does not read as Codex), and no names at all, which is narrowest and
+/// says least.
 enum BarLights {
     private static let diameter = 6.0
     private static let betweenDots = 2.5
-    private static let nameToDots = 6.0
-    private static let betweenServices = 10.0
+    private static let nameToDots = 3.0
+    private static let betweenServices = 8.0
+    private static let badgeHeight = 16.0
+    private static let badgePadding = 3.0
+    private static let badgeRadius = 3.5
 
-    /// Set in capitals, letter-spaced, a size down: the names are labels for the lights next
-    /// to them rather than titles of their own, and the panel's section captions are set the
-    /// same way.
-    private static var font: NSFont { .menuBarFont(ofSize: 11) }
-    private static let tracking = 0.6
+    /// Set lowercase, tight, small: inside a badge the name is a tag on the lights beside it,
+    /// not a title. Capitals and letter-spacing were what the previous arrangement needed to
+    /// read on the bare menu bar; on a plate they only cost width.
+    private static var font: NSFont { .systemFont(ofSize: 9, weight: .semibold) }
 
     static func image(for services: [(name: String, lights: ServiceLights)]) -> NSImage {
-        let columnWidth = diameter
-        let widths = services.map { width(of: $0.name) + nameToDots + columnWidth }
+        let widths = services.map { badgeWidth(for: $0.name) }
         let total = widths.reduce(0, +) + betweenServices * Double(max(services.count - 1, 0))
-        let height = (font.ascender - font.descender).rounded(.up) + 2
+        let height = badgeHeight + 2
         let middle = height / 2
 
         let image = NSImage(size: NSSize(width: total.rounded(.up), height: height), flipped: false) { _ in
             var x = 0.0
-            for service in services {
+            for (service, width) in zip(services, widths) {
                 // Resolved here rather than stored: the drawing handler runs at draw time, so
-                // the name comes out in the menu bar's own colour in either appearance.
+                // the plate and the name come out in the menu bar's own colours in either
+                // appearance. The plate is the label colour at low alpha rather than a colour
+                // of its own, so it sits behind the text in both without being picked twice.
+                NSColor.labelColor.withAlphaComponent(0.18).setFill()
+                NSBezierPath(
+                    roundedRect: NSRect(x: x, y: middle - badgeHeight / 2, width: width, height: badgeHeight),
+                    xRadius: badgeRadius,
+                    yRadius: badgeRadius
+                ).fill()
+
                 let text = NSAttributedString(
-                    string: service.name.uppercased(),
-                    attributes: [.font: font, .foregroundColor: NSColor.labelColor, .kern: tracking]
+                    string: service.name.lowercased(),
+                    attributes: [.font: font, .foregroundColor: NSColor.labelColor]
                 )
                 // `draw(at:)` takes the bottom-left of the whole line box, not the baseline, so
                 // the offset has to walk down from the capitals: half the cap height to reach
                 // the baseline, then the descender to reach the box. Centring the line box
                 // instead leaves the name visibly high, because that box is as tall as the
                 // font's accents and descenders and the name uses neither.
-                text.draw(at: NSPoint(x: x, y: middle - font.capHeight / 2 + font.descender))
-                x += width(of: service.name) + nameToDots
+                text.draw(at: NSPoint(x: x + badgePadding, y: middle - font.capHeight / 2 + font.descender))
 
                 // Stacked, in the order the panel puts them in: limits above, context below,
-                // and the pair centred on the same middle the capitals are centred on.
-                draw(service.lights.limits, atX: x, y: middle + betweenDots / 2)
-                draw(service.lights.context, atX: x, y: middle - betweenDots / 2 - diameter)
-                x += columnWidth + betweenServices
+                // and the pair centred on the same middle the name is centred on.
+                let dotsX = x + badgePadding + self.width(of: service.name) + nameToDots
+                draw(service.lights.limits, atX: dotsX, y: middle + betweenDots / 2)
+                draw(service.lights.context, atX: dotsX, y: middle - betweenDots / 2 - diameter)
+                x += width + betweenServices
             }
             return true
         }
@@ -129,8 +152,13 @@ enum BarLights {
         return image
     }
 
+    /// Name, lights and the padding around both — everything inside one plate.
+    private static func badgeWidth(for name: String) -> Double {
+        badgePadding + width(of: name) + nameToDots + diameter + badgePadding
+    }
+
     private static func width(of name: String) -> Double {
-        (name.uppercased() as NSString).size(withAttributes: [.font: font, .kern: tracking]).width
+        (name.lowercased() as NSString).size(withAttributes: [.font: font]).width
     }
 
     /// The three things a light can be.

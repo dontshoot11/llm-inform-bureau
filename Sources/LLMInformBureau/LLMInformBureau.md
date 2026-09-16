@@ -16,7 +16,12 @@ is no Dock icon to quit it from.
 
 The bar carries two lights per service and no numbers, stacked one above the other: the upper
 light is that service's subscription limits, the lower one the context its running sessions
-hold. Stacked because it costs a third of the width, and because it puts the two in the order
+hold. The services are named `CLD` and `CDX` here and `Claude` and `Codex` everywhere else —
+`AgentService.barLabel` against `shortLabel`. The bar is shared with every other app on the
+Mac, and when it runs out of room macOS stops drawing status items, this one included;
+measured at the bar's font, the abbreviations cost 83.2 pt drawn against 123.7 pt for the
+names, so a third of the width goes back to staying visible. Nowhere with room to spare uses
+them: in the panel or in a notification title "CLD" only reads as a typo. Stacked because it costs a third of the width, and because it puts the two in the order
 the panel's sections are in, so the bar reads the same way round as what opens behind it. A limit window with nothing left in it is a red **cross** rather than a fourth colour: red
 already means "the end is close", and no shade of it reads as "the end arrived", while a
 different shape says so at a glance. A light with nothing behind it is not drawn at all, and

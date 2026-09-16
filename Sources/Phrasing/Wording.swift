@@ -14,6 +14,9 @@ import SessionHealthCore
 public enum Wording {
     public static func service(_ service: AgentService) -> String { service.shortLabel }
 
+    /// The same service as the menu bar has room to name it. See `AgentService.barLabel`.
+    public static func serviceInBar(_ service: AgentService) -> String { service.barLabel }
+
     /// Said for an agent whose CLI is not on this machine at all. Not a fault and not a gap:
     /// there is nothing to install for this app's sake, and nothing to wait for.
     public static let notInstalled = "Not installed on this Mac — nothing to connect."
