@@ -2,9 +2,10 @@ import Foundation
 
 /// The directory this app keeps its own files in.
 ///
-/// Four things live in it and nothing else does: the payloads the status line command leaves,
-/// the command that held the slot before this app took it, the editable copy of the thresholds,
-/// and the note that the first-run explanation has been shown.
+/// Three things live in it and nothing else does: the payloads the status line command leaves,
+/// the command that held the slot before this app took it, and the note that the first-run
+/// explanation has been shown. The marks this app watches are not among them — they ship inside
+/// the app, where nobody is asked to have an opinion about them.
 ///
 /// `~/.codex` is never written to at all, and `~/.claude` only in one place: the
 /// `statusLine.command` key of `settings.json`, which is the only way the subscription limits

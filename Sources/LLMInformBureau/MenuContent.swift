@@ -62,11 +62,6 @@ struct MenuContent: View {
                 }
             }
 
-            if !model.configProblems.isEmpty {
-                Divider()
-                configProblems
-            }
-
             Divider()
             settings
         }
@@ -321,6 +316,12 @@ struct MenuContent: View {
         case .free, .somebodyElse:
             Button(SlotPhrasing.connect) { model.propose(.connect) }
                 .help(SlotPhrasing.connectHelp)
+        case .shellWrapper:
+            // The one offer that stands under a working reading rather than in place of a
+            // missing one: the numbers above it came through the old shell wrapper, and this
+            // is the app offering to carry them itself.
+            Button(SlotPhrasing.takeOver) { model.propose(.connect) }
+                .help(SlotPhrasing.takeOverHelp)
         case .unreadable(let path):
             explanation(SlotPhrasing.unreadable(path))
         case .ours:
@@ -328,7 +329,8 @@ struct MenuContent: View {
             // already above.
             EmptyView()
         }
-        if model.slot.isOurs, model.usage?.limits(of: .claude).value == nil {
+        if model.slot.isOurs || model.slot.needsTakingOver,
+           model.usage?.limits(of: .claude).value == nil {
             explanation(model.usage?.limits(of: .claude).explanation ?? "")
         }
         if let problem = model.slotProblem {
@@ -574,16 +576,6 @@ struct MenuContent: View {
     }
 
     // MARK: Odds and ends
-
-    private var configProblems: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Default thresholds applied")
-                .font(.caption.weight(.medium))
-            ForEach(model.configProblems, id: \.self) { problem in
-                explanation(problem)
-            }
-        }
-    }
 
     /// The command that shows the rest of a reading in the CLI.
     ///

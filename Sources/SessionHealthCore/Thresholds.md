@@ -60,25 +60,36 @@ So the marks measure what the app can actually read: how full the window is.
 In order:
 
 1. `$LLM_INFORM_BUREAU_THRESHOLDS`, if set — used by the tests and when running against a
-   working copy.
-2. `~/Library/Application Support/LLMInformBureau/thresholds.json` — the installed copy.
-   Editing it changes behaviour on the next read, with no rebuild.
-3. The copy inside the app bundle — the floor, so a fresh install works before anything has
-   been installed.
-4. `ThresholdConfig.builtIn` — the values compiled into the app, in case even the bundled
-   copy is unreadable. A test fails if they ever drift from the bundled file.
+   working copy. It is the only way the app ever reads marks that are not its own.
+2. The copy inside the app — what every ordinary run uses.
+3. `ThresholdConfig.builtIn` — the values compiled into the app, in case even the shipped
+   copy is unreadable. A test fails if they ever drift from the shipped file.
 
-## A broken file never takes the app down
+**There is no copy in Application Support**, nothing is created on a first launch, and one
+left behind by the release that had an installer is not read. The marks are the app's own:
+nobody was going to hand-edit JSON to move a percentage, and the way to choose these numbers
+will be the app's own settings (`TODO/thresholds-in-settings/`). Installing this app is a drag
+and one command, and a file the reader is expected to find and edit is exactly the kind of
+step that path is meant to be free of.
+
+Inside the app the file travels in SwiftPM's resource bundle, in `Contents/Resources`, and
+`ThresholdConfigLoader.bundledConfigURL` is what finds it there. Not `Bundle.module`:
+SwiftPM's accessor looks beside the `.app` and at the absolute path of the build directory,
+which on anybody else's Mac is neither, and it calls `fatalError` rather than returning nil.
+`build-app.sh` fails the build if no bundle with the file in it was packed.
+
+## A broken file is the author's problem, not the reader's
 
 Nothing in the loader throws. Each entry is read on its own, and an entry that is missing,
 malformed or self-contradictory (marks out of order, a percentage above 100) falls back to the
 copy below it while the rest of the file is still used. Every substitution shows up in
-`load.problems`, and the dropdown says "default thresholds applied" — the one thing the app
-must not do is behave differently from the file the user is looking at without saying so.
+`load.problems` — for whoever is editing the file, which is the author with the test suite in
+front of them. The panel shows none of it.
 
 A `version` that is not the one this app reads makes the whole file fall back, because a
-changed schema means the keys no longer mean what they used to. Version 3 — two marks per
-light, plus the Claude token mark — is exactly that case, and it is covered by a test.
+changed schema means the keys no longer mean what they used to — and it does so without a
+word anywhere. Version 3 — two marks per light, plus the Claude token mark — is exactly that
+case, and it is covered by a test.
 
 ## Format
 

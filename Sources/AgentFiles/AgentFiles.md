@@ -354,6 +354,23 @@ The command written into the slot ends in `|| true`. It names a binary inside th
 and the day that bundle goes to the trash without being disconnected first, the alternative is
 an error at the bottom of every turn instead of an empty status line.
 
+**A slot filled by the release that had an installer is a case of its own.** That release put a
+shell wrapper in Application Support and its path in the slot; the wrapper did what
+`StatusLineMode` does now and saved the displaced command in the same `previous-statusline`.
+So `state()` answers `.shellWrapper` for it rather than `.somebodyElse`, and connecting neither
+saves it nor drops what is underneath: one line of `settings.json` changes, and the orphaned
+script is deleted once the slot is the app's.
+
+Telling those two apart is not a nicety. Saved as "the command that was here before", the
+wrapper's path would go over the top of the person's own command in that file — and then be
+called by a wrapper that reads the file naming itself, round and round. The recognition is by
+the path of `statusline-wrapper.sh` in this app's own directory, written bare or single-quoted,
+which are the two spellings that installer produced.
+
+Because limits keep arriving all the while, this is the one offer the panel makes *underneath*
+a working reading rather than in place of a missing one — `StatusLineSlotState.needsTakingOver`
+against `isConnectable`.
+
 The state and the change are `SessionHealthCore`'s types (`StatusLineSlotState`,
 `StatusLineChange`) and the English is `Phrasing`'s (`SlotPhrasing`), for the reason everything
 else here is split that way.
@@ -405,8 +422,5 @@ run against fixtures instead of against whatever the machine happens to have.
 | `Timestamps.swift` | The one way a written moment is read, shared by both readers |
 | `SourceWatcher.swift` | Noticing that one of the trees changed, which is how a finished turn is noticed |
 | `Setup.swift` | Which sources have written anything at all, and whether the first run has been explained |
-
-`Scripts/install-statusline.sh` still exists and still works on a machine set up with it; it is
-removed, along with the shell wrapper, in a later phase. Nothing in this module needs it.
 
 Tests: `Tests/SessionHealthTests/`, run with `swift run SessionHealthTests`.

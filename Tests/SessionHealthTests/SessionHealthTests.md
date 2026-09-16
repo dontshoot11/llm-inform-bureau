@@ -35,13 +35,12 @@ the cases are plain functions and would port to swift-testing mechanically.
 | `LargeTranscriptTests` | A 400 MB transcript read from its end alone, within a time limit that fails if it is not |
 | `SourceWatcherTests` | That a file change is reported at all, including a source directory that appears later |
 | `SessionActivityTests` | Which sessions count as being worked on right now, and both sides of the edge |
-| `ClaudeStatusTests` | Reading the statusLine wrapper's payloads, and the join between the two Claude sources |
+| `ClaudeStatusTests` | Reading the payloads the status line command leaves, and the join between the two Claude sources |
 | `ClaudeTranscriptTests` | Reading a session out of a transcript: tokens held, turn growth, sidechains, `/clear` |
 | `WaitingStateTests` | Whether a session is waiting on its agent: the four moments of a turn, the housekeeping written after an answer, and a response arriving as several entries |
 | `CodexRolloutTests` | Reading limits and sessions out of rollout fixtures, including the shapes that mean "no data" and "source changed" |
 | `SetupTests` | Which sources read as connected, what the first run says about the ones that do not, and showing that explanation once |
-| `StatuslineInstallerTests` | What `Scripts/install-statusline.sh` does to the user's `settings.json`: the slot filled and emptied, a command that was already there surviving both, and every branch that must not write |
-| `StatusLineSlotTests` | The same file edited from Swift: the key set and removed, every other byte of a hand-used `settings.json` where it was, a command already in the slot saved and put back, and the two branches that refuse to write |
+| `StatusLineSlotTests` | `~/.claude/settings.json` edited from Swift: the key set and removed, every other byte of a hand-used file where it was, a command already in the slot saved and put back, the two branches that refuse to write, and taking over from the shell wrapper an earlier release installed |
 | `OfflineTests` | That no source file reaches for a network API — the reason the app works with the network off |
 
 ## Writing a case
@@ -80,12 +79,12 @@ different ideas of what a transcript looks like.
 semaphore with a generous timeout instead of sleeping for a fixed while: a loaded machine does
 not fail them, and an event that never arrives still does.
 
-**A shell script is tested by running it.** `StatuslineInstallerTests` starts the real
-`Scripts/install-statusline.sh` against a throwaway `HOME` rather than re-implementing its
-branching in Swift. A second test runner just for shell was not worth having: this suite
-already is the one runner, and `Process` starts a script as well as anything else would. The
-script is on its way out — `StatusLineSlotTests` covers the Swift that replaces it — and both
-sets of cases exist while both do.
+**The machine an older release left behind is a fixture, not a memory.** The cases for taking
+over from the shell wrapper build that machine on disk — the wrapper's file in the app's own
+directory, its path in the slot, the displaced command saved underneath — because the failure
+they guard is silent: read as somebody else's command, the wrapper's path would be written over
+the person's own saved command and then called by a wrapper that reads the file naming itself.
+Nothing on screen would say so.
 
 **The file that belongs to somebody else is checked byte for byte.** `settings.json` is the one
 file this project writes that is not its own, and the failure worth catching there is not a

@@ -14,7 +14,9 @@ than fixtures.
 
 ## What it measures
 
-Four marks, all of them in `Resources/thresholds.json`, none of them in the code:
+Four marks, all of them in `Resources/thresholds.json`, none of them in the code — and none of
+them the reader's to set: the file ships inside the app, and choosing these numbers from its own
+settings is a task of its own (`TODO/thresholds-in-settings/`).
 
 | Mark | Applies to | What it means | What the user can do |
 | --- | --- | --- | --- |
@@ -159,7 +161,7 @@ Nothing in the loader throws: a broken config file degrades to the values below 
 | `AlertDispatch.swift` | What is news: scoping every alert of a whole reading, and staying quiet about the backlog found at launch |
 | `BudgetRules.swift` | The rules themselves, and the two assessments they return |
 | `ThresholdConfig.swift` | The marks, and the built-in copy of them |
-| `ThresholdConfigLoader.swift` | Reading the config: installed copy, bundled copy, built-in values |
+| `ThresholdConfigLoader.swift` | Reading the marks the app ships with, and the built-in values under them |
 | `SetupState.swift` | Which sources have written anything on this machine |
 | `StatusLineSlotState.swift` | Whose Claude Code's one status line slot is, and what taking it or giving it back would change |
 | `SupportDirectory.swift` | The directory this app keeps its own files in |

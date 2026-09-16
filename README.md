@@ -96,9 +96,14 @@ Nothing is said twice about the same crossing.
 Mac, so the Xcode Command Line Tools are not needed; there is nothing to sign in to, and the
 app makes no network calls at any point — during installation or after it.
 
-What you are given is one file, `LLMInformBureau-<version>.dmg`, holding the built app, the
-installer and an `INSTALL.txt` saying everything this section says. Building it yourself
-instead is one command — see [Development](#development).
+What you are given is one file, `LLMInformBureau-<version>.dmg`, holding the built app and an
+`INSTALL.txt` saying everything this section says. Building it yourself instead is one
+command — see [Development](#development).
+
+**No script of anybody else's runs on your Mac.** You drag the app in, the way you drag any
+other app, and run one command. There is nothing else to set up: the marks the app watches
+travel inside it, and Claude's limits are connected from its own panel, which shows you the
+change before making it.
 
 ### Step 1 — Mount the image
 
@@ -111,47 +116,32 @@ hdiutil attach ~/Downloads/LLMInformBureau-*.dmg
 The volume is called `LLMInformBureau`, which is what makes the command below a constant
 rather than something depending on where your browser puts downloads.
 
-### Step 2 — Two commands, in this order
+### Step 2 — Drag the app into Applications
+
+Out of the window that opened, into your Applications folder. Replacing an older copy is the
+same gesture; quit the running one from its panel first.
+
+### Step 3 — One command
 
 ```sh
-sh /Volumes/LLMInformBureau/install.sh --apply                        # installs it
-xattr -d -r com.apple.quarantine /Applications/LLMInformBureau.app    # lets macOS run it
+xattr -d -r com.apple.quarantine /Applications/LLMInformBureau.app
 ```
 
-Run the first one without `--apply` to read the whole plan and change nothing. It is someone
-else's shell script and one of its steps edits a file of Claude Code's, so reading it once is
-worth the minute.
+macOS marks everything that arrives over the network, and an ad-hoc signed app carrying that
+mark is refused on launch. This clears it.
 
-Four steps, each printed before it happens:
+**It has to run after the drag, and it has to name the installed copy.** The mark travels with
+a copy: clearing it on the disk image still leaves the copy in `/Applications` marked. Run it
+first and there is nothing to clear — `xattr` answers `No such file` and stops.
 
-1. **Install the app to `/Applications`** — the bundle lying on the image, copied as it is.
-   Nothing is compiled here.
-2. **Copy the thresholds to `~/Library/Application Support/LLMInformBureau/thresholds.json`** —
-   the editable copy. Editing it changes the marks with no rebuild. An existing one is left
-   exactly as it is.
-3. **Connect the statusLine wrapper** (see below) — the one step that touches a file of
-   Claude Code's. It prints the change, keeps a timestamped backup, and preserves whatever
-   command was there before. The wrapper travels inside the app, so this works with no clone
-   and no Command Line Tools.
-4. **Start the app** — unless macOS has the copy quarantined, in which case the installer
-   prints the second command instead of opening anything.
-
-**The order does not swap.** macOS marks everything that arrives over the network, and the mark
-travels with a copy: clearing it on the disk image still leaves the copy in `/Applications`
-marked. Run the second command first and there is nothing to clear — `xattr` answers
-`No such file` and stops.
-
-**`sh` in front of the first command is not decoration.** A script run straight off a mounted
-image is blocked by Gatekeeper with a dialog and no output; handed to an interpreter, it runs.
-
-### Step 3 — If you opened the app too early
+### Step 4 — If you opened the app too early
 
 macOS shows **"LLMInformBureau Not Opened — Apple could not verify…"**. Nothing is wrong with
 the download. The bundle is signed ad-hoc rather than with a paid Apple developer account, and
 anything so signed that arrived over the network is refused until the mark is cleared.
 
 **Do not press the blue button.** It reads **Move to Trash**, it is the default one, and it
-removes the app rather than the mark. Press **Done**, then run the second command.
+removes the app rather than the mark. Press **Done**, then run the command.
 
 On macOS 26 that command is the only way through: the dialog leaves no "Open Anyway" entry in
 System Settings → Privacy & Security — checked on a downloaded image. The routes usually named
@@ -159,90 +149,89 @@ for older systems — that same "Open Anyway" entry on macOS 15, Control-click i
 **Open** on macOS 13 and 14 — are **not verified here**, there was no Mac on those versions to
 try them on. The command works on all of them.
 
-### Step 4 — The first run
+### Step 5 — The first run
 
-Open it from Launchpad or `/Applications`, or with `open -a LLMInformBureau`. The installer
-starts the app itself, but not while the quarantine mark is on it — so after a download the
-first launch is yours to make.
+Open it from Launchpad or `/Applications`, or with `open -a LLMInformBureau`.
 
-The app opens one window explaining where each of its numbers comes from and what is not
-connected yet. It carries the **Open at login** checkbox; afterwards the same checkbox lives
-behind the `?` icon in the panel. Nothing is installed as a background service or a daemon:
-this is a normal application that happens to have no windows, and unticking the checkbox is
-all it takes to stop it starting.
+It opens one window explaining where each of its numbers comes from and what is not connected
+yet. It carries the **Open at login** checkbox; afterwards the same checkbox lives behind the
+`?` icon in the panel. Nothing is installed as a background service or a daemon: this is a
+normal application that happens to have no windows, and unticking the checkbox is all it takes
+to stop it starting.
 
-### Step 5 — Check the menu bar
+### Step 6 — Check the menu bar
 
 Two lights per service. What you should expect to see on a fresh install:
 
 | What you see | What it means |
 | --- | --- |
 | Codex lights are lit | Codex needs nothing connected — it is read from its own rollouts |
-| Claude's limits light is missing | Either the wrapper is not connected yet, or the current session has not answered since |
+| Claude's limits light is missing | The status line slot is not connected yet — see below |
 | A service shows one line saying it is not installed | That agent is not on this Mac. Nothing to do |
 
 Claude's limits appear only on a **Pro or Max** subscription, and only after the first answer
 of a session — that field is not written on other plans at all. Open the panel for the numbers
 behind the lights.
 
-### The statusLine wrapper
+### Connecting Claude's limits
 
 Claude's subscription limits and the size of its context window are handed to the statusLine
 command and to nothing else — no file under `~/.claude` carries them. Reading them means
 occupying that slot, and **there is exactly one slot.**
 
-So the wrapper is a wrapper and not a replacement. Whatever command was configured before is
-saved, called with the same payload, and its output printed unchanged:
+So the app asks for it. Open the panel: where Claude's limits would be there is a **Connect
+limits** button instead of an empty reading — the place you look for the figure is the place
+that tells you how to get one. Pressing it shows the exact line it would write into
+`~/.claude/settings.json` and changes nothing until you say yes; a timestamped copy of that
+file is kept beside it first.
+
+The app then *is* the status line command, and it is a wrapper rather than a replacement.
+Whatever command was configured before is saved, called with the same payload, and its output
+printed unchanged:
 
 ```
-Claude Code ──payload──▶ wrapper ──┬──▶ ~/Library/Application Support/…/claude-status/<session>.json
-                                   └──▶ the command that was there before ──▶ the status line
+Claude Code ──payload──▶ LLMInformBureau --status-line ──┬──▶ …/claude-status/<session>.json
+                                                         └──▶ the command that was there before ──▶ the status line
 ```
 
-The installer shows exactly what it will change in `~/.claude/settings.json` before changing
-it, keeps a timestamped backup, and can be undone with `--uninstall`. One consequence it says
-out loud: **with any statusLine configured, Claude Code stops showing most footer hints**,
-`esc to interrupt` among them. That is Claude Code's behaviour and the real cost of connecting
-the wrapper.
+The way back out is the icon beside the `?` in the panel's bottom row: it puts your previous
+command back in the slot and takes the app out of it.
 
-Step 3 of the installation runs it, and it can be run on its own at any time afterwards. It
-lives inside the installed app, which is the whole copy of this repository a recipient needs:
-
-```sh
-sh /Applications/LLMInformBureau.app/Contents/Resources/install-statusline.sh            # the plan
-sh /Applications/LLMInformBureau.app/Contents/Resources/install-statusline.sh --apply       # connect it
-sh /Applications/LLMInformBureau.app/Contents/Resources/install-statusline.sh --uninstall   # put the old command back
-```
-
-From a clone the same script is `Scripts/install-statusline.sh`; both copies behave the same,
-because each one takes the wrapper from beside itself.
+One consequence the preview says out loud: **with any statusLine configured, Claude Code stops
+showing most footer hints**, `esc to interrupt` among them. That is Claude Code's behaviour and
+the real cost of connecting.
 
 Without it the app still shows Codex in full and Claude's context from the transcripts — and
 says "no data" for Claude's limits rather than showing them as 0%.
 
+**Set up by an older version?** That one installed a shell wrapper and put its path in the
+slot. The panel offers to update it — under the numbers this time, because they are arriving
+and nothing is broken. Taking the offer changes one line of `settings.json`, deletes the
+leftover script, and leaves whatever command you had underneath exactly where it is.
+
 ### Keeping it up to date
 
-Download the new image and run the same two commands. The installed copy is replaced, a running
-one is quit first, and **your edited `thresholds.json` is left exactly as it is** — it is the
-file the app reads, and overwriting your marks during an update is the one thing the installer
-will not do. If a release changes the shape of that file, the app falls back to the built-in
-values and the panel says "default thresholds applied"; the installer prints the one `cp` that
-takes the new ones.
+Download the new image and drag the app in over the old one, quitting the running copy from its
+panel first. Then run the `xattr` command again: the mark is on the new copy too.
+
+The connected slot stays connected — the command in it names the bundle, which is where the
+new one went. Nothing else carries over, because there is nothing else: the marks come with the
+app.
 
 ### Removing it
 
-Untick **Open at login**, quit from the panel, then, in this order:
+Untick **Open at login**. Then, in the panel, **disconnect the status line** — that puts your
+previous command back where it was and takes the app's out, which matters because the command
+in that slot names a binary inside the bundle you are about to delete. Then quit from the panel
+and:
 
 ```sh
-sh /Applications/LLMInformBureau.app/Contents/Resources/install-statusline.sh --uninstall
 rm -rf /Applications/LLMInformBureau.app
 rm -rf ~/Library/Application\ Support/LLMInformBureau
 ```
 
-The first line puts your previous statusLine command back where it was, and it has to run
-before the second: the script it names lives inside the bundle that the second line deletes.
-The third removes the thresholds you edited, the saved payloads and the copy of the wrapper —
-everything this app ever wrote.
+The second line removes the saved payloads and the command the app kept for you — everything
+this app ever wrote for itself.
 
 ## Where the data comes from
 
@@ -255,7 +244,7 @@ a network API ever appears in the sources.
 | Codex | `~/.codex/sessions/**/rollout-*.jsonl` | limits, context, window size | no |
 | Claude Code | `~/.claude/projects/**/*.jsonl` | context held, turn growth, project | no |
 | Claude Code | `~/.claude/projects/**/<session>/subagents/agent-*.jsonl` | a subagent's context, its kind and its task | no |
-| Claude Code | [statusLine contract](https://code.claude.com/docs/en/statusline) via the wrapper | limits, context window size | **yes** |
+| Claude Code | [statusLine contract](https://code.claude.com/docs/en/statusline), with the app in the slot | limits, context window size | **yes** |
 
 **Running only one of the two agents is normal.** The other keeps its place in the bar and the
 panel, with hollow lights and one line saying it is not installed — nothing errors, and nothing
@@ -283,9 +272,10 @@ There is no mark for "this context has got too long" either: no published measur
 one for the models in use today, and the vendors' position is that there is no such length.
 Every number the app compares against is the project's own, and **not one of them carries a
 source** — an entry with no measurement is honest, an entry with an invented one lies silently.
-Which numbers, what they rest on and what would make them wrong:
-[Thresholds.md](Sources/SessionHealthCore/Thresholds.md); how to change one:
-[AGENTS.md](AGENTS.md).
+They ship inside the app rather than sitting in a file you are expected to find and edit;
+choosing them from the app's own settings is a task of its own. Which numbers, what they rest on
+and what would make them wrong: [Thresholds.md](Sources/SessionHealthCore/Thresholds.md); how to
+change one: [AGENTS.md](AGENTS.md).
 
 ### What was tried and dropped
 
@@ -340,9 +330,9 @@ version in the file name is `CFBundleShortVersionString` from `Scripts/Info.plis
 no second place to remember. The recipient's instructions ride inside the image as
 `INSTALL.txt`, written by that same script — there is no second copy of them to keep in step.
 
-**The author installs from the image like everybody else**, with the two commands in
-[Install](#install). There is no developer-only installation path in this repository, which is
-why the one path there is stays working.
+**The author installs from the image like everybody else**, with the drag and the one command
+in [Install](#install). There is no developer-only installation path in this repository, which
+is why the one path there is stays working.
 
 ### What to send with the link
 
@@ -351,23 +341,23 @@ says to mount it, which is no use to somebody who has not. So the message carryi
 carries the first steps too:
 
 ```
-Download the image, then, in Terminal:
+Download the image, then:
 
-  1. open ~/Downloads/LLMInformBureau-<version>.dmg
-  2. sh /Volumes/LLMInformBureau/install.sh --apply
-  3. xattr -d -r com.apple.quarantine /Applications/LLMInformBureau.app
-  4. open -a LLMInformBureau
+  1. Open ~/Downloads/LLMInformBureau-<version>.dmg
+  2. Drag LLMInformBureau.app into your Applications folder
+  3. In Terminal:
+       xattr -d -r com.apple.quarantine /Applications/LLMInformBureau.app
+  4. Open it from Launchpad
 
-Line 2 installs it, line 3 lets macOS run it — that order, and both are needed. Line 4 is
-yours to run because the installer will not open an app macOS still has marked.
+Line 3 is what lets macOS run it, and it has to come after the drag. Nothing else to run:
+no installer, no script of mine on your Mac.
 
-INSTALL.txt on the image says all of this at length, and what to do when a step fails.
-Worth the two minutes before line 2: it is someone else's shell script.
+INSTALL.txt on the image says all of this at length, including what the app asks you before
+it touches Claude Code's settings.
 ```
 
-Replace `<version>` with the number in the file name. Paste it as it is — the commands are
-constants, because the volume is always `/Volumes/LLMInformBureau` no matter where the browser
-put the download.
+Replace `<version>` with the number in the file name. Paste it as it is — the command is a
+constant, whatever the browser did with the download.
 
 **The app is built as a universal binary**, `arm64` and `x86_64`, so the image runs on an Intel
 Mac as well — that is a thing to be sure of before handing the file over, not after. It is two

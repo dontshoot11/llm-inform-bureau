@@ -338,5 +338,124 @@ func runStatusLineSlotTests(_ suite: TestSuite) {
             suite.expect(slot.change(for: .disconnect) == nil, "there is nothing to offer")
             suite.expectEqual(text(of: slot), takenSettings, "the file")
         }
+
+        // MARK: A Mac set up by the release that had an installer
+
+        // That release copied a shell wrapper into this app's own directory, put its path in
+        // the slot, and saved whatever was there into the very file this app reads. Every case
+        // below is about telling that apart from somebody else's command — because read as
+        // somebody else's, its path would be written over the person's own saved command, and
+        // then called by a wrapper that reads the file naming itself.
+
+        /// A slot of its own with the shell wrapper in it, the wrapper's file on disk, and the
+        /// command it displaced saved underneath — a machine as that release left it.
+        func wrapperSlot(_ name: String, quoted: Bool, saved: String?) -> StatusLineSlot {
+            let slot = slot(root, name, settings: plainSettings)
+            let path = slot.shellWrapperFile.path
+            let command = quoted ? "'\(path)'" : path
+            do {
+                try """
+                    {
+                      "model": "opus",
+                      "statusLine": {
+                        "type": "command",
+                        "command": "\(command)",
+                        "padding": 0
+                      },
+                      "tui": "fullscreen"
+                    }
+                    """.write(to: slot.settings.url, atomically: true, encoding: .utf8)
+                try Data("#!/bin/sh\n".utf8).write(to: slot.shellWrapperFile)
+                if let saved {
+                    try Data(saved.utf8).write(to: slot.previousCommandFile)
+                }
+            } catch {
+                suite.expect(false, "could not set the fixture up: \(error)")
+            }
+            return slot
+        }
+
+        suite.test("the wrapper an earlier release installed is not read as somebody else's command") {
+            for quoted in [true, false] {
+                let slot = wrapperSlot("state-wrapper-\(quoted)", quoted: quoted, saved: nil)
+                suite.expectEqual(slot.state(), .shellWrapper, "written \(quoted ? "quoted" : "bare")")
+            }
+        }
+
+        // The limits are arriving through it, so the panel puts the offer under the numbers
+        // rather than in place of them — which is the difference between these two answers.
+        suite.test("a slot holding the wrapper is offered a take-over, not a connection") {
+            let state = wrapperSlot("offer-wrapper", quoted: true, saved: nil).state()
+            suite.expectEqual(state.isConnectable, false, "isConnectable")
+            suite.expectEqual(state.needsTakingOver, true, "needsTakingOver")
+            suite.expectEqual(state.isOurs, false, "isOurs")
+        }
+
+        suite.test("the change says the wrapper is what is being replaced, and names what stays") {
+            let slot = wrapperSlot("change-wrapper", quoted: true, saved: "/Users/nobody/bin/mine.sh")
+            guard let change = slot.change(for: .connect) else {
+                suite.expect(false, "there must be something to offer")
+                return
+            }
+            suite.expectEqual(change.replacesShellWrapper, true, "replacesShellWrapper")
+            suite.expectEqual(change.command, ours, "the command going in")
+            suite.expectEqual(change.keptUnderneath, "/Users/nobody/bin/mine.sh", "what stays underneath")
+        }
+
+        // The case this whole branch exists for. Read as somebody else's command, the wrapper's
+        // own path would be saved over "my-own.sh" — and the person's status line would be gone
+        // for good, with nothing on screen to say so.
+        suite.test("taking over from the wrapper leaves the command saved underneath it untouched") {
+            let slot = wrapperSlot("take-over", quoted: true, saved: "/Users/nobody/bin/mine.sh")
+            connect(slot)
+
+            suite.expectEqual(slot.state(), .ours, "the slot after")
+            suite.expectEqual(slot.savedCommand(), "/Users/nobody/bin/mine.sh", "what is saved")
+            suite.expect(
+                !FileManager.default.fileExists(atPath: slot.shellWrapperFile.path),
+                "the orphaned script must be gone"
+            )
+        }
+
+        // And the way back out still works: the command put back is the person's, not the
+        // wrapper's path.
+        suite.test("disconnecting after a take-over puts the original command back") {
+            let slot = wrapperSlot("take-over-back", quoted: false, saved: "/Users/nobody/bin/mine.sh")
+            connect(slot)
+            disconnect(slot)
+
+            suite.expectEqual(slot.state(), .somebodyElse("/Users/nobody/bin/mine.sh"), "the slot after")
+        }
+
+        // Nothing was saved because there was nothing to save: the wrapper was printing its own
+        // line, and so will this. What must not happen is a stale file being invented here.
+        suite.test("taking over a wrapper with nothing underneath saves nothing") {
+            let slot = wrapperSlot("take-over-empty", quoted: true, saved: nil)
+            guard let change = slot.change(for: .connect) else {
+                suite.expect(false, "there must be something to offer")
+                return
+            }
+            suite.expect(change.keptUnderneath == nil, "nothing to keep: \(change.keptUnderneath ?? "—")")
+            connect(slot)
+
+            suite.expectEqual(slot.state(), .ours, "the slot after")
+            suite.expect(slot.savedCommand() == nil, "still nothing saved: \(slot.savedCommand() ?? "—")")
+        }
+
+        // A command that merely mentions the app's directory is still somebody else's.
+        suite.test("a command of their own that names this app's folder is not the wrapper") {
+            let slot = slot(root, "not-the-wrapper", settings: plainSettings)
+            let command = "\(slot.support.path)/mine.sh"
+            do {
+                try """
+                    {
+                      "statusLine": { "type": "command", "command": "\(command)" }
+                    }
+                    """.write(to: slot.settings.url, atomically: true, encoding: .utf8)
+            } catch {
+                suite.expect(false, "could not write the fixture: \(error)")
+            }
+            suite.expectEqual(slot.state(), .somebodyElse(command), "the slot")
+        }
     }
 }

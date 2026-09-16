@@ -8,6 +8,11 @@ import SessionHealthCore
 /// out. It is the other half of `StatusLineMode` — that one is the command being run, this one
 /// is what puts it in the slot.
 ///
+/// It also knows the slot it is replacing. A Mac set up by the release that shipped an
+/// installer has that installer's shell wrapper in the slot, and telling it apart from
+/// somebody else's command is what makes taking over from it safe rather than a loop —
+/// see `isShellWrapper`.
+///
 /// Two rules shape all of it. The slot is one and it was somebody's first, so a command found
 /// in it is saved and goes on being called with the same payload. And a change to
 /// `settings.json` is shown before it is made, never after — `change(for:)` is what the panel
@@ -55,6 +60,15 @@ public struct StatusLineSlot: Sendable {
         support.appendingPathComponent("previous-statusline", isDirectory: false)
     }
 
+    /// The shell wrapper an earlier release of this app copied here and put in the slot.
+    ///
+    /// It did exactly what `StatusLineMode` does now, down to the file it saved the displaced
+    /// command in — which is why taking over from it is a change of one line in
+    /// `settings.json` and nothing else.
+    public var shellWrapperFile: URL {
+        support.appendingPathComponent("statusline-wrapper.sh", isDirectory: false)
+    }
+
     /// Whose the slot is right now.
     public func state() -> StatusLineSlotState {
         switch settings.read() {
@@ -66,7 +80,9 @@ public struct StatusLineSlot: Sendable {
             guard let command, !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 return .free
             }
-            return isOurs(command) ? .ours : .somebodyElse(command)
+            if isOurs(command) { return .ours }
+            if isShellWrapper(command) { return .shellWrapper }
+            return .somebodyElse(command)
         }
     }
 
@@ -77,6 +93,18 @@ public struct StatusLineSlot: Sendable {
     /// answering. What it must not match is a command that merely mentions the app somewhere.
     private func isOurs(_ command: String) -> Bool {
         command.contains(executable.path) && command.contains(StatusLineMode.argument)
+    }
+
+    /// Whether a command in the slot is the wrapper an earlier release installed — written
+    /// bare or in single quotes, both of which that installer produced.
+    ///
+    /// This has to be told apart from somebody else's command, and the cost of not telling
+    /// them apart is the whole reason the case exists: connecting would save the wrapper as
+    /// "the command that was here before", over the top of the person's own command saved in
+    /// that same file — and then call it, so the wrapper would read the file naming itself and
+    /// go round for ever.
+    private func isShellWrapper(_ command: String) -> Bool {
+        command.contains(shellWrapperFile.path)
     }
 
     /// What the saved command is, if there is one.
@@ -98,6 +126,17 @@ public struct StatusLineSlot: Sendable {
                 return nil
             case .free:
                 return StatusLineChange(kind: .connect, settingsPath: settings.url.path, command: command)
+            case .shellWrapper:
+                // What is kept is what the wrapper was already keeping. The person's own
+                // command, if they had one, is in that file and stays there untouched — this
+                // change is one line of `settings.json` and a leftover script deleted.
+                return StatusLineChange(
+                    kind: .connect,
+                    settingsPath: settings.url.path,
+                    command: command,
+                    keptUnderneath: savedCommand(),
+                    replacesShellWrapper: true
+                )
             case .somebodyElse(let existing):
                 return StatusLineChange(
                     kind: .connect,
@@ -134,6 +173,7 @@ public struct StatusLineSlot: Sendable {
     }
 
     private func connect() throws {
+        var takingOverFromWrapper = false
         switch state() {
         case .ours:
             return
@@ -141,6 +181,11 @@ public struct StatusLineSlot: Sendable {
             throw ClaudeSettings.Failure.unreadable(path)
         case .somebodyElse(let existing):
             try save(existing)
+        case .shellWrapper:
+            // Nothing is saved and nothing is dropped. The wrapper read the same file this
+            // binary reads, so whatever it was passing the payload on to goes on being passed
+            // the payload — the only thing that changes is who does the passing.
+            takingOverFromWrapper = true
         case .free:
             // A saved command with nothing in the slot is a leftover: the command it names is
             // not what this machine is configured with any more, and keeping it would have the
@@ -148,6 +193,12 @@ public struct StatusLineSlot: Sendable {
             try? FileManager.default.removeItem(at: previousCommandFile)
         }
         try settings.setStatusLineCommand(command, tag: "connect")
+        if takingOverFromWrapper {
+            // Only after the slot is ours, and only this one file: it is the app's own copy,
+            // nothing names it any more, and deleting it before the write would have left a
+            // slot pointing at a script that is gone.
+            try? FileManager.default.removeItem(at: shellWrapperFile)
+        }
     }
 
     private func disconnect() throws {

@@ -12,12 +12,13 @@ in `AgentFiles`; the row it prints is `StatusLineText` in `Phrasing`.
 ## Build and run
 
 ```sh
-Scripts/install.sh --apply  # build, install, connect the wrapper, start it
 Scripts/build-app.sh --run  # rebuild the bundle and restart it, while working on it
+Scripts/build-dmg.sh        # the image that is handed out
 ```
 
-See `Scripts/Scripts.md` for what each script does. The app is quit from its own panel; there
-is no Dock icon to quit it from.
+See `Scripts/Scripts.md` for what each script does. There is nothing else to run: the marks
+travel inside the app, and the status line slot is taken from the panel. The app is quit from
+its own panel; there is no Dock icon to quit it from.
 
 ## What it shows
 
@@ -98,7 +99,7 @@ says both things at once and neither of them twice. It keeps the dot's slot and 
 overhanging it by about an eighth of a diameter into the padding on either side: at six points
 a figure eight squeezed into a dot's width is a smudge, and a light that moved its neighbour
 would read as a different light. A sign is drawn only where a dot would have been drawn — in
-the bar an unreported reading draws nothing, so a Claude session with no wrapper connected
+the bar an unreported reading draws nothing, so a Claude session with the slot unconnected
 stalls invisibly there, exactly as it blinks invisibly today, and the panel shows it in the
 grey of its outline.
 
@@ -197,9 +198,7 @@ The panel carries, in order, its two halves named after the two dots in the bar:
    service whose files stopped parsing: that is a reading, and one nobody would otherwise
    ever see.
 3. **Why the bar is that colour** — the one reading that set it, named.
-4. **"Default thresholds applied"**, with what was wrong, when the config file could not be
-   used as written.
-5. **The icons**: disconnecting the status line slot, while it is the app's; the way back to
+4. **The icons**: disconnecting the status line slot, while it is the app's; the way back to
    the first-run explanation; and the way out. Terminating asks once — the panel is opened to
    read something, and the icon sits where a thumb lands.
 
@@ -221,8 +220,8 @@ Three rules the interface follows everywhere:
   and cost the only way to learn the widget covers that service; saying it in two places at
   once would read as two different problems, so the sessions half stays quiet about it.
 - **Unknown is never zero.** No reading at all shows an em dash in the bar and a sentence in
-  the panel, never `0%`. A Claude session without the wrapper says "window size unknown" and
-  shows its tokens.
+  the panel, never `0%`. A Claude session with the status line slot unconnected says "window
+  size unknown" and shows its tokens.
 - **The age is always visible.** Limits are what the service reported at its last API call,
   not a live reading, and an hour-old number that looks current is worse than no number.
 - **Nothing implies a measure of quality.** "Past the length Anthropic compacts at" is a fact
@@ -320,8 +319,8 @@ the notification centre.
 The state is read back from the system every time the control appears rather than remembered:
 Login Items can be switched off in System Settings without the app hearing about it, and a
 remembered "on" would then be a lie. What is registered is the bundle **where it is now**, so
-the app is installed to `/Applications` before the box is ticked — which is the order
-`Scripts/install.sh` does it in.
+the app belongs in `/Applications` before the box is ticked — which is why the instructions have
+the drag first and the first launch after it.
 
 ## Files
 

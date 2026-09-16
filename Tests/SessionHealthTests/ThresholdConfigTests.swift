@@ -86,20 +86,36 @@ func runThresholdConfigTests(_ suite: TestSuite, config: ThresholdConfig) {
         suite.expectEqual(fill.mark(for: .notice), fill.notice, "the notice level names its own mark")
     }
 
-    suite.test("the editable config lives outside the bundle, and the override wins over it") {
-        let home = URL(fileURLWithPath: "/Users/nobody")
-        let installed = ThresholdConfigLoader.externalConfigURL(environment: [:], home: home)
+    // The marks are the app's own: nothing outside it is read unless a run says so in so many
+    // words. A machine set up by an older release still has a thresholds.json in Application
+    // Support, and this is what makes it a leftover rather than a config.
+    suite.test("nothing outside the app is read unless an override names it") {
         suite.expect(
-            installed.path.hasPrefix("/Users/nobody/Library/Application Support/LLMInformBureau"),
-            "the installed copy belongs in Application Support, got \(installed.path)"
+            ThresholdConfigLoader.overrideConfigURL(environment: [:]) == nil,
+            "an ordinary run reads no file of its own"
         )
-        suite.expectEqual(installed.lastPathComponent, "thresholds.json", "file name")
+        suite.expect(
+            ThresholdConfigLoader.overrideConfigURL(
+                environment: [ThresholdConfigLoader.environmentOverrideKey: ""]
+            ) == nil,
+            "an empty override is no override"
+        )
+        suite.expectEqual(
+            ThresholdConfigLoader.overrideConfigURL(
+                environment: [ThresholdConfigLoader.environmentOverrideKey: "/tmp/elsewhere.json"]
+            )?.path,
+            "/tmp/elsewhere.json",
+            "override"
+        )
+    }
 
-        let overridden = ThresholdConfigLoader.externalConfigURL(
-            environment: [ThresholdConfigLoader.environmentOverrideKey: "/tmp/elsewhere.json"],
-            home: home
-        )
-        suite.expectEqual(overridden.path, "/tmp/elsewhere.json", "override")
+    // And so a copy in Application Support, left behind by the release that had an installer,
+    // is a leftover rather than a config: there is no path from here to it to take.
+    suite.test("an ordinary run reads the copy the app ships and nothing else") {
+        let load = ThresholdConfigLoader.load()
+        suite.expectEqual(load.source, .bundled, "source")
+        suite.expectEqual(load.config, config, "the marks the app ships with")
+        suite.expectEqual(load.problems.count, 0, "problems: \(load.problems)")
     }
 
     // MARK: Reading it from disk
@@ -131,14 +147,14 @@ func runThresholdConfigTests(_ suite: TestSuite, config: ThresholdConfig) {
             suite.expectEqual(load.problems.count, 1, "problems: \(load.problems)")
         }
 
-        suite.test("a config in a format this app does not read is ignored whole") {
+        // Silently, and that is the decision: the app installs this file itself, so a release
+        // that moves the format would otherwise put a complaint in front of everybody who has
+        // never opened it — about marks they have no reason to have an opinion on.
+        suite.test("a config in a format this app does not read is ignored whole, and quietly") {
             write(configJSON(version: 99), to: external, suite)
             let load = ThresholdConfigLoader.load(at: external)
             suite.expectEqual(load.config, config, "values")
-            suite.expect(
-                load.problems.first?.contains("99") == true,
-                "the report must name the version it found: \(load.problems)"
-            )
+            suite.expectEqual(load.problems.count, 0, "problems: \(load.problems)")
         }
 
         suite.test("an incomplete config keeps the values it does have") {
@@ -179,18 +195,29 @@ func runThresholdConfigTests(_ suite: TestSuite, config: ThresholdConfig) {
         }
 
         // The whole point of the version field: a v3 file read as v4 would silently apply a
-        // two-mark scale as a three-mark one.
+        // two-mark scale as a three-mark one. Falling back is what must happen; saying so is
+        // not, for the reason above.
         suite.test("the schema this replaces is refused whole, not read in part") {
             write(previousSchemaJSON(), to: external, suite)
             let load = ThresholdConfigLoader.load(at: external)
             suite.expectEqual(load.config, config, "every value falls back")
+            suite.expectEqual(load.problems.count, 0, "problems: \(load.problems)")
+        }
+
+        // The other half of that decision, and the line between them: a file somebody is
+        // editing right now is still reported. Silence there would be the app running on marks
+        // other than the ones in front of them.
+        suite.test("a file being edited is still reported when it cannot be used as written") {
+            write(configJSON(windowFill: (notice: 30, elevated: 80, high: 20)), to: external, suite)
+            let load = ThresholdConfigLoader.load(at: external)
             suite.expectEqual(load.usesFallbackValues, true, "usesFallbackValues")
             suite.expect(
-                load.problems.first?.contains("version 3") == true,
-                "the report must name the version it found: \(load.problems)"
+                load.problems.first?.contains("window_fill_percent") == true,
+                "problems: \(load.problems)"
             )
         }
     }
+
 }
 
 // MARK: Fixtures

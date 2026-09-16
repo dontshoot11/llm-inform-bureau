@@ -13,6 +13,11 @@ public enum StatusLineSlotState: Equatable, Sendable {
     case free
     /// This app's command is in it, which is the only way limits ever arrive.
     case ours
+    /// The shell wrapper an earlier release of this app installed. Limits are arriving, so
+    /// there is nothing wrong on screen — but the file it names is a leftover of an install
+    /// path that no longer exists, and the command the person had before this app is saved
+    /// underneath it. Replacing it is the app taking over its own job.
+    case shellWrapper
     /// Somebody else's command, quoted as it is written in the file. Connecting saves it and
     /// keeps calling it.
     case somebodyElse(String)
@@ -22,14 +27,23 @@ public enum StatusLineSlotState: Equatable, Sendable {
 
     public var isOurs: Bool { self == .ours }
 
-    /// Whether the app has something to offer here — which is what decides whether the panel
-    /// shows a button in place of the limits.
+    /// Whether the app has something to offer *in place of a reading* — which is what decides
+    /// whether the panel shows a button where the limits would be.
+    ///
+    /// The old shell wrapper is not one of these, and that is the distinction: it is feeding
+    /// the panel real numbers, and a button standing where they should be would be hiding a
+    /// working reading behind an offer. What it gets instead is `needsTakingOver` — an offer
+    /// underneath the numbers rather than instead of them.
     public var isConnectable: Bool {
         switch self {
         case .free, .somebodyElse: true
-        case .ours, .unreadable: false
+        case .ours, .shellWrapper, .unreadable: false
         }
     }
+
+    /// Whether what is in the slot is this app's own work done the old way, so the offer is to
+    /// take it over rather than to connect something that is missing.
+    public var needsTakingOver: Bool { self == .shellWrapper }
 }
 
 /// What pressing the button would do to `settings.json`, before anything is written.
@@ -57,15 +71,22 @@ public struct StatusLineChange: Equatable, Sendable {
     /// Connecting only, and `nil` when the slot was free.
     public let keptUnderneath: String?
 
+    /// `true` when what is being replaced is the shell wrapper an earlier release installed.
+    /// The preview has to say so: on this branch nothing of the person's is being displaced —
+    /// it was displaced once already, and what is saved underneath stays exactly where it is.
+    public let replacesShellWrapper: Bool
+
     public init(
         kind: Kind,
         settingsPath: String,
         command: String?,
-        keptUnderneath: String? = nil
+        keptUnderneath: String? = nil,
+        replacesShellWrapper: Bool = false
     ) {
         self.kind = kind
         self.settingsPath = settingsPath
         self.command = command
         self.keptUnderneath = keptUnderneath
+        self.replacesShellWrapper = replacesShellWrapper
     }
 }

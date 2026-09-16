@@ -2,11 +2,13 @@ import Foundation
 
 /// Which copy of the threshold config the values came from.
 public enum ThresholdConfigSource: Equatable, Sendable {
-    /// A file outside the app bundle — editing it changes behaviour without a rebuild.
+    /// A file named from outside — the environment override, which is how the tests and a run
+    /// against a working copy point the app at marks of their own. Never something a person
+    /// installed: the app ships its marks and reads no others.
     case external(URL)
-    /// The copy shipped inside the bundle, used when nothing is installed outside it.
+    /// The copy shipped inside the app, which is what every ordinary run uses.
     case bundled
-    /// The values compiled into the app, used when even the bundled copy failed to load.
+    /// The values compiled into the app, used when even the shipped copy failed to load.
     case builtIn
 }
 
@@ -15,12 +17,16 @@ public struct ThresholdConfigLoad: Equatable, Sendable {
     public let config: ThresholdConfig
     public let source: ThresholdConfigSource
 
-    /// One line per problem found in the file, in the words the dropdown can show. Empty
-    /// when the config was used exactly as written.
+    /// One line per problem found in the file. Empty when the config was used exactly as
+    /// written — which is every ordinary run, because the only config an ordinary run reads is
+    /// the one this app ships and a test keeps correct.
+    ///
+    /// Nothing in the interface shows these: the marks are the app's own business, and a person
+    /// who never chose a number has nothing to do about one. What reads them is whoever is
+    /// editing the file — the author, with the suite in front of them.
     public let problems: [String]
 
-    /// `true` when at least one value had to fall back. The interface says so rather than
-    /// quietly behaving differently from the file the user is looking at.
+    /// `true` when at least one value had to fall back.
     public var usesFallbackValues: Bool { !problems.isEmpty }
 
     public init(config: ThresholdConfig, source: ThresholdConfigSource, problems: [String]) {
@@ -30,40 +36,41 @@ public struct ThresholdConfigLoad: Equatable, Sendable {
     }
 }
 
-/// Reads the threshold config from disk.
+/// Reads the threshold config the app ships with.
 ///
-/// The config lives outside the app bundle so that changing a threshold is a file edit rather
-/// than a build. Nothing here throws: a broken file must not take the menu bar down with it,
-/// so every failure degrades to the next copy down and is reported in `problems`.
+/// The marks are data rather than code so that changing one is an edit to a file and a commit,
+/// not a number hunted down in a rule — but the file is the app's, not the reader's. There is
+/// no copy in Application Support, nothing is created on a first launch, and a copy left behind
+/// by an older release is not read: nobody was going to hand-edit JSON to move a percentage,
+/// and the way to choose these numbers will be the app's own settings.
+///
+/// Nothing here throws: a broken file must not take the menu bar down with it, so every failure
+/// degrades to the next copy down and is listed in `problems` for whoever is editing it.
 ///
 /// Usage:
 /// ```swift
 /// let load = ThresholdConfigLoader.load()
 /// let rules = BudgetRules(config: load.config)
-/// if load.usesFallbackValues { /* the dropdown says "default values applied" */ }
 /// ```
 public enum ThresholdConfigLoader {
-    /// Overrides the external path. For the tests and for running against a working copy.
+    /// Reads marks from somewhere else entirely. For the tests and for running against a
+    /// working copy — it is the only way anything but the shipped file is ever read.
     public static let environmentOverrideKey = "LLM_INFORM_BUREAU_THRESHOLDS"
 
-    /// Path of the editable config: the environment override if set, otherwise the per-user
-    /// copy in Application Support.
-    public static func externalConfigURL(
-        environment: [String: String] = ProcessInfo.processInfo.environment,
-        home: URL = FileManager.default.homeDirectoryForCurrentUser
-    ) -> URL {
-        if let override = environment[environmentOverrideKey], !override.isEmpty {
-            return URL(fileURLWithPath: override)
-        }
-        return SupportDirectory.url(home: home)
-            .appendingPathComponent("thresholds.json", isDirectory: false)
+    /// The file named by the override, when one is set. `nil` is the ordinary answer, and it
+    /// means the app runs on its own marks.
+    public static func overrideConfigURL(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL? {
+        guard let override = environment[environmentOverrideKey], !override.isEmpty else { return nil }
+        return URL(fileURLWithPath: override)
     }
 
-    /// The installed config when there is one, the bundled copy otherwise, the compiled-in
-    /// values as the last resort.
+    /// The shipped copy, or the file an override names; the compiled-in values as the last
+    /// resort.
     public static func load(at externalURL: URL? = nil) -> ThresholdConfigLoad {
         let bundled = loadBundled()
-        let url = externalURL ?? externalConfigURL()
+        guard let url = externalURL ?? overrideConfigURL() else { return bundled }
 
         guard FileManager.default.fileExists(atPath: url.path) else {
             return bundled
@@ -87,7 +94,7 @@ public enum ThresholdConfigLoader {
     /// The copy inside the bundle, falling back to the compiled-in values.
     public static func loadBundled() -> ThresholdConfigLoad {
         guard
-            let url = Bundle.module.url(forResource: "thresholds", withExtension: "json"),
+            let url = bundledConfigURL(),
             let data = try? Data(contentsOf: url)
         else {
             return ThresholdConfigLoad(
@@ -103,6 +110,39 @@ public enum ThresholdConfigLoader {
             problems: parsed.problems.map { "bundled thresholds.json: \($0)" }
         )
     }
+
+    /// The copy of the config that ships inside the app.
+    ///
+    /// Found the way an app finds its own resources, with `Bundle.module` only as the fallback,
+    /// and that order is the whole point. SwiftPM's `Bundle.module` looks in exactly two
+    /// places — beside the `.app`, and at the absolute path of the build directory — and calls
+    /// `fatalError` when it finds neither. `build-app.sh` puts the resource bundle where a Mac
+    /// app keeps its resources, `Contents/Resources`, which is neither of those, so on the
+    /// machine that built the app the build path carries it and on anybody else's the app dies
+    /// on launch. Measured 2026-09-16: the build directory hidden, a copy of the bundle run,
+    /// `could not load resource bundle`.
+    ///
+    /// Moving the bundle to the root of the `.app`, where the accessor does look, is not the
+    /// way out: `codesign --verify --strict` refuses a Mac app with unsealed contents there,
+    /// and the notification centre ignores a bundle whose signature does not hold.
+    ///
+    /// Nothing here knows SwiftPM's naming: the resources are searched for the file, so a
+    /// renamed package or target costs nothing. The fallback is for the test binary, where the
+    /// accessor's build path is the right answer.
+    public static func bundledConfigURL() -> URL? {
+        if let resources = Bundle.main.resourceURL {
+            let nested = (try? FileManager.default.contentsOfDirectory(
+                at: resources,
+                includingPropertiesForKeys: nil
+            )) ?? []
+            for candidate in nested where candidate.pathExtension == "bundle" {
+                if let url = Bundle(url: candidate)?.url(forResource: "thresholds", withExtension: "json") {
+                    return url
+                }
+            }
+        }
+        return Bundle.module.url(forResource: "thresholds", withExtension: "json")
+    }
 }
 
 /// Turns the config file into values, replacing anything unusable with the fallback and
@@ -112,21 +152,28 @@ public enum ThresholdConfigLoader {
 /// one error and no values, and this app needs the opposite — every value it can use, plus a
 /// list of what it could not. A half-broken file keeps the app running on the rest of it.
 enum ThresholdConfigParser {
-    static func parse(
-        _ data: Data,
-        fallback: ThresholdConfig
-    ) -> (config: ThresholdConfig, problems: [String]) {
+    /// Values to use, and what was wrong with the file.
+    struct Result {
+        let config: ThresholdConfig
+        let problems: [String]
+    }
+
+    static func parse(_ data: Data, fallback: ThresholdConfig) -> Result {
         guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
-            return (fallback, ["the file is not a JSON object — default values are in use"])
+            return Result(config: fallback, problems: ["the file is not a JSON object — default values are in use"])
         }
         guard let version = root["version"] as? Int else {
-            return (fallback, ["\"version\" is missing — default values are in use"])
+            return Result(config: fallback, problems: ["\"version\" is missing — default values are in use"])
         }
+        // A format this release does not read falls back **without a word.** Every other problem
+        // in this file belongs to somebody who is editing it right now, and silence there would
+        // be the app running on numbers other than the ones they are looking at. A changed
+        // schema is not that: the app installs this file itself on a first launch, so after a
+        // release that moves the format every single Mac would carry the complaint — including
+        // every person who has never opened the file and has no reason to care which marks
+        // these are. The marks that ship are the ones almost everybody runs on anyway.
         guard version == ThresholdConfig.currentVersion else {
-            return (
-                fallback,
-                ["version \(version) is not the format this app reads (\(ThresholdConfig.currentVersion)) — default values are in use"]
-            )
+            return Result(config: fallback, problems: [])
         }
 
         var problems: [String] = []
@@ -173,7 +220,7 @@ enum ThresholdConfigParser {
                 problems: &problems
             )
         )
-        return (config, problems)
+        return Result(config: config, problems: problems)
     }
 
     // MARK: Entries

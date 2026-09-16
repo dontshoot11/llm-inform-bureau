@@ -56,22 +56,17 @@ Threshold updates land in the repository as commits.
    downstream could catch it.
 6. Changing the shape of the file — a new entry, a renamed key — means raising
    `ThresholdConfig.currentVersion` and the `version` in the file together, because the app
-   falls back wholesale on a version it does not read. Say so in the commit message: anyone
-   with an installed copy in Application Support has to update theirs.
+   falls back wholesale on a version it does not read.
 
-   **Updating an installed copy** is one command, and it is not done automatically — the
-   installed file is the user's, and overwriting a file someone edited is the kind of thing
-   this app does not do:
+   Nobody has to be told: the file ships inside the app and is the only one it reads. A copy
+   in Application Support, left over from the release that had an installer, is not read at
+   all, and the panel says nothing about any of it — a reader who never chose a number has
+   nothing to do about one. Choosing them from the app's own settings is a task of its own
+   (`TODO/thresholds-in-settings/`).
 
-   ```sh
-   cp Sources/SessionHealthCore/Resources/thresholds.json \
-      ~/Library/Application\ Support/LLMInformBureau/thresholds.json
-   ```
-
-   Until it is run, an installed copy of an older version makes the app fall back to its
-   built-in values and say "default thresholds applied" in the panel. That is the intended
-   behaviour, not a bug to work around: the app never pretends a file says something it does
-   not.
+   To run against marks other than the shipped ones, name a file:
+   `LLM_INFORM_BUREAU_THRESHOLDS=/path/to/thresholds.json`. That override is the only way
+   anything else is read, and it is for the tests and for a working copy.
 7. Commit the config change on its own, with the source in the commit message.
 
 ### Running this as an agent task
@@ -102,9 +97,13 @@ one already there.
   network off" can be claimed at all.
 - Do not hardcode a threshold in the rules. Every mark comes from the config; `BudgetRules`
   compares, it does not decide.
-- Do not let a broken config throw. A file someone edited badly must degrade to the values
-  below it and say so in the panel — never take the menu bar down, never change behaviour
-  silently.
+- Do not let a broken config throw. A badly edited file must degrade to the values below it and
+  list what it got wrong in `load.problems`, for whoever is editing it — never take the menu
+  bar down. Nothing of this reaches the interface: the marks are the app's own, and the panel
+  has nothing to say to a reader about them.
+- Do not put a file, a setting or a step in front of the reader that the app can do without.
+  Installing this app is a drag and one command, and everything it needs it either ships with
+  or asks for by a button in the panel.
 - Do not present any of this as a measure of answer quality. The widget reports how full a
   window is, and every mark on that scale is the project's own. There is no signal for "this
   session has degraded" in the data the app can read — no vendor publishes one, and the

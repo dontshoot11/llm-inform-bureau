@@ -68,7 +68,6 @@ final class UsageModel: ObservableObject {
     @Published private(set) var usage: UsageReading?
     @Published private(set) var limits: [AgentService: LimitsAssessment] = [:]
     @Published private(set) var sessions: [SessionView] = []
-    @Published private(set) var configProblems: [String] = []
 
     /// Whose Claude Code's status line slot is. What decides whether the panel offers to take
     /// it, and the only thing that decides whether limits can arrive at all.
@@ -294,7 +293,6 @@ final class UsageModel: ObservableObject {
         self.slot = slot
         self.limits = limits
         self.sessions = sessions
-        self.configProblems = load.problems
         self.thresholds = load.config
         self.level = worst.level
         self.levelReason = worst.reason

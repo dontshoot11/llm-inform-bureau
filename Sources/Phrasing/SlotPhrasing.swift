@@ -39,6 +39,17 @@ public enum SlotPhrasing {
 
     public static let disconnectHelp = "Disconnect: put back the status line that was there before"
 
+    /// The button for a Mac set up by the release that had an installer. It stands under the
+    /// limits rather than in place of them, because the limits are there — what is being
+    /// offered is the app doing its own job instead of a script it left behind.
+    public static let takeOver = "Update the status line"
+
+    public static let takeOverHelp = """
+        Claude's limits are reaching this panel through a shell script an earlier version of \
+        this app installed. The app does that itself now — the same numbers, one less file on \
+        this Mac, and whatever command you had before stays exactly where it is.
+        """
+
     /// Said on the two buttons of the preview. "Write it" rather than "OK": the whole reason
     /// the preview exists is that the next click edits a file.
     public static let apply = "Write it"
@@ -66,6 +77,7 @@ public enum SlotPhrasing {
     }
 
     private static func connectNotes(_ change: StatusLineChange) -> [String] {
+        if change.replacesShellWrapper { return takeOverNotes(change) }
         guard let existing = change.keptUnderneath else {
             return [
                 """
@@ -87,6 +99,39 @@ public enum SlotPhrasing {
             existing,
             keptCopy
         ]
+    }
+
+    /// Taking over from the shell wrapper an earlier release installed. Said apart from the
+    /// other branches because on this one nothing of the person's is being displaced: it was
+    /// displaced once, by the same app, and what was saved then is left alone now.
+    private static func takeOverNotes(_ change: StatusLineChange) -> [String] {
+        var notes = [
+            """
+            The slot holds the shell script an earlier version of this app installed. This \
+            puts the app itself there instead: the same payload, read the same way, with \
+            nothing in between.
+            """
+        ]
+        if let existing = change.keptUnderneath {
+            notes.append(
+                """
+                The status line command you had before that app is kept, exactly where it \
+                already is. It goes on being called with the same payload and its output \
+                printed unchanged:
+                """
+            )
+            notes.append(existing)
+        } else {
+            notes.append(
+                """
+                Nothing of yours is saved underneath it, so nothing is being put back: the \
+                app will print a short line of its own, as the script does now.
+                """
+            )
+        }
+        notes.append("The script itself is deleted once the slot is the app's.")
+        notes.append(keptCopy)
+        return notes
     }
 
     /// Said on every branch that writes, because it is the answer to the question the preview
