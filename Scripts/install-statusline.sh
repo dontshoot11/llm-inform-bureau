@@ -54,6 +54,26 @@ JS
 saved=""
 [ -s "$previous" ] && saved=$(cat "$previous")
 
+# The slot holds our wrapper. Written shell-quoted, so both spellings count.
+wrapper_connected() {
+	[ "$current" = "$installed" ] || [ "$current" = "'$installed'" ]
+}
+
+# settings.json is the user's file and holds far more than this one key, so every branch that
+# writes to it leaves a copy behind first — including --uninstall, which is the branch that
+# removes things.
+backup_settings() {
+	# The operation goes in the name along with the timestamp. Seconds are not fine enough on
+	# their own: --apply and --uninstall run back to back land on the same second, and the
+	# second copy would overwrite the first — which is the one holding the user's original
+	# command, the only state actually worth keeping.
+	#
+	# Explicitly 0: under set -e a function ending on a failed test takes the script down, and
+	# "there is no settings.json yet" is a normal first install, not a failure.
+	[ -f "$settings" ] && cp "$settings" "$settings.backup-$(date +%Y%m%d%H%M%S)-$1"
+	return 0
+}
+
 case "$mode" in
 preview | --preview | --apply)
 	echo "statusLine wrapper"
@@ -70,7 +90,7 @@ preview | --preview | --apply)
 		echo
 		echo "  One thing this changes for you: with any statusLine configured, Claude Code"
 		echo "  stops showing most footer hints, including 'esc to interrupt'."
-	elif [ "$current" = "$installed" ] || [ "$current" = "'$installed'" ]; then
+	elif wrapper_connected; then
 		echo "  The wrapper is already connected."
 		if [ -n "$saved" ]; then
 			echo "  Your own command is saved and still being called:"
@@ -85,7 +105,27 @@ preview | --preview | --apply)
 	fi
 	echo
 	;;
---uninstall) ;;
+--uninstall)
+	echo "statusLine wrapper — removing"
+	echo
+	if ! wrapper_connected; then
+		echo "  The wrapper is not in the statusLine slot, so there is nothing of this app's"
+		echo "  to take out of it."
+		if [ -n "$current" ]; then
+			echo "  What is there now, and what this will NOT touch:"
+			echo "      $current"
+		else
+			echo "  No statusLine is configured at all."
+		fi
+		echo
+		exit 0
+	fi
+	echo "  restore statusLine.command in $settings"
+	echo "        to ${saved:-(nothing — the key will be removed, as there was none before)}"
+	echo
+	echo "  A copy of $settings is kept beside it first."
+	echo
+	;;
 *)
 	echo "usage: $0 [--apply | --uninstall]" >&2
 	exit 1
@@ -98,9 +138,14 @@ if [ "$mode" = "preview" ] || [ "$mode" = "--preview" ]; then
 fi
 
 if [ "$mode" = "--uninstall" ]; then
+	# Guarded above: this branch is only reached with the wrapper actually in the slot. Without
+	# that guard an empty $saved means "delete the key", and $previous is gone after the first
+	# run — so a second --uninstall, or one on a Mac that never had the wrapper, would take the
+	# user's own statusLine command away instead of this app's.
 	restore="$saved"
 	echo "Restoring the statusLine that was there before:"
 	echo "      ${restore:-(none — the key will be removed)}"
+	backup_settings uninstall
 	osascript -l JavaScript - "$settings" "$restore" <<'JS'
 ObjC.import('Foundation');
 function run(argv) {
@@ -135,14 +180,14 @@ mkdir -p "$support" "$(dirname "$settings")"
 
 # Saved before the settings are touched, and never when the wrapper is already the command:
 # saving the wrapper as its own predecessor would make it call itself forever.
-if [ -n "$current" ] && [ "$current" != "$installed" ] && [ "$current" != "'$installed'" ]; then
+if [ -n "$current" ] && ! wrapper_connected; then
 	printf '%s' "$current" >"$previous"
 fi
 
 cp "$wrapper" "$installed"
 chmod +x "$installed"
 
-[ -f "$settings" ] && cp "$settings" "$settings.backup-$(date +%Y%m%d%H%M%S)"
+backup_settings apply
 
 osascript -l JavaScript - "$settings" "$installed" <<'JS'
 ObjC.import('Foundation');

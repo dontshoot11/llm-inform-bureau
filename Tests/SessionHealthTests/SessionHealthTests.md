@@ -39,6 +39,7 @@ the cases are plain functions and would port to swift-testing mechanically.
 | `ClaudeTranscriptTests` | Reading a session out of a transcript: tokens held, turn growth, sidechains, `/clear` |
 | `CodexRolloutTests` | Reading limits and sessions out of rollout fixtures, including the shapes that mean "no data" and "source changed" |
 | `SetupTests` | Which sources read as connected, what the first run says about the ones that do not, and showing that explanation once |
+| `StatuslineInstallerTests` | What `Scripts/install-statusline.sh` does to the user's `settings.json`: the slot filled and emptied, a command that was already there surviving both, and every branch that must not write |
 | `OfflineTests` | That no source file reaches for a network API — the reason the app works with the network off |
 
 ## Writing a case
@@ -76,6 +77,14 @@ different ideas of what a transcript looks like.
 **A case that waits for something waits for the real thing.** The watcher cases block on a
 semaphore with a generous timeout instead of sleeping for a fixed while: a loaded machine does
 not fail them, and an event that never arrives still does.
+
+**A shell script is tested by running it.** `StatuslineInstallerTests` starts the real
+`Scripts/install-statusline.sh` against a throwaway `HOME` rather than re-implementing its
+branching in Swift. It is the only file this project writes that belongs to somebody else, and
+the failure worth catching is not a crash but a silent removal — the wrapper's `--uninstall`
+used to take the user's own statusLine command away on a second run. A second test runner just
+for shell was not worth having: this suite already is the one runner, and `Process` starts a
+script as well as anything else would.
 
 **A fixture's modification date is part of it.** What the widget shows depends on when a file
 was last written, so the fixtures set it explicitly instead of relying on the order they were

@@ -66,11 +66,14 @@ version_of() {
 
 # The quarantine mark macOS puts on everything that arrived over the network. It is read from
 # the installed copy and not from the image: the mark travels with the copy, so clearing it
-# before installing achieves nothing. Both the bundle and the binary are asked, because the
-# mark sits on every file that came across, not only on the top of the tree.
+# before installing achieves nothing.
+#
+# The whole tree is asked, not just the top of it, to stay symmetric with the `xattr -d -r` the
+# instructions hand out: the mark sits on every file that came across, and a copy marked only
+# somewhere inside would pass a shallower check and still be refused on launch. head -1 stops
+# at the first one found.
 quarantined() {
-	xattr -p com.apple.quarantine "$1" >/dev/null 2>&1 ||
-		xattr -p com.apple.quarantine "$1/Contents/MacOS/LLMInformBureau" >/dev/null 2>&1
+	[ -n "$(find "$1" -exec xattr -p com.apple.quarantine {} \; 2>/dev/null | head -1)" ]
 }
 
 step() {
@@ -80,7 +83,26 @@ step() {
 
 # ---------------------------------------------------------------- the plan
 
+# Which version is about to be installed, and from where. Both are printed because the volume
+# name is a constant: mount a second image while the first is still mounted and macOS calls it
+# "LLMInformBureau 1", so the command from the instructions keeps pointing at the older one and
+# reinstalls it without a word. The version on screen is what makes that visible.
+version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$bundle/Contents/Info.plist" 2>/dev/null || echo "unknown")
+installed_app_version=""
+[ -d "$app" ] && installed_app_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist" 2>/dev/null || echo "")
+
 echo "LLM Inform Bureau — install"
+echo "  installing version $version"
+echo "  from $here"
+if [ -n "$installed_app_version" ]; then
+	echo "  replacing version $installed_app_version already in $applications"
+	if [ "$installed_app_version" = "$version" ]; then
+		echo "  NOTE: that is the same version. Expecting a newer one? An older image may still"
+		echo "  be mounted — macOS mounts a second one as \"LLMInformBureau 1\" and this command"
+		echo "  keeps finding the old volume. Unmount it and mount the new image:"
+		echo "    hdiutil detach /Volumes/LLMInformBureau"
+	fi
+fi
 
 step "1. Install the app to $applications"
 echo "   Copies $bundle"

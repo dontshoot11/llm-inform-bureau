@@ -138,7 +138,17 @@ application that happens to have no windows.
 
 A NEW VERSION
 
-Download the new image and run the same two commands. Your edited thresholds are left exactly
+Unmount the old image first, if it is still mounted:
+
+  hdiutil detach /Volumes/$volume
+
+This matters more than it looks. Every version uses the same volume name, and macOS mounts a
+second one alongside the first as "$volume 1" — so the command above would keep finding the
+old volume and reinstall the version you already have, without any sign that it did. The
+installer prints the version it is about to install on its first line; if that number is not
+the new one, an old image is still mounted.
+
+Then download the new image and run the same two commands. Your edited thresholds are left exactly
 as they are: the file the app reads is
 ~/Library/Application Support/LLMInformBureau/thresholds.json, and the installer never
 overwrites it. If a release changes the format of that file, the app falls back to its built-in

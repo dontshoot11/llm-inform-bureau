@@ -48,6 +48,13 @@ sh /Volumes/LLMInformBureau/install.sh            # prints the plan and changes 
 sh /Volumes/LLMInformBureau/install.sh --apply    # carries it out
 ```
 
+The plan opens with the version being installed and the folder it comes from. That line is
+there because the volume name is a constant: mount a second image while the first is still
+mounted and macOS calls it `LLMInformBureau 1`, so the command from the instructions keeps
+finding the old volume and reinstalls the version already there without a word about it. When
+the version on the image matches the one already in `/Applications`, the script says so and
+names the `hdiutil detach` that fixes it.
+
 Four steps, each printed before any of them happens: install the bundle lying beside the
 script to `/Applications`, put an editable copy of the thresholds in Application Support,
 connect the statusLine wrapper (by running `install-statusline.sh`, whose own plan is printed
@@ -75,8 +82,10 @@ it is — it is the one the app reads, and overwriting someone's edited marks du
 would be the worst thing this script could do — and the wrapper step says "already connected"
 rather than saving the wrapper as its own predecessor.
 
-**Step 4 does not open a quarantined app.** It reads `com.apple.quarantine` off the copy it has
-just made, and if the mark is there it prints the unlocking command and stops. This is not
+**Step 4 does not open a quarantined app.** It reads `com.apple.quarantine` across the copy it
+has just made — the whole tree, not just the top of it, to stay symmetric with the recursive
+`xattr -d -r` the instructions hand out — and if the mark is anywhere it prints the unlocking
+command and stops. This is not
 politeness. Opening such a bundle brings up "LLMInformBureau Not Opened", whose default button
 is a blue **Move to Trash** — so the most obvious thing to press deletes what was installed a
 second earlier. Ending on a command the person can paste is the only way not to leave them in
@@ -131,8 +140,18 @@ layout is named anywhere in it.
 
 The preview is the point: the script edits `~/.claude/settings.json`, which is the user's file
 and holds much more than this one key, so it says what it will copy where, what the current
-command is, and where that command will be saved — before doing any of it. `--apply` keeps a
-timestamped backup of the settings file next to it.
+command is, and where that command will be saved — before doing any of it. `--uninstall` prints
+its own plan the same way — what goes back into the slot — and acts straight away rather than
+waiting for `--apply`, because putting something back is what it is for.
+
+**`--uninstall` only ever removes this app's wrapper.** If the slot holds something else, or
+nothing, it says so and exits without writing: the saved predecessor is deleted once it has been
+restored, and an empty one means "remove the key", so an unguarded run would take away the
+command it had just put back — or, on a Mac where the wrapper was never connected, somebody
+else's. Both writes keep a copy of the settings file beside it, named for the timestamp **and
+the operation** (`settings.json.backup-20260916134639-apply`): the two run back to back land on
+the same second, and a name without the operation would let the second copy overwrite the first,
+which is the one holding the original command.
 
 Two things the preview says out loud because they surprise people:
 
