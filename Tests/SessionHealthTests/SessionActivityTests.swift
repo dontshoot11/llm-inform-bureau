@@ -35,25 +35,37 @@ func runSessionActivityTests(_ suite: TestSuite, config: ThresholdConfig) {
     }
 
     // The fuse under the blinking light. Nothing on disk says a session died, so a wait that
-    // has gone this long without a word is presumed abandoned — and the session goes on being
-    // listed for its own, much longer, window: quiet is not the same as finished.
+    // has gone this long without a word stops being one an answer is expected out of — it is
+    // drawn as a stall instead, and the session goes on being listed for its own, much longer,
+    // window: quiet is not the same as finished.
     suite.test("a wait that has just started is one somebody is waiting on") {
-        suite.expectEqual(activity.isStillWaiting(since: now.addingTimeInterval(-5), now: now), true, "5 seconds in")
+        suite.expectEqual(activity.replyWait(since: now.addingTimeInterval(-5), now: now), .waiting, "5 seconds in")
     }
 
-    suite.test("the edge of the fuse still waits, just past it does not") {
+    suite.test("the edge of the fuse still waits, just past it stalls") {
         let fuse = config.abandonedWait.seconds
-        suite.expectEqual(activity.isStillWaiting(since: now.addingTimeInterval(-fuse), now: now), true, "exactly at the mark")
-        suite.expectEqual(activity.isStillWaiting(since: now.addingTimeInterval(-fuse - 1), now: now), false, "a second past it")
+        suite.expectEqual(
+            activity.replyWait(since: now.addingTimeInterval(-fuse), now: now), .waiting, "exactly at the mark"
+        )
+        suite.expectEqual(
+            activity.replyWait(since: now.addingTimeInterval(-fuse - 1), now: now), .stalled, "a second past it"
+        )
         suite.expect(fuse < window, "the fuse must be shorter than the window the session itself gets")
     }
 
-    suite.test("nothing owed is not a wait at all") {
-        suite.expectEqual(activity.isStillWaiting(since: nil, now: now), false, "no answer owed")
+    // A stall is still an answer owed, which is what the sign says and what separates it from
+    // a session that has simply gone quiet.
+    suite.test("a stall says an answer is owed, an idle session says nothing is") {
+        suite.expect(activity.replyWait(since: now.addingTimeInterval(-86_400), now: now).isOwed, "still owed")
+        suite.expect(!activity.replyWait(since: nil, now: now).isOwed, "nothing owed")
     }
 
-    suite.test("an entry written in the future is a wait rather than an abandoned one") {
-        suite.expectEqual(activity.isStillWaiting(since: now.addingTimeInterval(600), now: now), true, "ahead of now")
+    suite.test("nothing owed is not a wait at all") {
+        suite.expectEqual(activity.replyWait(since: nil, now: now), .none, "no answer owed")
+    }
+
+    suite.test("an entry written in the future is a wait rather than a stalled one") {
+        suite.expectEqual(activity.replyWait(since: now.addingTimeInterval(600), now: now), .waiting, "ahead of now")
     }
 
     suite.test("filtering keeps the active sessions and puts the freshest first") {

@@ -159,6 +159,7 @@ struct MenuContent: View {
         return entry(
             light: light(of: session),
             blinkedOut: blinkedOut(model.pulse(ofSession: snapshot.sessionID)),
+            stalled: model.isStalled(session: snapshot.sessionID),
             name: Wording.service(snapshot.service),
             badge: snapshot.project,
             help: "The context this session holds — the second of its service's two dots in the menu bar. "
@@ -182,7 +183,11 @@ struct MenuContent: View {
         let snapshot = subagent.snapshot
 
         return HStack(alignment: .firstTextBaseline, spacing: 5) {
-            StatusLight(light: light(of: subagent), diameter: 6)
+            StatusLight(
+                light: light(of: subagent),
+                diameter: 6,
+                stalled: model.isStalled(session: snapshot.sessionID)
+            )
                 .opacity(blinkedOut(model.pulse(ofSession: snapshot.sessionID)) ? 0 : 1)
                 .alignmentGuide(.firstTextBaseline) { $0.height * 0.5 + 2.5 }
                 .help(
@@ -284,6 +289,7 @@ struct MenuContent: View {
     private func entry(
         light: Light,
         blinkedOut: Bool = false,
+        stalled: Bool = false,
         name: String,
         badge: String?,
         help: String,
@@ -291,7 +297,7 @@ struct MenuContent: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                StatusLight(light: light)
+                StatusLight(light: light, stalled: stalled)
                     // Hidden rather than removed: the row must not shift sideways while it
                     // blinks, or the blink reads as the layout moving instead of the light.
                     .opacity(blinkedOut ? 0 : 1)
@@ -375,9 +381,24 @@ struct StatusLight: View {
     let light: Light
     var diameter: Double = 8
 
+    /// Whether this light stands for a wait that has gone past the fuse: the same light in the
+    /// same colour, drawn as a figure eight instead of a dot. Shape carries the state and
+    /// colour goes on carrying the budget — a context against the ceiling shows a red sign,
+    /// which says both things at once and neither of them twice.
+    var stalled: Bool = false
+
     var body: some View {
         Group {
             switch light {
+            case _ where stalled:
+                WaitSign.path(in: CGRect(x: 0, y: 0, width: diameter, height: diameter))
+                    .stroke(
+                        colour(of: light),
+                        style: StrokeStyle(
+                            lineWidth: WaitSign.lineWidth(forDiameter: diameter),
+                            lineCap: .round
+                        )
+                    )
             case .unknown:
                 Circle().strokeBorder(Color.secondary, lineWidth: 1.5)
             case .level(let level):
@@ -400,6 +421,72 @@ struct StatusLight: View {
             }
         }
         .frame(width: diameter, height: diameter)
+    }
+
+    /// What colour a light of this kind is drawn in when it is drawn as a sign rather than as
+    /// itself. An unreported reading keeps the grey its outline would have had: the sign says
+    /// the wait is long, and inventing a budget colour to go with it would say something nobody
+    /// measured.
+    private func colour(of light: Light) -> Color {
+        switch light {
+        case .unknown: .secondary
+        case .level(let level): Palette.colour(of: level)
+        case .spent: Palette.colour(of: .high)
+        }
+    }
+}
+
+/// The figure eight a light becomes when the wait behind it has gone past the fuse.
+///
+/// Drawn rather than taken from SF Symbols, for the reason the cross above is: a glyph brings
+/// its own line box and sits off-centre in a box six points wide, and this sign has to line up
+/// with the dots it stands among. Two cubics, each leaving the centre and coming back to it,
+/// which is the shortest description of a lemniscate that a bezier path can hold.
+///
+/// It keeps the dot's slot and its centre, and overhangs it by about an eighth of a diameter on
+/// each side — into padding both in the bar and in the panel, so nothing next to it moves. That
+/// overhang is the whole reason the sign reads at menu bar size at all: a figure eight squeezed
+/// into the width of a six-point dot is a smudge, and the position of a light is its name.
+enum WaitSign {
+    /// Half the sign's width and height, as fractions of the light's diameter.
+    private static let halfWidth = 0.62
+    private static let halfHeight = 0.33
+
+    /// What a cubic that starts and ends at one point reaches, as a fraction of its control
+    /// offset: three quarters of it sideways, and 0.2887 of it at the widest point of the lobe.
+    /// Dividing by them is what makes the sign come out the size it was asked for rather than
+    /// roughly that.
+    private static let sidewaysReach = 0.75
+    private static let verticalReach = 0.2887
+
+    static func lineWidth(forDiameter diameter: Double) -> Double { max(diameter * 0.2, 1.1) }
+
+    /// The centre, and the two control offsets that put each lobe where it belongs. Shared so
+    /// that the bar's `NSBezierPath` and the panel's `Path` draw one shape and not two that
+    /// merely resemble each other.
+    static func lobes(in box: CGRect) -> (centre: CGPoint, reach: Double, lift: Double) {
+        (
+            CGPoint(x: box.midX, y: box.midY),
+            box.width * halfWidth / sidewaysReach,
+            box.height * halfHeight / verticalReach
+        )
+    }
+
+    static func path(in box: CGRect) -> Path {
+        let (centre, reach, lift) = lobes(in: box)
+        return Path { path in
+            path.move(to: centre)
+            path.addCurve(
+                to: centre,
+                control1: CGPoint(x: centre.x - reach, y: centre.y + lift),
+                control2: CGPoint(x: centre.x - reach, y: centre.y - lift)
+            )
+            path.addCurve(
+                to: centre,
+                control1: CGPoint(x: centre.x + reach, y: centre.y - lift),
+                control2: CGPoint(x: centre.x + reach, y: centre.y + lift)
+            )
+        }
     }
 }
 

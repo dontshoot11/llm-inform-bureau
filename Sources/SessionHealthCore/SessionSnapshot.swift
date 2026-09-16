@@ -36,6 +36,29 @@ public struct SubagentOrigin: Equatable, Sendable {
     }
 }
 
+/// Whether anybody is waiting on this session's agent, and for how long that has been true.
+///
+/// Three outcomes rather than a yes and a no, because an answer that has not come in ten
+/// seconds and one that has not come in an hour are different things to a person glancing at
+/// the bar — and the app cannot tell the second from a session that died. What it can say is
+/// how long the silence has run, and that is the whole difference between the middle case and
+/// the last one.
+public enum ReplyWait: String, Equatable, Sendable {
+    /// Nothing is owed: the turn ended, or the person is the one who owes the next move.
+    case none
+    /// An answer is owed and the silence is still short enough to believe in. The blinking
+    /// light.
+    case waiting
+    /// An answer is owed and has been owed past the fuse
+    /// (`sessions.abandoned_wait_after_minutes`). Either the agent is thinking very hard or
+    /// the session is gone; nothing on disk separates the two, so the app says the one thing
+    /// it knows — there has been no answer for a long time — and draws the sign for it.
+    case stalled
+
+    /// Whether an answer is owed at all, however long it has been owed.
+    public var isOwed: Bool { self != .none }
+}
+
 /// One reading of a coding-agent session, as it was found on disk.
 ///
 /// Everything the budget rules need and nothing else. Where the numbers come from
@@ -67,15 +90,15 @@ public struct SessionSnapshot: Equatable, Sendable {
     /// first reading of the session and there is nothing to compare against.
     public let turnGrowthTokens: Int?
 
-    /// Whether the agent owes this session an answer right now — a question was asked, or a
-    /// tool was called, and nothing has come back yet.
+    /// Whether the agent owes this session an answer right now, and whether it is still
+    /// plausible that one is coming.
     ///
     /// Derived, not observed: nothing on disk announces a request in flight, so this is read
     /// off the last thing written — whose entry it was, and whether it promised another. The
     /// rule belongs to whichever reader knows the shape of its own source, and it is a fact
     /// about the session rather than a decision of the view, so it is carried here beside
     /// `lastActivityAt`.
-    public let isAwaitingReply: Bool
+    public let replyWait: ReplyWait
 
     /// Set when this reading is a subagent's rather than a session's. Everything above means
     /// the same thing either way — the difference is what it is allowed to do, which is why
@@ -92,7 +115,7 @@ public struct SessionSnapshot: Equatable, Sendable {
         turnGrowthTokens: Int? = nil,
         project: String? = nil,
         lastActivityAt: Date = Date(),
-        isAwaitingReply: Bool = false,
+        replyWait: ReplyWait = .none,
         subagent: SubagentOrigin? = nil
     ) {
         self.sessionID = sessionID
@@ -102,7 +125,7 @@ public struct SessionSnapshot: Equatable, Sendable {
         self.turnGrowthTokens = turnGrowthTokens
         self.project = project
         self.lastActivityAt = lastActivityAt
-        self.isAwaitingReply = isAwaitingReply
+        self.replyWait = replyWait
         self.subagent = subagent
     }
 
@@ -119,7 +142,7 @@ public struct SessionSnapshot: Equatable, Sendable {
             turnGrowthTokens: turnGrowthTokens,
             project: project,
             lastActivityAt: lastActivityAt,
-            isAwaitingReply: isAwaitingReply,
+            replyWait: replyWait,
             subagent: subagent
         )
     }

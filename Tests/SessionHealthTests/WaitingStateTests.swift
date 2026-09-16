@@ -2,13 +2,13 @@ import Foundation
 import AgentFiles
 import SessionHealthCore
 
-/// Whether a session is waiting on its agent — the state the blinking light rests on.
+/// What a session is waiting for — the state the blinking light and the stalled sign rest on.
 ///
 /// Nothing in a transcript says "a request is in flight": measured, while a turn is worked on
 /// nothing is written at all. So the state is read off the last thing that *was* written, and
-/// these cases are the four moments of a turn plus the two things that make the reading hard —
-/// the housekeeping written after an answer lands, and a response arriving as several entries
-/// of which the middle one is plain text.
+/// these cases are the four moments of a turn plus the three things that make the reading hard —
+/// the housekeeping written after an answer lands, a response arriving as several entries of
+/// which the middle one is plain text, and a wait that no answer is ever coming for.
 func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
     let activity = SessionActivity(config: config)
     let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -26,9 +26,9 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
         return found
     }
 
-    func expectWaiting(_ root: URL, _ name: String, _ lines: [String], _ waiting: Bool, _ label: String) {
+    func expectWaiting(_ root: URL, _ name: String, _ lines: [String], _ wait: ReplyWait, _ label: String) {
         guard let snapshot = session(root, name, lines) else { return }
-        suite.expectEqual(snapshot.isAwaitingReply, waiting, label)
+        suite.expectEqual(snapshot.replyWait, wait, label)
     }
 
     withTemporaryDirectory(suite, named: "claude-waiting") { root in
@@ -40,7 +40,7 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                     assistant(input: 1, cacheCreation: 0, cacheRead: 40_000, stopReason: "end_turn", blocks: ["text"]),
                     userPrompt("do the thing")
                 ],
-                true, "waiting from the moment the question is written"
+                .waiting, "waiting from the moment the question is written"
             )
         }
 
@@ -65,7 +65,7 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                     userPrompt("do the thing"),
                     assistant(input: 1, cacheCreation: 0, cacheRead: 40_000, stopReason: "tool_use", blocks: ["tool_use"])
                 ],
-                true, "waiting while the tool runs"
+                .waiting, "waiting while the tool runs"
             )
         }
 
@@ -77,7 +77,7 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                     assistant(input: 1, cacheCreation: 0, cacheRead: 40_000, stopReason: "tool_use", blocks: ["tool_use"]),
                     toolResult()
                 ],
-                true, "waiting after the result comes back"
+                .waiting, "waiting after the result comes back"
             )
         }
 
@@ -93,7 +93,7 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                     assistant(input: 1, cacheCreation: 0, cacheRead: 40_000, stopReason: "tool_use", blocks: ["thinking"]),
                     assistant(input: 1, cacheCreation: 0, cacheRead: 40_000, stopReason: "tool_use", blocks: ["text"])
                 ],
-                true, "waiting: the response is not over"
+                .waiting, "waiting: the response is not over"
             )
         }
 
@@ -106,7 +106,7 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                     toolResult(),
                     assistant(input: 1, cacheCreation: 0, cacheRead: 60_000, stopReason: "end_turn", blocks: ["text"])
                 ],
-                false, "the answer landed"
+                .none, "the answer landed"
             )
         }
 
@@ -117,7 +117,7 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                     userPrompt("do the thing"),
                     assistant(input: 1, cacheCreation: 0, cacheRead: 60_000, stopReason: "end_turn", blocks: ["text"])
                 ] + serviceTail(),
-                false, "the tail carries no message and decides nothing"
+                .none, "the tail carries no message and decides nothing"
             )
         }
 
@@ -132,14 +132,16 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                     userPrompt("do the thing"),
                     assistant(input: 1, cacheCreation: 0, cacheRead: 60_000, stopReason: "stop_sequence", blocks: ["text"])
                 ],
-                false, "not waiting on a turn that stopped"
+                .none, "not waiting on a turn that stopped"
             )
         }
 
         // The fuse. A terminal closed mid-turn and a killed process leave exactly what a
         // working agent leaves — an entry owing an answer and nothing after it — so how long
-        // ago it was written is the only thing that separates them.
-        suite.test("a wait older than the fuse stops being a wait") {
+        // ago it was written is the only thing that separates them. Past it the wait is not
+        // dropped but stalled: an answer is still owed, and the app has no way of knowing
+        // whether one is coming, so it says the one thing it does know.
+        suite.test("a wait older than the fuse becomes a stall") {
             let longAgo = now.addingTimeInterval(-config.abandonedWait.seconds - 60)
             expectWaiting(
                 root, "abandoned",
@@ -150,7 +152,7 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                         stopReason: "tool_use", blocks: ["tool_use"], at: longAgo
                     )
                 ],
-                false, "the answer is not coming"
+                .stalled, "no answer for this long is a stall, not an answer that landed"
             )
         }
 
@@ -165,13 +167,13 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                         stopReason: "tool_use", blocks: ["tool_use"], at: recently
                     )
                 ],
-                true, "a long tool call is still somebody waiting"
+                .waiting, "a long tool call is still somebody waiting"
             )
         }
 
         // The fuse takes the blink away and nothing else: the session is still one being
         // worked on, and a row that vanished would say it was over.
-        suite.test("a session whose wait gave up keeps its row") {
+        suite.test("a stalled session keeps its row and its numbers") {
             let longAgo = now.addingTimeInterval(-config.abandonedWait.seconds - 60)
             guard let snapshot = session(
                 root, "abandoned-row",
@@ -184,6 +186,44 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                 ]
             ) else { return }
             suite.expectEqual(snapshot.contextTokens, 40_001, "the row still carries what the session holds")
+            suite.expectEqual(snapshot.replyWait, .stalled, "and says an answer is still owed")
+        }
+
+        // The sign is for a wait and only for a wait. A session nobody has typed into for an
+        // hour owes nothing: its turn ended, and what happens next waits on the person. The
+        // half-hour activity window is what eventually takes that row away, not this rule.
+        suite.test("a session that owes nothing never stalls, however long it is quiet") {
+            let longAgo = now.addingTimeInterval(-config.abandonedWait.seconds * 3)
+            expectWaiting(
+                root, "quiet",
+                [
+                    userPrompt("do the thing", at: longAgo.addingTimeInterval(-30)),
+                    assistant(
+                        input: 1, cacheCreation: 0, cacheRead: 60_000,
+                        stopReason: "end_turn", blocks: ["text"], at: longAgo
+                    )
+                ],
+                .none, "idle is idle at any age"
+            )
+        }
+
+        // A turn the person stopped is over, and staying stopped for longer does not turn it
+        // into something the agent owes an answer for. Read the marker only inside the fuse
+        // and every interrupted session on the machine would end up wearing the sign.
+        suite.test("a turn stopped long ago is over rather than stalled") {
+            let longAgo = now.addingTimeInterval(-config.abandonedWait.seconds * 3)
+            expectWaiting(
+                root, "interrupted-long-ago",
+                [
+                    userPrompt("do the thing", at: longAgo.addingTimeInterval(-60)),
+                    assistant(
+                        input: 1, cacheCreation: 0, cacheRead: 40_000,
+                        stopReason: "tool_use", blocks: ["tool_use"], at: longAgo.addingTimeInterval(-40)
+                    ),
+                    interrupted(at: longAgo)
+                ],
+                .none, "stopped on purpose, whatever the age"
+            )
         }
 
         // Pressing Esc writes an ordinary user entry, which the rule above would read as a
@@ -200,7 +240,7 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                     ),
                     interrupted(at: now.addingTimeInterval(-20))
                 ],
-                false, "stopped on purpose, not waiting"
+                .none, "stopped on purpose, not waiting"
             )
         }
 
@@ -215,7 +255,7 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                     ),
                     interrupted(forToolUse: true, at: now.addingTimeInterval(-20))
                 ],
-                false, "the second wording says the same thing"
+                .none, "the second wording says the same thing"
             )
         }
 
@@ -234,7 +274,7 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                     interrupted(at: now.addingTimeInterval(-20)),
                     userPrompt("do this instead", at: now.addingTimeInterval(-10))
                 ],
-                true, "a new question is a new wait"
+                .waiting, "a new question is a new wait"
             )
         }
 
@@ -261,7 +301,10 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                 suite.expect(false, "expected a session")
                 return
             }
-            suite.expect(!snapshot.isAwaitingReply, "the session answered; the sidechain is somebody else's turn")
+            suite.expectEqual(
+                snapshot.replyWait, .none,
+                "the session answered; the sidechain is somebody else's turn"
+            )
         }
 
         suite.test("of two sessions, only the one being worked on is waiting") {
@@ -283,7 +326,7 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
 
             let sessions = ClaudeTranscriptStore(projectsDirectory: directory)
                 .activeSessions(activity: activity, now: now).value ?? []
-            let waiting = sessions.filter(\.isAwaitingReply).map(\.sessionID).sorted()
+            let waiting = sessions.filter { $0.replyWait == .waiting }.map(\.sessionID).sorted()
             suite.expectEqual(waiting, ["busy"], "only the session whose agent owes an answer")
         }
 
@@ -313,7 +356,31 @@ func runWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                 suite.expect(false, "expected a subagent row")
                 return
             }
-            suite.expect(agent.isAwaitingReply, "the agent has a tool running")
+            suite.expectEqual(agent.replyWait, .waiting, "the agent has a tool running")
         }
+    }
+
+    // What the sign is drawn in. Shape carries the wait and colour goes on carrying the
+    // budget, so a stall must not touch what the rules make of the session's numbers — a
+    // session that stalled with its window against the ceiling wears a red sign, which says
+    // both things at once. The drawing itself lives in the app target, which no test can
+    // import; what is checked here is the reading it is handed.
+    suite.test("a stalled session is still judged by its numbers, ceiling included") {
+        let rules = BudgetRules(config: config)
+        func assess(_ wait: ReplyWait, tokens: Int) -> BudgetLevel {
+            rules.assess(
+                SessionSnapshot(
+                    sessionID: "stalled",
+                    service: .claude,
+                    contextTokens: tokens,
+                    contextWindowTokens: 100_000,
+                    replyWait: wait
+                )
+            ).level
+        }
+        let full = Int(config.windowFill.high / 100 * 100_000) + 1
+        suite.expectEqual(assess(.stalled, tokens: full), assess(.none, tokens: full), "at the ceiling")
+        suite.expectEqual(assess(.stalled, tokens: full), .high, "and the ceiling is red")
+        suite.expectEqual(assess(.stalled, tokens: 1_000), assess(.none, tokens: 1_000), "well under it")
     }
 }

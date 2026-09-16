@@ -182,8 +182,8 @@ public struct ThresholdConfig: Equatable, Sendable {
     /// Not a budget mark — it decides what the widget shows rather than what it warns about.
     public let sessionActivity: DurationThreshold
 
-    /// How long a session may owe an answer in silence before nobody is taken to be waiting
-    /// on it. The fuse under the blinking light — `SessionActivity.isStillWaiting`.
+    /// How long a session may owe an answer in silence before an answer stops being expected
+    /// out of it. The fuse under the blinking light — `SessionActivity.replyWait`.
     public let abandonedWait: DurationThreshold
 
     public init(
@@ -284,8 +284,10 @@ public struct ThresholdConfig: Equatable, Sendable {
                 sessions are not the ones it was written on. Nothing on disk says a session \
                 died: a closed terminal, a killed process and an agent hard at work all look \
                 like an entry that owes an answer and nothing after it. So a wait that has \
-                gone this long without a word is presumed abandoned and its light stops \
-                blinking, while the session itself stays listed for its own half hour. The \
+                gone this long without a word stops being one an answer is expected out of: \
+                its light stops blinking and is drawn as a figure eight instead, which says \
+                no answer has come for a long time without claiming the session is dead. The \
+                session itself stays listed for its own half hour. The \
                 number only has to be longer than the longest silence inside a turn that is \
                 really running — a working turn writes an entry every few seconds — and \
                 short enough that nobody watches a dead session blink. Raise it if a long \

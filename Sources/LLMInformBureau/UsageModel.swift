@@ -109,13 +109,31 @@ final class UsageModel: ObservableObject {
     /// **Waiting is derived, not observed.** Measured: while a turn is being worked on, neither
     /// the statusLine payload nor the transcript is written — both move only when a step lands.
     /// So the blink rests on what the last thing written leaves owed
-    /// (`SessionSnapshot.isAwaitingReply`), which is the strongest true thing this app can say.
+    /// (`SessionSnapshot.replyWait`), which is the strongest true thing this app can say.
+    ///
+    /// And it rests on that only for as long as the silence is short enough to believe in. Past
+    /// the fuse the blink stops and the light is drawn as a sign instead — `stalledServices`.
     @Published private(set) var pulse: [AgentService: Double] = [:]
 
     /// The same pulse, per session, for the panel — where there is room to say which of three
     /// Claude sessions moved. The bar has one light per service and can only blink for "one of
     /// them did"; a row of its own can be honest about which.
     @Published private(set) var sessionPulse: [String: Double] = [:]
+
+    /// Whose wait has gone on past the fuse, by service for the bar and by session for the
+    /// panel — the lights drawn as a sign instead of a dot.
+    ///
+    /// Published rather than kept beside the private sets below, because unlike a blink this
+    /// changes nothing else: a stall starts and ends without a frame being drawn, and a view
+    /// that was not told would go on showing the dot until something else moved.
+    ///
+    /// A service the bar would have to say two things about says the live one. `stalledServices`
+    /// leaves out any service that also has a session blinking: one of them means "something is
+    /// running right now" and the other "nothing has come back for ten minutes", and on a light
+    /// that speaks for every session of a service the first is the newer fact. The panel, which
+    /// has a row per session, shows both without having to choose.
+    @Published private(set) var stalledServices: Set<AgentService> = []
+    @Published private(set) var stalledSessions: Set<String> = []
 
     private let notifier: Notifier
     private var dispatch = AlertDispatch()
@@ -203,6 +221,12 @@ final class UsageModel: ObservableObject {
     /// How far through its pulse this session is, or nil when it is not pulsing.
     func pulse(ofSession sessionID: String) -> Double? { sessionPulse[sessionID] }
 
+    /// Whether this service's light stands for a wait that has gone past the fuse.
+    func isStalled(_ service: AgentService) -> Bool { stalledServices.contains(service) }
+
+    /// Whether this session's own light does.
+    func isStalled(session sessionID: String) -> Bool { stalledSessions.contains(sessionID) }
+
     func refresh() async {
         // A read already running will see everything this one would have; asking it to go
         // round once more is how the last event of a burst is not lost.
@@ -289,9 +313,16 @@ final class UsageModel: ObservableObject {
     /// is in and drops out, which is one beat at most and leaves it lit rather than dark: a
     /// blink cut off mid-beat is read as the light going out for good.
     private func updateWaiting(for sessions: [SessionView]) {
-        let waiting = sessions.flatMap { [$0] + $0.subagents }.filter(\.snapshot.isAwaitingReply)
-        waitingServices = Set(waiting.map(\.snapshot.service))
-        waitingSessions = Set(waiting.map(\.snapshot.sessionID))
+        let rows = sessions.flatMap { [$0] + $0.subagents }.map(\.snapshot)
+        let waiting = rows.filter { $0.replyWait == .waiting }
+        let stalled = rows.filter { $0.replyWait == .stalled }
+        waitingServices = Set(waiting.map(\.service))
+        waitingSessions = Set(waiting.map(\.sessionID))
+        // A stalled wait stops blinking and starts being drawn as a sign — nothing here keeps
+        // a frame running for it, which is what leaves an app with nothing but stalls as idle
+        // as one with nothing at all.
+        stalledServices = Set(stalled.map(\.service)).subtracting(waitingServices)
+        stalledSessions = Set(stalled.map(\.sessionID))
         guard !waiting.isEmpty else { return }
 
         for service in waitingServices where pulse[service] == nil { pulse[service] = 0 }

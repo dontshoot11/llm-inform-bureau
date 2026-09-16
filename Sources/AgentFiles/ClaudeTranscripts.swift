@@ -97,7 +97,7 @@ public struct ClaudeTranscriptStore: Sendable {
                         fromWorkingDirectory: Self.home(of: file.url) ?? reading.workingDirectory
                     ),
                     lastActivityAt: file.modified,
-                    isAwaitingReply: activity.isStillWaiting(since: reading.awaitingSince, now: now)
+                    replyWait: activity.replyWait(since: reading.awaitingSince, now: now)
                 )
                 snapshots.append(session)
                 snapshots.append(
@@ -144,7 +144,7 @@ public struct ClaudeTranscriptStore: Sendable {
                     turnGrowthTokens: nil,
                     project: snapshot.project,
                     lastActivityAt: file.modified,
-                    isAwaitingReply: activity.isStillWaiting(since: reading.awaitingSince, now: now),
+                    replyWait: activity.replyWait(since: reading.awaitingSince, now: now),
                     subagent: SubagentOrigin(
                         parentSessionID: snapshot.sessionID,
                         type: meta?.type,
@@ -408,7 +408,7 @@ private struct TranscriptLine {
     /// housekeeping that surrounds them is nobody's.
     func isTurnEntry(sidechain: Bool) -> Bool { isMessage && isSidechain == sidechain }
 
-    /// Whether this entry leaves an answer owed. See `ClaudeTranscriptStore.isAwaitingReply`
+    /// Whether this entry leaves an answer owed. See `ClaudeTranscriptStore.awaitingSince`
     /// for why a tool call counts and why `stop_reason` answers it rather than the blocks.
     var owesAnAnswer: Bool {
         switch json?["type"] as? String {

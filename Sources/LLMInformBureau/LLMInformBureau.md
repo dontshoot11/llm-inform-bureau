@@ -72,12 +72,29 @@ while a turn is being worked on neither the statusLine payload nor the transcrip
 all. What the app reads is what the last thing written leaves owed — the rule, and what it
 cannot cover, are in `AgentFiles.md`.
 
-**And a wait is given up on rather than kept forever.** A closed terminal, a killed process and
-an agent hard at work leave the same thing on disk, so what ends the blinking when no answer is
-ever coming is time: past `sessions.abandoned_wait_after_minutes` of silence the reader stops
-calling it a wait, the light goes steady, and the row stays — quiet is not finished, and a
-session keeps its line for the full activity window. Stopping the agent on purpose needs no
-fuse at all: the interrupt is written down, and the light goes steady on the next pass.
+**And a wait that drags on stops blinking and becomes a sign.** A closed terminal, a killed
+process and an agent hard at work leave the same thing on disk, so what ends the blinking when
+no answer is ever coming is time: past `sessions.abandoned_wait_after_minutes` of silence the
+light is drawn as a figure eight instead — in the bar for the service, in the panel for the row.
+It says the one thing the file supports, *no answer for a long time*, and refuses the two it
+does not: neither "the session is dead", which nothing on disk shows, nor a plain steady dot,
+which would claim the wait was over. It lasts until an answer arrives or until the row itself
+goes by the activity window; there is no second fuse under it. Stopping the agent on purpose
+needs no fuse at all: the interrupt is written down, and the light goes steady on the next pass.
+
+**Shape carries the state, colour goes on carrying the budget.** The sign is the light's own
+colour — green because `.normal` is green, red when the context is against the ceiling, which
+says both things at once and neither of them twice. It keeps the dot's slot and its centre,
+overhanging it by about an eighth of a diameter into the padding on either side: at six points
+a figure eight squeezed into a dot's width is a smudge, and a light that moved its neighbour
+would read as a different light. A sign is drawn only where a dot would have been drawn — in
+the bar an unreported reading draws nothing, so a Claude session with no wrapper connected
+stalls invisibly there, exactly as it blinks invisibly today, and the panel shows it in the
+grey of its outline.
+
+Only a wait can become a sign. A session nobody has typed into for an hour owes nothing, so it
+keeps its plain dot however long it stays quiet and leaves by the half-hour window like any
+other — the sign is about an answer that has not come, not about a session that is idle.
 
 Why blinking and not a glow: a halo fading in alpha over a point or two was drawn first and
 was simply invisible in a menu bar — the eye gets nothing from a gradient that small. A light
@@ -87,7 +104,9 @@ same reason it is kept for a light with nothing behind it: position is what name
 
 The animation runs only while a blink does, and a wait is what keeps one going: the frames stop
 the moment nothing is blinking and nothing is waiting. There is no timer the rest of the time —
-the app still wakes only when a file changes, which is what makes this affordable at all.
+the app still wakes only when a file changes, which is what makes this affordable at all. A
+stalled light costs nothing on top of that: it is a shape and not a beat, so a machine full of
+abandoned sessions animates exactly as much as an empty one does, which is not at all.
 
 **Three colours on one scale, under every light.** Yellow, orange and red mark the same three
 shares of a window whether the window is a subscription limit or a session's context, so a

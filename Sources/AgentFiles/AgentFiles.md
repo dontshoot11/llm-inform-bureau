@@ -89,7 +89,9 @@ Three shapes in a transcript the reader has to know about:
 ### Whether a session is waiting on its agent
 
 A session's row says not only what it holds but whether the agent owes it an answer right now —
-`SessionSnapshot.isAwaitingReply`, which the panel and the bar blink on.
+`SessionSnapshot.replyWait`, which the panel and the bar draw on. Three outcomes, not two:
+nothing owed, an answer owed and still expected (`.waiting`, the blinking light), and an answer
+owed for longer than the fuse (`.stalled`, the figure eight).
 
 **Nothing on disk announces a request in flight.** Measured: while a turn is worked on, neither
 the transcript nor the statusLine payload is written — 25 seconds of a busy session moved
@@ -124,7 +126,7 @@ Two things make that readable:
   answers it, so the wait goes on.
 - **How long the entry has owed it.** An entry that owes an answer says the agent was working
   when it was written, not that it still is, so the reading carries the moment rather than a
-  flag, and `SessionActivity.isStillWaiting` puts it against the configured fuse
+  flag, and `SessionActivity.replyWait` puts it against the configured fuse
   (`sessions.abandoned_wait_after_minutes`). The moment is the entry's own timestamp and never
   the file's date: measured, a transcript's modification date runs ahead of the last thing
   said in it by a median of a minute and a half and, in 87 files of 385, by more than ten
@@ -136,14 +138,20 @@ Two things this rule does not do, and both are honest rather than hidden:
   transcript carries no `usage` until the first answer, and a row with no tokens on it would
   be the zero this app does not invent. It applies to a new session and to one just cleared,
   which starts a file of its own; every turn after the first is covered.
-- **A wait that never ends is given up on rather than believed.** Counted over 382 transcripts
-  on this machine, 34 end owing an answer that never came — a closed terminal, a killed
-  process, a machine that slept. Nothing in a transcript marks any of that, and nothing can:
-  a session hard at work leaves exactly the same thing behind. So the reading is true to the
-  file and the fuse is time, not a marker — past `sessions.abandoned_wait_after_minutes` of
-  silence the row stops claiming anybody is waiting on it, while staying a row for as long as
-  the activity window says. Verified on a session killed mid-turn: the transcript ends on the
-  question, the row reads as waiting, and it stops the moment the fuse is up.
+- **A wait that never ends is not believed, and not denied either.** Counted over 382
+  transcripts on this machine, 34 end owing an answer that never came — a closed terminal, a
+  killed process, a machine that slept. Nothing in a transcript marks any of that, and nothing
+  can: a session hard at work leaves exactly the same thing behind. So the reading is true to
+  the file and the fuse is time, not a marker — past `sessions.abandoned_wait_after_minutes`
+  of silence the row stops saying an answer is expected and starts saying it has been owed a
+  long while (`.stalled`), which is the whole of what the file supports. The row stays for as
+  long as the activity window says, and the stall ends when an answer arrives or when the row
+  does. Verified on a session killed mid-turn: the transcript ends on the question, the row
+  reads as waiting, and it turns to a stall the moment the fuse is up.
+- **Only a wait can stall.** A session nobody has typed into for an hour owes nothing — its
+  turn ended — so it gets a plain dot however long it stays quiet, and leaves by the activity
+  window like any other. The same goes for a turn the person stopped: it is over, and staying
+  over for longer does not make it something the agent owes an answer for.
 
 ### Claude: the subagents of a session
 
