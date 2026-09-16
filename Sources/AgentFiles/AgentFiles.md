@@ -354,18 +354,30 @@ The command written into the slot ends in `|| true`. It names a binary inside th
 and the day that bundle goes to the trash without being disconnected first, the alternative is
 an error at the bottom of every turn instead of an empty status line.
 
-**A slot filled by the release that had an installer is a case of its own.** That release put a
-shell wrapper in Application Support and its path in the slot; the wrapper did what
-`StatusLineMode` does now and saved the displaced command in the same `previous-statusline`.
-So `state()` answers `.shellWrapper` for it rather than `.somebodyElse`, and connecting neither
-saves it nor drops what is underneath: one line of `settings.json` changes, and the orphaned
-script is deleted once the slot is the app's.
+**A slot holding this app's own command from another copy is a case of its own.** Two ways it
+happens: the release that had an installer put a shell wrapper in Application Support and its
+path in the slot, and a second copy of the binary — a build directory beside an installed
+bundle, an app dragged somewhere new — writes a command naming its own path. Either way
+`state()` answers `.oursElsewhere` rather than `.somebodyElse`, and connecting neither saves it
+nor drops what is underneath: one line of `settings.json` changes, and the orphaned script is
+deleted if that is what was there.
 
-Telling those two apart is not a nicety. Saved as "the command that was here before", the
-wrapper's path would go over the top of the person's own command in that file — and then be
-called by a wrapper that reads the file naming itself, round and round. The recognition is by
-the path of `statusline-wrapper.sh` in this app's own directory, written bare or single-quoted,
-which are the two spellings that installer produced.
+Telling those two apart is not a nicety, and this is not theory. Saved as "the command that was
+here before", that copy's command goes into the file **every** copy reads — so the app calls
+itself, reads the same file, and calls itself again. It happened here on 2026-09-16, with a
+build directory and an installed bundle both on disk: two thousand processes in seventy seconds
+and a panel announcing every context jump they wrote.
+
+The recognition is by two questions. The path of `statusline-wrapper.sh` in this app's own
+directory, written bare or single-quoted — the two spellings that installer produced. Or, for a
+copy of the binary, `StatusLineMode.isOwnInvocation`: the private `--status-line` argument and
+this app's executable name, both in the one command. Either alone would answer yes to somebody
+else's tool that takes a flag of the same name or mentions this app in a path.
+
+The same question is asked once more, on the way out of the file: a `previous-statusline` that
+names this app — written by an older build, or by hand — is read as nothing saved, by both
+`StatusLineSlot.savedCommand()` and the mode itself. A file that cannot be fixed by a rule in
+one place should not be able to start the loop from the other.
 
 Because limits keep arriving all the while, this is the one offer the panel makes *underneath*
 a working reading rather than in place of a missing one — `StatusLineSlotState.needsTakingOver`

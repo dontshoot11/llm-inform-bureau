@@ -206,10 +206,14 @@ the real cost of connecting.
 Without it the app still shows Codex in full and Claude's context from the transcripts — and
 says "no data" for Claude's limits rather than showing them as 0%.
 
-**Set up by an older version?** That one installed a shell wrapper and put its path in the
-slot. The panel offers to update it — under the numbers this time, because they are arriving
-and nothing is broken. Taking the offer changes one line of `settings.json`, deletes the
-leftover script, and leaves whatever command you had underneath exactly where it is.
+**Slot held by another copy of this app?** Two ways that happens: an older version installed a
+shell wrapper and put its path there, or a second copy of the app lives somewhere else on this
+Mac and was connected from there. The panel offers to update it — under the numbers this time,
+because they are arriving and nothing is broken. Taking the offer changes one line of
+`settings.json`, deletes the leftover script if there is one, and leaves whatever command you
+had underneath exactly where it is. What the app never does is treat its own command as
+somebody else's: every copy keeps the displaced command in the same file, so saving one would
+have the app calling itself out of that file for ever.
 
 ### Keeping it up to date
 

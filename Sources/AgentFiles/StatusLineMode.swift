@@ -30,6 +30,23 @@ public struct StatusLineMode: Sendable {
     /// mode the app can be asked for is a mode that can be run by hand and tested.
     public static let argument = "--status-line"
 
+    /// Whether a command line is this app run in this mode — this copy of it or any other.
+    ///
+    /// Asked before anything is treated as somebody else's command, and it is not a nicety.
+    /// Every copy of this app keeps the displaced command in the same file, so a command that
+    /// is itself this app, saved as "what was in the slot before", makes the app call itself,
+    /// read that same file, and call itself again, without end. It takes one copy in a second
+    /// place to arrange — a build directory and an installed bundle, an app dragged somewhere
+    /// new — and the machine fills with processes.
+    ///
+    /// Two things have to be true together: the private argument that turns this app into a
+    /// command, and the name of this app's executable. Either alone would answer yes to
+    /// somebody else's command that happens to take a `--status-line` flag or to mention this
+    /// app in a path.
+    public static func isOwnInvocation(_ command: String, executableName: String) -> Bool {
+        command.contains(argument) && command.contains(executableName)
+    }
+
     /// What the payload said, for the line the command prints when the slot was empty before.
     ///
     /// Not `ClaudeStatusPayload`: that one is what the panel reads back off disk later, where
@@ -77,13 +94,20 @@ public struct StatusLineMode: Sendable {
     /// otherwise sit in the directory forever, ageing the panel's idea of what is running.
     public let keepPayloadsFor: TimeInterval
 
+    /// The name of this app's executable, for telling this app's own command apart from
+    /// somebody else's — see `isOwnInvocation`. A parameter because a test binary is not
+    /// called what the app is called.
+    public let executableName: String
+
     public init(
         support: URL = SupportDirectory.url(),
-        keepPayloadsFor: TimeInterval = 24 * 60 * 60
+        keepPayloadsFor: TimeInterval = 24 * 60 * 60,
+        executableName: String = StatusLineSlot.runningExecutable().lastPathComponent
     ) {
         directory = support.appendingPathComponent("claude-status", isDirectory: true)
         previousCommandFile = support.appendingPathComponent("previous-statusline", isDirectory: false)
         self.keepPayloadsFor = keepPayloadsFor
+        self.executableName = executableName
     }
 
     /// Saves the payload, then answers what the status line should say.
@@ -154,12 +178,21 @@ public struct StatusLineMode: Sendable {
     // MARK: Passing the payload on
 
     /// The command that held the slot, or `nil` when the slot was this app's to begin with.
+    /// The command to hand the payload on to, if there is one.
+    ///
+    /// A saved command that is this app itself is read as no command at all. It should never
+    /// have been written — `StatusLineSlot` does not save one — but a file written by an older
+    /// build, or by hand, must not be able to start the app calling itself: this is the one
+    /// place where such a file would do it, and refusing to run it costs a string comparison.
     private func previousCommand() -> String? {
         guard
             let text = try? String(contentsOf: previousCommandFile, encoding: .utf8)
         else { return nil }
         let command = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return command.isEmpty ? nil : command
+        guard !command.isEmpty, !Self.isOwnInvocation(command, executableName: executableName) else {
+            return nil
+        }
+        return command
     }
 
     /// Runs the previous command through a shell with the same payload on stdin and collects

@@ -378,7 +378,7 @@ func runStatusLineSlotTests(_ suite: TestSuite) {
         suite.test("the wrapper an earlier release installed is not read as somebody else's command") {
             for quoted in [true, false] {
                 let slot = wrapperSlot("state-wrapper-\(quoted)", quoted: quoted, saved: nil)
-                suite.expectEqual(slot.state(), .shellWrapper, "written \(quoted ? "quoted" : "bare")")
+                suite.expectEqual(slot.state(), .oursElsewhere, "written \(quoted ? "quoted" : "bare")")
             }
         }
 
@@ -397,7 +397,7 @@ func runStatusLineSlotTests(_ suite: TestSuite) {
                 suite.expect(false, "there must be something to offer")
                 return
             }
-            suite.expectEqual(change.replacesShellWrapper, true, "replacesShellWrapper")
+            suite.expectEqual(change.replacesEarlierCopy, true, "replacesEarlierCopy")
             suite.expectEqual(change.command, ours, "the command going in")
             suite.expectEqual(change.keptUnderneath, "/Users/nobody/bin/mine.sh", "what stays underneath")
         }
@@ -440,6 +440,62 @@ func runStatusLineSlotTests(_ suite: TestSuite) {
 
             suite.expectEqual(slot.state(), .ours, "the slot after")
             suite.expect(slot.savedCommand() == nil, "still nothing saved: \(slot.savedCommand() ?? "—")")
+        }
+
+        // MARK: The same app, installed in a second place
+
+        // The case that cost two thousand processes in seventy seconds on 2026-09-16: a build
+        // directory and an installed bundle, both this app, and the installed one asked to
+        // connect. Read as somebody else's, the other copy's command is saved in the file
+        // *every* copy reads — so the app calls itself, reads the same file, and calls itself
+        // again.
+
+        /// The same binary somewhere else on disk, written the way this app writes it.
+        let elsewhere = "'/Users/nobody/build/LLMInformBureau.app/Contents/MacOS/LLMInformBureau' --status-line || true"
+
+        func elsewhereSlot(_ name: String, saved: String?) -> StatusLineSlot {
+            let slot = slot(root, name, settings: nil)
+            do {
+                try """
+                    {
+                      "statusLine": { "type": "command", "command": "\(elsewhere)" }
+                    }
+                    """.write(to: slot.settings.url, atomically: true, encoding: .utf8)
+                if let saved {
+                    try Data(saved.utf8).write(to: slot.previousCommandFile)
+                }
+            } catch {
+                suite.expect(false, "could not set the fixture up: \(error)")
+            }
+            return slot
+        }
+
+        suite.test("this app installed in a second place is not read as somebody else's command") {
+            suite.expectEqual(elsewhereSlot("state-elsewhere", saved: nil).state(), .oursElsewhere, "the slot")
+        }
+
+        suite.test("taking over from another copy does not save that copy as the command underneath") {
+            let slot = elsewhereSlot("take-over-elsewhere", saved: "/Users/nobody/bin/mine.sh")
+            connect(slot)
+
+            suite.expectEqual(slot.state(), .ours, "the slot after")
+            suite.expectEqual(slot.savedCommand(), "/Users/nobody/bin/mine.sh", "what is saved")
+        }
+
+        // Even written by hand, or left by a build that did not know better: a saved command
+        // that is this app cannot come back into the slot.
+        suite.test("a saved command that is this app itself reads as nothing saved") {
+            let slot = slot(root, "poisoned-saved", settings: nil)
+            do {
+                try Data(elsewhere.utf8).write(to: slot.previousCommandFile)
+            } catch {
+                suite.expect(false, "could not write the fixture: \(error)")
+            }
+            suite.expect(slot.savedCommand() == nil, "nothing saved: \(slot.savedCommand() ?? "—")")
+
+            connect(slot)
+            disconnect(slot)
+            suite.expectEqual(slot.state(), .free, "the slot after disconnecting")
         }
 
         // A command that merely mentions the app's directory is still somebody else's.

@@ -81,7 +81,7 @@ public struct StatusLineSlot: Sendable {
                 return .free
             }
             if isOurs(command) { return .ours }
-            if isShellWrapper(command) { return .shellWrapper }
+            if isOursElsewhere(command) { return .oursElsewhere }
             return .somebodyElse(command)
         }
     }
@@ -95,23 +95,32 @@ public struct StatusLineSlot: Sendable {
         command.contains(executable.path) && command.contains(StatusLineMode.argument)
     }
 
-    /// Whether a command in the slot is the wrapper an earlier release installed — written
-    /// bare or in single quotes, both of which that installer produced.
+    /// Whether a command in the slot is this app's, from a copy that is not this one: the
+    /// shell wrapper an earlier release installed — written bare or in single quotes, both of
+    /// which that installer produced — or the same binary somewhere else on disk.
     ///
     /// This has to be told apart from somebody else's command, and the cost of not telling
-    /// them apart is the whole reason the case exists: connecting would save the wrapper as
-    /// "the command that was here before", over the top of the person's own command saved in
-    /// that same file — and then call it, so the wrapper would read the file naming itself and
-    /// go round for ever.
-    private func isShellWrapper(_ command: String) -> Bool {
-        command.contains(shellWrapperFile.path)
+    /// them apart is the whole reason the case exists: connecting would save it as "the
+    /// command that was here before", over the top of the person's own command saved in that
+    /// same file — and then call it, so it would read the file naming itself and go round for
+    /// ever. Measured on this machine 2026-09-16, with a build directory and an installed
+    /// bundle both on disk: two thousand processes in seventy seconds.
+    private func isOursElsewhere(_ command: String) -> Bool {
+        if command.contains(shellWrapperFile.path) { return true }
+        return StatusLineMode.isOwnInvocation(command, executableName: executable.lastPathComponent)
     }
 
     /// What the saved command is, if there is one.
+    ///
+    /// A saved command that is this app itself reads as nothing saved. Nothing here writes
+    /// one — that is what `isOursElsewhere` is for — but a file left by an older build, or
+    /// edited by hand, must not be able to come back into the slot on disconnect and have the
+    /// app calling itself.
     public func savedCommand() -> String? {
         guard let text = try? String(contentsOf: previousCommandFile, encoding: .utf8) else { return nil }
         let command = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return command.isEmpty ? nil : command
+        guard !command.isEmpty, !isOurs(command), !isOursElsewhere(command) else { return nil }
+        return command
     }
 
     /// What either button would change, before anything is written. `nil` when there is
@@ -126,16 +135,17 @@ public struct StatusLineSlot: Sendable {
                 return nil
             case .free:
                 return StatusLineChange(kind: .connect, settingsPath: settings.url.path, command: command)
-            case .shellWrapper:
-                // What is kept is what the wrapper was already keeping. The person's own
+            case .oursElsewhere:
+                // What is kept is what that copy was already keeping. The person's own
                 // command, if they had one, is in that file and stays there untouched — this
-                // change is one line of `settings.json` and a leftover script deleted.
+                // change is one line of `settings.json`, and a leftover script deleted if the
+                // copy being replaced was the old shell wrapper.
                 return StatusLineChange(
                     kind: .connect,
                     settingsPath: settings.url.path,
                     command: command,
                     keptUnderneath: savedCommand(),
-                    replacesShellWrapper: true
+                    replacesEarlierCopy: true
                 )
             case .somebodyElse(let existing):
                 return StatusLineChange(
@@ -181,10 +191,10 @@ public struct StatusLineSlot: Sendable {
             throw ClaudeSettings.Failure.unreadable(path)
         case .somebodyElse(let existing):
             try save(existing)
-        case .shellWrapper:
-            // Nothing is saved and nothing is dropped. The wrapper read the same file this
-            // binary reads, so whatever it was passing the payload on to goes on being passed
-            // the payload — the only thing that changes is who does the passing.
+        case .oursElsewhere:
+            // Nothing is saved and nothing is dropped. That copy read the same file this one
+            // reads, so whatever it was passing the payload on to goes on being passed the
+            // payload — the only thing that changes is which copy does the passing.
             takingOverFromWrapper = true
         case .free:
             // A saved command with nothing in the slot is a leftover: the command it names is

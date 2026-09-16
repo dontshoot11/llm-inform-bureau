@@ -39,15 +39,17 @@ public enum SlotPhrasing {
 
     public static let disconnectHelp = "Disconnect: put back the status line that was there before"
 
-    /// The button for a Mac set up by the release that had an installer. It stands under the
-    /// limits rather than in place of them, because the limits are there — what is being
-    /// offered is the app doing its own job instead of a script it left behind.
+    /// The button for a slot held by another copy of this app — a Mac set up by the release
+    /// that had an installer, or a bundle that has since moved. It stands under the limits
+    /// rather than in place of them, because while that copy is there the limits are there —
+    /// what is being offered is this copy doing the job itself.
     public static let takeOver = "Update the status line"
 
     public static let takeOverHelp = """
-        Claude's limits are reaching this panel through a shell script an earlier version of \
-        this app installed. The app does that itself now — the same numbers, one less file on \
-        this Mac, and whatever command you had before stays exactly where it is.
+        Claude's limits are reaching this panel through another copy of this app — a script an \
+        earlier version installed, or the same app in another place. This copy does it itself \
+        now: the same numbers, nothing else on this Mac in between, and whatever command you \
+        had before stays exactly where it is.
         """
 
     /// Said on the two buttons of the preview. "Write it" rather than "OK": the whole reason
@@ -77,7 +79,7 @@ public enum SlotPhrasing {
     }
 
     private static func connectNotes(_ change: StatusLineChange) -> [String] {
-        if change.replacesShellWrapper { return takeOverNotes(change) }
+        if change.replacesEarlierCopy { return takeOverNotes(change) }
         guard let existing = change.keptUnderneath else {
             return [
                 """
@@ -101,15 +103,16 @@ public enum SlotPhrasing {
         ]
     }
 
-    /// Taking over from the shell wrapper an earlier release installed. Said apart from the
-    /// other branches because on this one nothing of the person's is being displaced: it was
-    /// displaced once, by the same app, and what was saved then is left alone now.
+    /// Taking over from another copy of this app — the shell wrapper an earlier release
+    /// installed, or the same binary elsewhere on disk. Said apart from the other branches
+    /// because on this one nothing of the person's is being displaced: it was displaced once,
+    /// by this same app, and what was saved then is left alone now.
     private static func takeOverNotes(_ change: StatusLineChange) -> [String] {
         var notes = [
             """
-            The slot holds the shell script an earlier version of this app installed. This \
-            puts the app itself there instead: the same payload, read the same way, with \
-            nothing in between.
+            The slot holds this app's own command from another copy of it — a script an \
+            earlier version installed, or the same app in another place. This puts the copy \
+            you are looking at there instead: the same payload, read the same way.
             """
         ]
         if let existing = change.keptUnderneath {

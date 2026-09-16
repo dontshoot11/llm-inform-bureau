@@ -324,10 +324,11 @@ struct MenuContent: View {
         case .free, .somebodyElse:
             Button(SlotPhrasing.connect) { model.propose(.connect) }
                 .help(SlotPhrasing.connectHelp)
-        case .shellWrapper:
+        case .oursElsewhere:
             // The one offer that stands under a working reading rather than in place of a
-            // missing one: the numbers above it came through the old shell wrapper, and this
-            // is the app offering to carry them itself.
+            // missing one: the numbers above it came through another copy of this app — the
+            // old shell wrapper, or the same binary somewhere else — and this is the copy that
+            // is running offering to carry them itself.
             Button(SlotPhrasing.takeOver) { model.propose(.connect) }
                 .help(SlotPhrasing.takeOverHelp)
         case .unreadable(let path):

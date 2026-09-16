@@ -112,6 +112,38 @@ func runStatusLineModeTests(_ suite: TestSuite) {
             }
         }
 
+        // The loop this guard exists for, and the one this project fell into on 2026-09-16:
+        // a second copy of the app saved as "the command that was here before". Calling it
+        // would have that copy read this same file and call the app again, without end.
+        suite.test("a saved command that is this app itself is not called") {
+            let support = makeDirectory(root, "self-referencing", suite)
+            let mode = StatusLineMode(support: support, executableName: "LLMInformBureau")
+            writePrevious(
+                "'/Users/nobody/build/LLMInformBureau.app/Contents/MacOS/LLMInformBureau' --status-line || true",
+                to: support,
+                suite
+            )
+
+            guard case .nothingToPassTo = mode.run(input: statusLinePayload(session: "s1"), now: now) else {
+                suite.expect(false, "the app must not hand the payload to itself")
+                return
+            }
+        }
+
+        // And the guard is narrow: somebody else's status line tool is still somebody else's,
+        // whatever its flags are called.
+        suite.test("somebody else's command with a flag of the same name is still called") {
+            let support = makeDirectory(root, "not-ours", suite)
+            let mode = StatusLineMode(support: support, executableName: "LLMInformBureau")
+            writePrevious("printf 'theirs' # --status-line", to: support, suite)
+
+            guard case .passedThrough(let output) = mode.run(input: statusLinePayload(session: "s1"), now: now) else {
+                suite.expect(false, "expected the previous command's output")
+                return
+            }
+            suite.expectEqual(String(decoding: output, as: UTF8.self), "theirs", "output")
+        }
+
         suite.test("with nothing in the slot before, the numbers to print come back") {
             let (mode, _) = mode(root, "own-line")
             let outcome = mode.run(
