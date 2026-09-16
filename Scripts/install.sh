@@ -64,6 +64,15 @@ version_of() {
 	sed -n 's/.*"version"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$1" | head -1
 }
 
+# The quarantine mark macOS puts on everything that arrived over the network. It is read from
+# the installed copy and not from the image: the mark travels with the copy, so clearing it
+# before installing achieves nothing. Both the bundle and the binary are asked, because the
+# mark sits on every file that came across, not only on the top of the tree.
+quarantined() {
+	xattr -p com.apple.quarantine "$1" >/dev/null 2>&1 ||
+		xattr -p com.apple.quarantine "$1/Contents/MacOS/LLMInformBureau" >/dev/null 2>&1
+}
+
 step() {
 	echo ""
 	echo "$1"
@@ -122,6 +131,12 @@ echo "   It lives at the right-hand end of the menu bar, with no Dock icon. On i
 echo "   it opens one window explaining where each of its numbers comes from and what is not"
 echo "   connected yet. Starting with the Mac is a checkbox in that window — and afterwards"
 echo "   in the panel behind the menu bar item."
+if quarantined "$bundle"; then
+	echo ""
+	echo "   This copy arrived over the network, so macOS has it quarantined and the installed"
+	echo "   one will be too. This step will NOT start it — it will print the one command that"
+	echo "   clears the mark, and you run it yourself."
+fi
 
 if [ "$mode" != "--apply" ]; then
 	echo ""
@@ -172,5 +187,21 @@ fi
 
 echo ""
 echo "4. Starting."
-open "$app"
-echo "   Running. Look for it at the right-hand end of the menu bar."
+# Not started while the mark is on it. Opening a quarantined ad-hoc signed bundle brings up
+# "LLMInformBureau Not Opened", whose default button is a blue "Move to Trash" — and it deletes
+# the app past the Trash, so the most obvious thing to press destroys what was just installed.
+# Better to end on a command than on that dialog.
+if quarantined "$app"; then
+	echo "   Not started: macOS has this copy quarantined, as it does everything that arrived"
+	echo "   over the network. Opening it now would show \"Not Opened\", whose default button"
+	echo "   deletes the app rather than the mark."
+	echo ""
+	echo "   Run this, and the app is yours:"
+	echo ""
+	echo "     xattr -d -r com.apple.quarantine \"$app\""
+	echo ""
+	echo "   Then open it from Launchpad or /Applications. Everything above is already done."
+else
+	open "$app"
+	echo "   Running. Look for it at the right-hand end of the menu bar."
+fi

@@ -27,6 +27,12 @@ and writes `.build/LLMInformBureau-<version>.dmg`. The version is read from
 `Scripts/Info.plist` — `CFBundleShortVersionString` — so the number in the file name and the
 number in the app are one number, and there is no second place to remember to change.
 
+`INSTALL.txt` is written here, as a heredoc, rather than kept as a file to copy: it carries the
+version it was built with, and a copy sitting in the repository is a copy that goes out of step
+with the script it describes. It is everything the recipient is given in writing — the two
+commands and their order, the Gatekeeper dialog and which of its buttons not to press,
+connecting the wrapper, updating, removing.
+
 The volume is called `LLMInformBureau`, without spaces, because the recipient's first command
 names the mount point and has to survive being retyped.
 
@@ -45,7 +51,7 @@ sh /Volumes/LLMInformBureau/install.sh --apply    # carries it out
 Four steps, each printed before any of them happens: install the bundle lying beside the
 script to `/Applications`, put an editable copy of the thresholds in Application Support,
 connect the statusLine wrapper (by running `install-statusline.sh`, whose own plan is printed
-inside this one), and start the app.
+inside this one), and start the app — or, on a copy that came over the network, not start it.
 
 The script installs the bundle **next to itself** and cannot build one: run it where there is
 no `LLMInformBureau.app` beside it — in `Scripts/`, for instance — and it says so and stops,
@@ -68,6 +74,18 @@ Two of the steps refuse to repeat themselves: an existing `thresholds.json` is l
 it is — it is the one the app reads, and overwriting someone's edited marks during an update
 would be the worst thing this script could do — and the wrapper step says "already connected"
 rather than saving the wrapper as its own predecessor.
+
+**Step 4 does not open a quarantined app.** It reads `com.apple.quarantine` off the copy it has
+just made, and if the mark is there it prints the unlocking command and stops. This is not
+politeness. Opening such a bundle brings up "LLMInformBureau Not Opened", whose default button
+is a blue **Move to Trash** — so the most obvious thing to press deletes what was installed a
+second earlier. Ending on a command the person can paste is the only way not to leave them in
+front of that dialog.
+
+The mark is read from the installed copy and not from the image, because that is where it
+matters: it travels with a copy, so clearing it on the image changes nothing about what ends up
+in `/Applications`. Running the unlocking command first therefore has nothing to clear, and the
+instructions say so.
 
 Starting with the Mac is not done here: it is a checkbox, offered in the window the app opens
 on its first run and afterwards in the panel. `SMAppService` registers the bundle where it is

@@ -76,35 +76,35 @@ Nothing is said twice about the same crossing.
 
 ## Install
 
-**Before you start:** macOS 13 or newer, and the Xcode Command Line Tools
-(`xcode-select --install` if `swift --version` does not answer). No other dependencies, nothing
-to sign in to, no network access at any point — during installation or after it.
+**Before you start:** macOS 13 or newer. That is the whole list. Nothing is compiled on your
+Mac, so the Xcode Command Line Tools are not needed; there is nothing to sign in to, and the
+app makes no network calls at any point — during installation or after it.
 
-Build it yourself rather than accepting a built copy from someone: the bundle is signed
-ad-hoc, and a `.app` that arrives over the network is quarantined by Gatekeeper and will not
-open. Building locally avoids that entirely.
+What you are given is one file, `LLMInformBureau-<version>.dmg`, holding the built app, the
+installer and an `INSTALL.txt` saying everything this section says. Building it yourself
+instead is one command — see [Development](#development).
 
-### Step 1 — Get the source and build the disk image
+### Step 1 — Mount the image
 
-```sh
-git clone https://github.com/dontshoot11/llm-inform-bureau.git
-cd llm-inform-bureau
-
-hdiutil attach "$(Scripts/build-dmg.sh)"      # builds the image and mounts it
-sh /Volumes/LLMInformBureau/install.sh        # prints the whole plan and changes nothing
-```
-
-Building and installing are two scripts: everything that needs a compiler happens in
-`build-dmg.sh`, and the installer only copies what the image holds. That is the same image
-anybody else would be handed, and installing from it is the only installation path there is.
-
-Read what the installer prints. Every step below is listed there.
-
-### Step 2 — Run it
+Double-click the downloaded `.dmg`, or:
 
 ```sh
-sh /Volumes/LLMInformBureau/install.sh --apply
+hdiutil attach ~/Downloads/LLMInformBureau-*.dmg
 ```
+
+The volume is called `LLMInformBureau`, which is what makes the command below a constant
+rather than something depending on where your browser puts downloads.
+
+### Step 2 — Two commands, in this order
+
+```sh
+sh /Volumes/LLMInformBureau/install.sh --apply                        # installs it
+xattr -d -r com.apple.quarantine /Applications/LLMInformBureau.app    # lets macOS run it
+```
+
+Run the first one without `--apply` to read the whole plan and change nothing. It is someone
+else's shell script and one of its steps edits a file of Claude Code's, so reading it once is
+worth the minute.
 
 Four steps, each printed before it happens:
 
@@ -117,9 +117,32 @@ Four steps, each printed before it happens:
    Claude Code's. It prints the change, keeps a timestamped backup, and preserves whatever
    command was there before. The wrapper travels inside the app, so this works with no clone
    and no Command Line Tools.
-4. **Start the app.**
+4. **Start the app** — unless macOS has the copy quarantined, in which case the installer
+   prints the second command instead of opening anything.
 
-### Step 3 — The first run
+**The order does not swap.** macOS marks everything that arrives over the network, and the mark
+travels with a copy: clearing it on the disk image still leaves the copy in `/Applications`
+marked. Run the second command first and there is nothing to clear — `xattr` answers
+`No such file` and stops.
+
+**`sh` in front of the first command is not decoration.** A script run straight off a mounted
+image is blocked by Gatekeeper with a dialog and no output; handed to an interpreter, it runs.
+
+### Step 3 — If you opened the app too early
+
+macOS shows **"LLMInformBureau Not Opened — Apple could not verify…"**. Nothing is wrong with
+the download. The bundle is signed ad-hoc rather than with a paid Apple developer account, and
+anything so signed that arrived over the network is refused until the mark is cleared.
+
+**Do not press the blue button.** It reads **Move to Trash**, it is the default one, and it
+removes the app rather than the mark. Press **Done**, then run the second command.
+
+On macOS 26 that command is the only way through: the dialog leaves no "Open Anyway" entry in
+System Settings → Privacy & Security — checked on a downloaded image. On macOS 13 and 14 the
+usual alternative is Control-click in Finder → **Open**; that route is **not verified here**,
+there was no Mac on those versions to try it on. The command works on all of them.
+
+### Step 4 — The first run
 
 The app opens one window explaining where each of its numbers comes from and what is not
 connected yet. It carries the **Open at login** checkbox; afterwards the same checkbox lives
@@ -127,7 +150,7 @@ behind the `?` icon in the panel. Nothing is installed as a background service o
 this is a normal application that happens to have no windows, and unticking the checkbox is
 all it takes to stop it starting.
 
-### Step 4 — Check the menu bar
+### Step 5 — Check the menu bar
 
 Two lights per service. What you should expect to see on a fresh install:
 
@@ -178,15 +201,12 @@ says "no data" for Claude's limits rather than showing them as 0%.
 
 ### Keeping it up to date
 
-```sh
-git pull && hdiutil attach "$(Scripts/build-dmg.sh)" && sh /Volumes/LLMInformBureau/install.sh --apply
-```
-
-The clone is not needed after installation — the wrapper is copied into Application Support and
-Claude Code points there — but keeping it is what makes the line above work. If a release
-changes the shape of `thresholds.json`, your installed copy falls back to the built-in values
-and the panel says "default thresholds applied"; one `cp` fixes it, and
-[AGENTS.md](AGENTS.md) has the command.
+Download the new image and run the same two commands. The installed copy is replaced, a running
+one is quit first, and **your edited `thresholds.json` is left exactly as it is** — it is the
+file the app reads, and overwriting your marks during an update is the one thing the installer
+will not do. If a release changes the shape of that file, the app falls back to the built-in
+values and the panel says "default thresholds applied"; the installer prints the one `cp` that
+takes the new ones.
 
 ### Removing it
 
@@ -194,11 +214,14 @@ Untick **Open at login**, quit from the panel, then, in this order:
 
 ```sh
 sh /Applications/LLMInformBureau.app/Contents/Resources/install-statusline.sh --uninstall
-rm -rf /Applications/LLMInformBureau.app ~/Library/Application\ Support/LLMInformBureau
+rm -rf /Applications/LLMInformBureau.app
+rm -rf ~/Library/Application\ Support/LLMInformBureau
 ```
 
 The first line puts your previous statusLine command back where it was, and it has to run
 before the second: the script it names lives inside the bundle that the second line deletes.
+The third removes the thresholds you edited, the saved payloads and the copy of the wrapper —
+everything this app ever wrote.
 
 ## Where the data comes from
 
@@ -281,6 +304,9 @@ change.
 ## Development
 
 ```sh
+git clone https://github.com/dontshoot11/llm-inform-bureau.git
+cd llm-inform-bureau
+
 swift build                  # the library targets and the executable
 swift run SessionHealthTests # the test suite: one line per case, exit code 0 or 1
 Scripts/build-app.sh --run   # rebuild the bundle and restart it
@@ -290,7 +316,12 @@ Scripts/build-dmg.sh         # the whole disk image, version and all — one com
 `Scripts/build-dmg.sh` is the release: it builds the app, checks it, and writes
 `.build/LLMInformBureau-<version>.dmg`, the single file that is handed to anybody else. The
 version in the file name is `CFBundleShortVersionString` from `Scripts/Info.plist`, so there is
-no second place to remember.
+no second place to remember. The recipient's instructions ride inside the image as
+`INSTALL.txt`, written by that same script — there is no second copy of them to keep in step.
+
+**The author installs from the image like everybody else**, with the two commands in
+[Install](#install). There is no developer-only installation path in this repository, which is
+why the one path there is stays working.
 
 **The app is built as a universal binary**, `arm64` and `x86_64`, so the image runs on an Intel
 Mac as well — that is a thing to be sure of before handing the file over, not after. It is two
