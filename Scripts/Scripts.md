@@ -1,25 +1,59 @@
 # Scripts
 
-Four scripts: one installs everything, one builds the app, two connect it to Claude Code.
+Five scripts: one builds the file that is handed out, one installs what is in it, one builds
+the app bundle, two connect it to Claude Code.
 
 | Script | Run by | Does |
 | --- | --- | --- |
-| `install.sh` | a person | Shows the whole installation as a plan, and with `--apply` carries it out |
-| `build-app.sh` | a person | Builds the `.app` bundle, and with `--run` restarts it |
+| `build-dmg.sh` | the author | Builds the disk image that is handed out: the app, the installer and the instructions |
+| `install.sh` | a person | Shows the installation of the bundle beside it as a plan, and with `--apply` carries it out |
+| `build-app.sh` | the author | Builds the `.app` bundle, and with `--run` restarts it |
 | `install-statusline.sh` | a person | Shows what connecting the wrapper would change, and with `--apply` does it |
 | `statusline-wrapper.sh` | Claude Code | Saves each statusLine payload for the app, and calls whatever command was there before |
 
-## Installing the whole thing
+Building and installing are two scripts and not one on purpose. Everything that needs a
+compiler happens on the author's machine, in `build-dmg.sh`; what the recipient runs only
+copies files. That is what makes "download, then two commands" true on a Mac with no Xcode
+Command Line Tools on it.
+
+## Building the file that is handed out
 
 ```sh
-Scripts/install.sh            # prints the plan and changes nothing
-Scripts/install.sh --apply    # carries it out
+Scripts/build-dmg.sh    # prints the path of the image it built
 ```
 
-Five steps, each printed before any of them happens: build the bundle, install it to
-`/Applications`, put an editable copy of the thresholds in Application Support, connect the
-statusLine wrapper (by running `install-statusline.sh`, whose own plan is printed inside this
-one), and start the app.
+It builds the app, puts it on a disk image beside a copy of `install.sh` and an `INSTALL.txt`,
+and writes `.build/LLMInformBureau-<version>.dmg`. The version is read from
+`Scripts/Info.plist` — `CFBundleShortVersionString` — so the number in the file name and the
+number in the app are one number, and there is no second place to remember to change.
+
+The volume is called `LLMInformBureau`, without spaces, because the recipient's first command
+names the mount point and has to survive being retyped.
+
+## Installing it
+
+```sh
+sh /Volumes/LLMInformBureau/install.sh            # prints the plan and changes nothing
+sh /Volumes/LLMInformBureau/install.sh --apply    # carries it out
+```
+
+Four steps, each printed before any of them happens: install the bundle lying beside the
+script to `/Applications`, put an editable copy of the thresholds in Application Support,
+connect the statusLine wrapper (by running `install-statusline.sh`, whose own plan is printed
+inside this one), and start the app.
+
+The script installs the bundle **next to itself** and cannot build one: run it where there is
+no `LLMInformBureau.app` beside it — in `Scripts/`, for instance — and it says so and stops,
+naming the way out. The author installs from the image like everyone else, which is why there
+is no second installation path in the repository to keep working.
+
+`sh` in front of the command is not decoration. A file that arrived over the network and is
+run directly off the mounted image is blocked by Gatekeeper with a dialog and no output;
+handed to an interpreter, it runs.
+
+The statusLine step runs `install-statusline.sh` from beside the script or from inside the
+bundle. Neither is on the image yet — the wrapper still lives only in the repository — so from
+a downloaded image that step says it is skipping and the rest of the installation finishes.
 
 Two of the steps refuse to repeat themselves: an existing `thresholds.json` is left exactly as
 it is — it is the one the app reads, and overwriting someone's edited marks during an update
@@ -49,7 +83,7 @@ Claude Code ──payload──▶ wrapper ──┬──▶ ~/Library/Applicat
 With nothing there before, the wrapper prints a short line of its own — model, context,
 limits — rather than leaving the status line blank.
 
-## Installing it
+## Connecting the wrapper
 
 ```sh
 Scripts/install-statusline.sh            # shows the plan and changes nothing

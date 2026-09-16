@@ -84,36 +84,41 @@ Build it yourself rather than accepting a built copy from someone: the bundle is
 ad-hoc, and a `.app` that arrives over the network is quarantined by Gatekeeper and will not
 open. Building locally avoids that entirely.
 
-### Step 1 — Get the source and look at the plan
+### Step 1 — Get the source and build the disk image
 
 ```sh
 git clone https://github.com/dontshoot11/llm-inform-bureau.git
 cd llm-inform-bureau
 
-Scripts/install.sh            # prints the whole plan and changes nothing
+hdiutil attach "$(Scripts/build-dmg.sh)"      # builds the image and mounts it
+sh /Volumes/LLMInformBureau/install.sh        # prints the whole plan and changes nothing
 ```
 
-Read what it prints. Every step below is listed there, including the exact edit it would make
-to `~/.claude/settings.json`.
+Building and installing are two scripts: everything that needs a compiler happens in
+`build-dmg.sh`, and the installer only copies what the image holds. That is the same image
+anybody else would be handed, and installing from it is the only installation path there is.
+
+Read what the installer prints. Every step below is listed there.
 
 ### Step 2 — Run it
 
 ```sh
-Scripts/install.sh --apply
+sh /Volumes/LLMInformBureau/install.sh --apply
 ```
 
-Five steps, each printed before it happens:
+Four steps, each printed before it happens:
 
-1. **Build the app bundle** — `swift build -c release`, then a `.app` around it with
-   `LSUIElement` set, so it has no Dock icon and no windows.
-2. **Install it to `/Applications`.**
-3. **Copy the thresholds to `~/Library/Application Support/LLMInformBureau/thresholds.json`** —
+1. **Install the app to `/Applications`** — the bundle lying on the image, copied as it is.
+   Nothing is compiled here.
+2. **Copy the thresholds to `~/Library/Application Support/LLMInformBureau/thresholds.json`** —
    the editable copy. Editing it changes the marks with no rebuild. An existing one is left
    exactly as it is.
-4. **Connect the statusLine wrapper** (see below) — the one step that touches a file of
+3. **Connect the statusLine wrapper** (see below) — the one step that touches a file of
    Claude Code's. It prints the change, keeps a timestamped backup, and preserves whatever
-   command was there before.
-5. **Start the app.**
+   command was there before. The wrapper does not travel on the image yet, so from a mounted
+   image this step says it is skipping; connect it from the clone instead:
+   `Scripts/install-statusline.sh --apply`.
+4. **Start the app.**
 
 ### Step 3 — The first run
 
@@ -163,7 +168,7 @@ says "no data" for Claude's limits rather than showing them as 0%.
 ### Keeping it up to date
 
 ```sh
-git pull && Scripts/install.sh --apply
+git pull && hdiutil attach "$(Scripts/build-dmg.sh)" && sh /Volumes/LLMInformBureau/install.sh --apply
 ```
 
 The clone is not needed after installation — the wrapper is copied into Application Support and
