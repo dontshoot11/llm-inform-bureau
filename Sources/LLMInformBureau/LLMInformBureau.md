@@ -171,9 +171,12 @@ The panel carries, in order, its two halves named after the two dots in the bar:
    right rather than a part of the session's number. Its light is drawn in full here and
    nowhere else — agent marks never colour the bar and never notify, because an agent ends by
    itself within minutes and a red dot nothing explains is a riddle.
-   A service with nothing running keeps its place here too, under a hollow light and the
-   sentence for why — an empty space beside the other service's sessions would read as a
-   service that is fine.
+   A service with nothing running is not listed. A row saying "No active sessions." under a
+   heading that already says what the section is about spends a name, a dot and a line to
+   repeat what the empty space says by itself; where the service stands in the widget is said
+   above, by its limits entry, and in the bar, by its two dots. What does keep a row is a
+   service whose files stopped parsing: that is a reading, and one nobody would otherwise
+   ever see.
 3. **Why the bar is that colour** — the one reading that set it, named.
 4. **"Default thresholds applied"**, with what was wrong, when the config file could not be
    used as written.

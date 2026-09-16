@@ -32,11 +32,7 @@ struct MenuContent: View {
             ForEach(model.sessions) { session in
                 sessionEntry(session)
             }
-            // A service with nothing to show keeps its place here, hollow dot and all: silence
-            // about a source is a reading of its own, and an empty space beside the other
-            // service's sessions reads as a service that is fine. An agent that is not on the
-            // machine is skipped: its own entry above has already said so, and saying it twice
-            // reads as two different problems.
+            // A service that is merely idle is not listed: see `silentServices`.
             ForEach(silentServices, id: \.self) { service in
                 silentEntry(service)
             }
@@ -313,19 +309,32 @@ struct MenuContent: View {
         return parts.joined(separator: " · ")
     }
 
-    /// The services owed a line in the context half although they have no session to show:
-    /// installed, and silent. One that is not on the machine is left out on purpose — see the
-    /// panel above.
+    /// The services owed a line in the context half although they have no session to show —
+    /// and only those with something to say.
+    ///
+    /// An idle service is left out. Its row said "No active sessions." under a heading that
+    /// already says what the section is about, and it cost the panel a name, a dot and a line
+    /// to repeat a fact the empty space was making anyway. Where a service stands in the
+    /// widget does not depend on this: its limits keep their entry above, and its two dots
+    /// keep their place in the bar.
+    ///
+    /// What does keep a row is a source that stopped making sense — an `.unavailable` reading
+    /// from files that no longer parse. That is a reading, and one nobody would otherwise ever
+    /// see: unlike an idle service, it does not explain itself by there being nothing there.
+    /// A service that is not on the machine is left out too, and for the older reason — its own
+    /// entry above has already said so, and saying it twice reads as two different problems.
     private var silentServices: [AgentService] {
         AgentService.allCases.filter { service in
             model.usage?.isInstalled(service) != false
                 && !model.sessions.contains { $0.snapshot.service == service }
+                && model.usage?.sessions(of: service).explanation != nil
         }
     }
 
-    /// A service with nothing running: the same entry as a session, with the hollow dot that
-    /// means "no reading" and the sentence for why. The light comes from the same rule the bar
-    /// uses, so the panel cannot disagree with the bar about a service it knows nothing about.
+    /// A service whose sessions could not be read: the same entry as a session, with the
+    /// hollow dot that means "no reading" and the sentence for why. The light comes from the
+    /// same rule the bar uses, so the panel cannot disagree with the bar about a service it
+    /// knows nothing about.
     private func silentEntry(_ service: AgentService) -> some View {
         entry(
             light: model.lights(of: service).context,
