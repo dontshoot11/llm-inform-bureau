@@ -237,16 +237,20 @@ extension CodexRolloutStore {
     /// second, 99% under 27, and 5 of them — 0.015% — ran past the ten-minute fuse.
     ///
     /// A turn whose boundary is further back than the tail this reads is not claimed as a
-    /// wait. Half a megabyte of rollout is many turns' worth; a turn longer than that is one
-    /// whose tool output ran to megabytes, and a light that blinks on a guess is worse than
-    /// one that stays steady.
+    /// wait. Half a megabyte of rollout is many turns' worth, and a light that blinks on a
+    /// guess is worse than one that stays steady. It does happen: one rollout on this machine
+    /// holds 102 lines longer than the window and one of 31.6 MB, and while a line like that
+    /// is the last one written this reader has no complete line to read at all — the row goes
+    /// quiet rather than wrong, which is the older behaviour of the reading and not of the
+    /// wait.
     private static func awaitingSince(_ events: [RolloutLine], writtenBy modified: Date) -> Date? {
         guard let boundary = events.last(where: { $0.isTurnStart || $0.isTurnEnd }), boundary.isTurnStart
         else { return nil }
-        // Every line of a rollout carries its own timestamp — measured, a rollout's
-        // modification date and the last line in it agree to the second — so the file's date
-        // is a floor under a line that stopped carrying one, not the usual answer.
-        return events.last(where: { $0.writtenAt != nil })?.writtenAt ?? modified
+        // The last line, and the file's own date under it — never an earlier line that still
+        // has a timestamp. Asking further back would answer with a moment older than the
+        // silence really is and stall a session that is working; the file's date cannot,
+        // because measured over every rollout here it and the last line agree to the second.
+        return events.last?.writtenAt ?? modified
     }
 
     /// What the head of the rollout says the session is.

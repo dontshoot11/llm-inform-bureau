@@ -176,7 +176,10 @@ Everything else about the wait is the same rule as Claude's, for the same reason
   (0.015%) past the ten-minute fuse. The fuse means the same thing here as it does for Claude.
   A rollout's modification date would do as well — measured, it and the last line in the file
   agree to the second, which a Claude transcript's does not — but the line's own timestamp is
-  what is read, so one reader's idea of when something happened is not two.
+  what is read, so one reader's idea of when something happened is not two. When that line's
+  moment cannot be read, the file's date stands in for it and an earlier line never does:
+  reaching further back would answer with a silence longer than the real one and stall a
+  session that is working.
 - **The 6 rollouts that end on an opening** are the abandoned waits: terminals closed mid-turn,
   processes killed. Verified on a session killed mid-turn with `SIGKILL` — the row reads as
   waiting and turns to a stall the moment the fuse is up.

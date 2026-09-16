@@ -141,9 +141,9 @@ private func instant(_ iso8601: String) -> Date {
     return formatter.date(from: iso8601) ?? .distantPast
 }
 
-private func chatter(padding: Int = 0) -> String {
+private func chatter(padding: Int = 0, at moment: Date = fixtureAnsweredAt) -> String {
     let text = String(repeating: "x", count: padding)
-    return "{\"timestamp\":\"2026-09-12T17:00:00.000Z\",\"type\":\"response_item\",\"payload\":{\"type\":\"message\",\"text\":\"\(text)\"}}"
+    return "{\"timestamp\":\"\(stamp(moment))\",\"type\":\"response_item\",\"payload\":{\"type\":\"message\",\"text\":\"\(text)\"}}"
 }
 
 /// Rollouts live nested by date, so the fixtures are nested the same way.
@@ -409,6 +409,38 @@ func runCodexWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
             )
         }
 
+        // And from the last line of any kind, not from the last one this reader took numbers
+        // out of. Two thirds of the rollouts here that end mid-turn end on something other
+        // than a `token_count`, and the gap between the two runs to six minutes — a reader
+        // clocking the silence from the token count would stall a session still writing.
+        suite.test("the silence is counted from the last line of any kind, not the last token count") {
+            let longAgo = now.addingTimeInterval(-config.abandonedWait.seconds - 60)
+            expectWaiting(
+                root, "last-line-not-last-count",
+                [
+                    sessionMeta(),
+                    taskStarted(at: longAgo.addingTimeInterval(-30)),
+                    tokenCount(held: 30_000, window: 258_400, at: longAgo),
+                    itemCompleted(at: now.addingTimeInterval(-10))
+                ],
+                .waiting, "the tool is still writing, whatever the last token count said"
+            )
+        }
+
+        suite.test("a last line with no readable moment falls back to the file, not to an older line") {
+            let longAgo = now.addingTimeInterval(-config.abandonedWait.seconds - 60)
+            expectWaiting(
+                root, "timeless-tail",
+                [
+                    sessionMeta(),
+                    taskStarted(at: longAgo.addingTimeInterval(-30)),
+                    tokenCount(held: 30_000, window: 258_400, at: longAgo),
+                    unreadableMoment()
+                ],
+                .waiting, "the file was written just now, whatever the line before it says"
+            )
+        }
+
         // The fuse. Six rollouts of the 133 on this machine end on an opening with nothing
         // after it: terminals closed mid-turn, processes killed. Nothing on disk tells those
         // from an agent thinking hard, so the app says the one thing it knows.
@@ -441,7 +473,7 @@ func runCodexWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
         // The sign is for a wait and only for a wait: a session whose turn ended owes nothing,
         // however long it sits there. The half-hour activity window is what takes that row
         // away, not this rule.
-        suite.test("a session that owes nothing never stalls, however long it is quiet") {
+        suite.test("a Codex session that owes nothing never stalls, however long it is quiet") {
             let longAgo = now.addingTimeInterval(-config.abandonedWait.seconds * 3)
             expectWaiting(
                 root, "quiet",
@@ -452,6 +484,21 @@ func runCodexWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                     taskComplete(at: longAgo)
                 ],
                 .none, "quiet is not waiting"
+            )
+        }
+
+        suite.test("asking again after cutting a turn short waits once more") {
+            expectWaiting(
+                root, "after-abort",
+                [
+                    sessionMeta(),
+                    taskStarted(at: now.addingTimeInterval(-300)),
+                    tokenCount(held: 20_000, window: 258_400, at: now.addingTimeInterval(-290)),
+                    turnAborted(at: now.addingTimeInterval(-289)),
+                    taskStarted(),
+                    tokenCount(held: 30_000, window: 258_400)
+                ],
+                .waiting, "an abort ends a wait, it does not end them"
             )
         }
 
@@ -507,6 +554,22 @@ private func turnAborted(at moment: Date = fixtureAnsweredAt) -> String {
     {"timestamp":"\(stamp(moment))","type":"event_msg","payload":{"type":"turn_aborted",\
     "turn_id":"019fa422-6a72-7a50-9550-42d1f7cbeb8a","reason":"interrupted"}}
     """
+}
+
+/// A line whose moment this app cannot read — the shape a loosened timestamp format takes on
+/// disk. The reader falls back to the file's own date for it, which for a rollout is accurate
+/// to the second; falling back to an earlier line instead would age the silence by whatever
+/// that line's distance is.
+private func unreadableMoment() -> String {
+    "{\"timestamp\":\"soon\",\"type\":\"event_msg\",\"payload\":{\"type\":\"item_completed\"}}"
+}
+
+/// A line that is not a `token_count` — what a rollout cut short mid-turn actually ends on.
+/// Of the rollouts here that end inside a turn, two thirds end on one of these, and the gap
+/// between the last `token_count` and the last line runs to six minutes, which is most of the
+/// fuse.
+private func itemCompleted(at moment: Date) -> String {
+    "{\"timestamp\":\"\(stamp(moment))\",\"type\":\"event_msg\",\"payload\":{\"type\":\"item_completed\"}}"
 }
 
 private func tokenCount(held: Int, window: Int, at moment: Date = fixtureAnsweredAt) -> String {
