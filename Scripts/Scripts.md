@@ -43,6 +43,10 @@ nothing — the wrapper goes in with `--apply` and comes out with the wrapper's 
 The volume is called `LLMInformBureau`, without spaces, because the recipient's first command
 names the mount point and has to survive being retyped.
 
+What the image cannot carry is the step that opens it: a person holding a `.dmg` has nowhere to
+read "mount this first". That part travels in the message with the link, and the text to paste
+there is kept in README, under [What to send with the link](../README.md#what-to-send-with-the-link).
+
 Before anything is packed the script checks the bundle it was given: the binary carries both
 architectures, and the signature verifies. Both of those are only ever wrong on the other
 side — an Intel Mac, or a notification centre that quietly refuses — so the check belongs on

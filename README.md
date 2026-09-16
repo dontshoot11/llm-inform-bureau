@@ -328,6 +328,31 @@ no second place to remember. The recipient's instructions ride inside the image 
 [Install](#install). There is no developer-only installation path in this repository, which is
 why the one path there is stays working.
 
+### What to send with the link
+
+Everything the recipient is given in writing rides inside the image — including the part that
+says to mount it, which is no use to somebody who has not. So the message carrying the link
+carries the first steps too:
+
+```
+Download the image, then, in Terminal:
+
+  1. open ~/Downloads/LLMInformBureau-<version>.dmg
+  2. sh /Volumes/LLMInformBureau/install.sh --apply
+  3. xattr -d -r com.apple.quarantine /Applications/LLMInformBureau.app
+  4. open -a LLMInformBureau
+
+Line 2 installs it, line 3 lets macOS run it — that order, and both are needed. Line 4 is
+yours to run because the installer will not open an app macOS still has marked.
+
+INSTALL.txt on the image says all of this at length, and what to do when a step fails.
+Worth the two minutes before line 2: it is someone else's shell script.
+```
+
+Replace `<version>` with the number in the file name. Paste it as it is — the commands are
+constants, because the volume is always `/Volumes/LLMInformBureau` no matter where the browser
+put the download.
+
 **The app is built as a universal binary**, `arm64` and `x86_64`, so the image runs on an Intel
 Mac as well — that is a thing to be sure of before handing the file over, not after. It is two
 builds joined with `lipo` rather than `swift build --arch`, whose xcbuild path needs the full

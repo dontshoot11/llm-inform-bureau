@@ -82,6 +82,10 @@ THEN TWO COMMANDS, IN THIS ORDER
 The first installs the app, the second allows macOS to run it. Paste them into Terminal one at
 a time; neither of them asks you anything back.
 
+Dragging LLMInformBureau.app out of the window by hand is not the same thing. It does the
+first half of command 1 and nothing else: no editable thresholds, no status line wrapper, and
+the mark still on the copy. The app runs that way and shows less than it could.
+
 Worth doing once before command 1: run it without --apply. It then prints its four steps — the
 app, the thresholds, Claude's status line, the start — and changes nothing. It is someone
 else's shell script, and one of those steps edits a file of yours: ~/.claude/settings.json,
