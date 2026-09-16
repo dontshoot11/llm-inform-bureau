@@ -199,7 +199,7 @@ func runCodexSessionTests(_ suite: TestSuite, config: ThresholdConfig) {
         suite.test("a rollout gives the tokens held, the real window size and the project") {
             let directory = makeRolloutDirectory(root, "reads", suite)
             write(
-                lines: [sessionMeta(), taskStarted(), tokenCount(held: 20_622, window: 258_400)],
+                lines: [sessionMeta(), taskStarted(), tokenCount(held: 20_622, window: 258_400), taskComplete()],
                 to: directory, named: "rollout-2026-09-15T17-59-45-aaa.jsonl",
                 modified: now.addingTimeInterval(-60), suite
             )
@@ -222,9 +222,9 @@ func runCodexSessionTests(_ suite: TestSuite, config: ThresholdConfig) {
             write(
                 lines: [
                     sessionMeta(),
-                    taskStarted(), tokenCount(held: 40_000, window: 258_400),
+                    taskStarted(), tokenCount(held: 40_000, window: 258_400), taskComplete(),
                     taskStarted(), tokenCount(held: 55_000, window: 258_400),
-                    tokenCount(held: 70_000, window: 258_400)
+                    tokenCount(held: 70_000, window: 258_400), taskComplete()
                 ],
                 to: directory, named: "rollout-2026-09-15T17-59-45-aaa.jsonl",
                 modified: now, suite
@@ -239,7 +239,7 @@ func runCodexSessionTests(_ suite: TestSuite, config: ThresholdConfig) {
         suite.test("the Anthropic mark is never applied to a Codex session") {
             let directory = makeRolloutDirectory(root, "no-claude-mark", suite)
             write(
-                lines: [sessionMeta(), taskStarted(), tokenCount(held: 200_000, window: 1_000_000)],
+                lines: [sessionMeta(), taskStarted(), tokenCount(held: 200_000, window: 1_000_000), taskComplete()],
                 to: directory, named: "rollout-2026-09-15T17-59-45-aaa.jsonl",
                 modified: now, suite
             )
@@ -259,7 +259,7 @@ func runCodexSessionTests(_ suite: TestSuite, config: ThresholdConfig) {
         suite.test("a session from yesterday is not active") {
             let directory = makeRolloutDirectory(root, "stale", suite)
             write(
-                lines: [sessionMeta(), taskStarted(), tokenCount(held: 9000, window: 258_400)],
+                lines: [sessionMeta(), taskStarted(), tokenCount(held: 9000, window: 258_400), taskComplete()],
                 to: directory, named: "rollout-2026-09-14T10-00-00-aaa.jsonl",
                 modified: now.addingTimeInterval(-86_400), suite
             )
@@ -311,13 +311,164 @@ func runCodexSessionTests(_ suite: TestSuite, config: ThresholdConfig) {
             // The real `session_meta` carries the whole system prompt and runs to about 18 KB.
             let directory = makeRolloutDirectory(root, "long-meta", suite)
             write(
-                lines: [sessionMeta(padding: 40_000), taskStarted(), tokenCount(held: 1000, window: 258_400)],
+                lines: [sessionMeta(padding: 40_000), taskStarted(), tokenCount(held: 1000, window: 258_400), taskComplete()],
                 to: directory, named: "rollout-2026-09-15T17-59-45-aaa.jsonl",
                 modified: now, suite
             )
             let session = CodexRolloutStore(sessionsDirectory: directory)
                 .activeSessions(activity: activity, now: now).value?.first
             suite.expectEqual(session?.project, "llm-inform-bureau", "project")
+        }
+    }
+}
+
+/// What a Codex session is waiting for — the same blinking light, read a different way.
+///
+/// Claude has to be inferred: nothing in a transcript says a turn is running, so the state
+/// comes off whose entry was last and whether it promised another. Codex says it outright —
+/// `task_started` opens a turn, `task_complete` closes it, `turn_aborted` closes the one the
+/// person cut short — so these cases are about reading those boundaries in the right order and
+/// about the two things the announcement does not cover: a turn nobody ever closed, and a turn
+/// that opened further back than the reader looks.
+func runCodexWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
+    let activity = SessionActivity(config: config)
+    let now = fixtureNow
+
+    /// The one rollout in a directory of its own, read back.
+    func session(_ root: URL, _ name: String, _ lines: [String]) -> SessionSnapshot? {
+        let directory = makeRolloutDirectory(root, name, suite)
+        write(lines: lines, to: directory, named: "rollout-2026-09-15T17-59-45-aaa.jsonl", modified: now, suite)
+        let reading = CodexRolloutStore(sessionsDirectory: directory).activeSessions(activity: activity, now: now)
+        guard let found = reading.value?.first else {
+            suite.expect(false, "expected a session, got \(reading)")
+            return nil
+        }
+        return found
+    }
+
+    func expectWaiting(_ root: URL, _ name: String, _ lines: [String], _ wait: ReplyWait, _ label: String) {
+        guard let snapshot = session(root, name, lines) else { return }
+        suite.expectEqual(snapshot.replyWait, wait, label)
+    }
+
+    withTemporaryDirectory(suite, named: "codex-waiting") { root in
+        suite.test("a turn that opened and has not closed is a session waiting") {
+            expectWaiting(
+                root, "open-turn",
+                [sessionMeta(), taskStarted(), tokenCount(held: 20_622, window: 258_400)],
+                .waiting, "the turn is still running"
+            )
+        }
+
+        suite.test("a turn that completed is not waiting") {
+            expectWaiting(
+                root, "completed",
+                [sessionMeta(), taskStarted(), tokenCount(held: 20_622, window: 258_400), taskComplete()],
+                .none, "the answer landed"
+            )
+        }
+
+        // The Codex half of "interrupting is an end of the wait announced in the file": the
+        // person pressed Esc, the turn is over, and nobody waits for the fuse to say so.
+        suite.test("a turn the person cut short is not waiting") {
+            expectWaiting(
+                root, "aborted",
+                [sessionMeta(), taskStarted(), tokenCount(held: 20_622, window: 258_400), turnAborted()],
+                .none, "an aborted turn owes nothing"
+            )
+        }
+
+        suite.test("the next question after an answer is a wait again") {
+            expectWaiting(
+                root, "second-turn",
+                [
+                    sessionMeta(),
+                    taskStarted(at: now.addingTimeInterval(-300)),
+                    tokenCount(held: 20_000, window: 258_400, at: now.addingTimeInterval(-290)),
+                    taskComplete(at: now.addingTimeInterval(-289)),
+                    taskStarted(),
+                    tokenCount(held: 30_000, window: 258_400)
+                ],
+                .waiting, "the last boundary is an opening one, not the completion before it"
+            )
+        }
+
+        // Codex writes all the way through a turn — reasoning, tool calls, their output, a
+        // token count per response — so the silence is the silence since the last of those.
+        // A turn that opened an hour ago and wrote something ten seconds ago is a turn with a
+        // long tool call in it, not an abandoned one.
+        suite.test("the silence is counted from the last line, not from the opening of the turn") {
+            expectWaiting(
+                root, "long-turn",
+                [
+                    sessionMeta(),
+                    taskStarted(at: now.addingTimeInterval(-config.abandonedWait.seconds * 3)),
+                    tokenCount(held: 30_000, window: 258_400)
+                ],
+                .waiting, "still writing, so still working"
+            )
+        }
+
+        // The fuse. Six rollouts of the 133 on this machine end on an opening with nothing
+        // after it: terminals closed mid-turn, processes killed. Nothing on disk tells those
+        // from an agent thinking hard, so the app says the one thing it knows.
+        suite.test("a turn silent for longer than the fuse is a stall") {
+            let longAgo = now.addingTimeInterval(-config.abandonedWait.seconds - 60)
+            expectWaiting(
+                root, "abandoned",
+                [
+                    sessionMeta(),
+                    taskStarted(at: longAgo.addingTimeInterval(-30)),
+                    tokenCount(held: 30_000, window: 258_400, at: longAgo)
+                ],
+                .stalled, "no line for this long is a stall, not an answer that landed"
+            )
+        }
+
+        suite.test("a turn silent for less than the fuse is still a wait") {
+            let recently = now.addingTimeInterval(-config.abandonedWait.seconds + 60)
+            expectWaiting(
+                root, "inside-fuse",
+                [
+                    sessionMeta(),
+                    taskStarted(at: recently.addingTimeInterval(-30)),
+                    tokenCount(held: 30_000, window: 258_400, at: recently)
+                ],
+                .waiting, "a long tool call is still somebody waiting"
+            )
+        }
+
+        // The sign is for a wait and only for a wait: a session whose turn ended owes nothing,
+        // however long it sits there. The half-hour activity window is what takes that row
+        // away, not this rule.
+        suite.test("a session that owes nothing never stalls, however long it is quiet") {
+            let longAgo = now.addingTimeInterval(-config.abandonedWait.seconds * 3)
+            expectWaiting(
+                root, "quiet",
+                [
+                    sessionMeta(),
+                    taskStarted(at: longAgo.addingTimeInterval(-30)),
+                    tokenCount(held: 30_000, window: 258_400, at: longAgo),
+                    taskComplete(at: longAgo)
+                ],
+                .none, "quiet is not waiting"
+            )
+        }
+
+        // The one thing the announcement does not survive: a turn whose opening is further
+        // back than the half megabyte this reader looks at. That takes a tool output running
+        // to megabytes, and on a guess the light stays steady rather than blinking.
+        suite.test("a turn whose boundary is out of reach is not claimed as a wait") {
+            expectWaiting(
+                root, "out-of-reach",
+                [
+                    sessionMeta(),
+                    taskStarted(),
+                    chatter(padding: 600_000),
+                    tokenCount(held: 30_000, window: 258_400)
+                ],
+                .none, "nothing read says a turn is open"
+            )
         }
     }
 }
@@ -333,13 +484,34 @@ private func sessionMeta(padding: Int = 0) -> String {
     """
 }
 
-private func taskStarted() -> String {
-    "{\"timestamp\":\"2026-09-15T15:59:46.000Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"task_started\"}}"
+/// The events that open and close a Codex turn. Unlike Claude, which leaves its boundaries to
+/// be inferred from whose entry was last, Codex announces both ends — which is the whole of
+/// why the waiting rule for it is read rather than derived.
+///
+/// The moments default to the same turn the Claude fixtures describe: asked a minute before
+/// the clock the tests read at, answered ten seconds before it. A fixture turn dated last year
+/// would read as abandoned and every case about the state would pass for the wrong reason.
+private func taskStarted(at moment: Date = fixtureAskedAt) -> String {
+    "{\"timestamp\":\"\(stamp(moment))\",\"type\":\"event_msg\",\"payload\":{\"type\":\"task_started\"}}"
 }
 
-private func tokenCount(held: Int, window: Int) -> String {
+private func taskComplete(at moment: Date = fixtureAnsweredAt) -> String {
+    "{\"timestamp\":\"\(stamp(moment))\",\"type\":\"event_msg\",\"payload\":{\"type\":\"task_complete\"}}"
+}
+
+/// How a turn the person cut short ends. Every one of the 39 aborts on this machine carried
+/// this reason; the field is kept in the fixture because it is what the line looks like, not
+/// because the reader asks about it.
+private func turnAborted(at moment: Date = fixtureAnsweredAt) -> String {
     """
-    {"timestamp":"2026-09-15T15:59:50.276Z","type":"event_msg","payload":{"type":"token_count",\
+    {"timestamp":"\(stamp(moment))","type":"event_msg","payload":{"type":"turn_aborted",\
+    "turn_id":"019fa422-6a72-7a50-9550-42d1f7cbeb8a","reason":"interrupted"}}
+    """
+}
+
+private func tokenCount(held: Int, window: Int, at moment: Date = fixtureAnsweredAt) -> String {
+    """
+    {"timestamp":"\(stamp(moment))","type":"event_msg","payload":{"type":"token_count",\
     "info":{"last_token_usage":{"total_tokens":\(held)},"model_context_window":\(window)}}}
     """
 }

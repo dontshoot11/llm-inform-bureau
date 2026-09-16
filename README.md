@@ -39,6 +39,22 @@ The scale measures how full something is, and nothing else. It is not a reading 
 the answers are: nobody publishes a length at which that changes, the vendors say it does not,
 and this app will not be the one to imply otherwise.
 
+**A light blinks while a session is waiting on its agent** — a question asked, a tool running,
+nothing back yet — and stops the moment the answer lands. The same light also blinks three
+times when a session's numbers move, so what tells the two apart is how long they last: three
+blinks and steady again is "the reading moved", blinking that does not stop is "it is still
+working". A wait that goes silent for longer than ten minutes is drawn as a figure eight
+instead: a closed terminal, a killed process and an agent hard at work leave the same thing on
+disk, so the app says the one thing it knows — no answer for a long time — rather than claiming
+the session died or pretending the wait is over. Shape carries the state and colour goes on
+carrying the budget: a session that stalled with its window against the ceiling wears a red
+figure eight.
+
+Both services do this, found in two different ways: Codex brackets every turn in its rollout,
+and Claude's boundaries are read off the last entry of the transcript — whose it was, and
+whether it promised another. The blink runs while something is waiting and stops with it;
+nothing is polled and no timer runs when nobody is waiting.
+
 No numbers in the bar on purpose. The bar answers *is anything worth looking at*; the panel
 behind it answers *how much exactly* — each service's limit windows with their reset times and
 the age of the reading, then every session running right now with its project, tokens, window

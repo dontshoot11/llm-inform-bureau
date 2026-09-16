@@ -67,10 +67,13 @@ and a blink that runs for minutes has to look at its end the way it looked at it
 wakeups ask for no tolerance for the same reason — a frame stretched to suit the scheduler is
 the unevenness this is avoiding.
 
-Waiting is **derived, not observed**, and nothing this app can read would observe it: measured,
-while a turn is being worked on neither the statusLine payload nor the transcript is written at
-all. What the app reads is what the last thing written leaves owed — the rule, and what it
-cannot cover, are in `AgentFiles.md`.
+Waiting reaches the light the same way from both services, and is found in two different ways.
+For Claude it is **derived, not observed**, and nothing this app can read would observe it:
+measured, while a turn is being worked on neither the statusLine payload nor the transcript is
+written at all, so what the app reads is what the last thing written leaves owed. Codex marks
+both ends of a turn in its rollout and the state is simply read off them. Either way the light
+is told a `ReplyWait` and nothing about where it came from — the rules, and what they cannot
+cover, are in `AgentFiles.md`.
 
 **And a wait that drags on stops blinking and becomes a sign.** A closed terminal, a killed
 process and an agent hard at work leave the same thing on disk, so what ends the blinking when

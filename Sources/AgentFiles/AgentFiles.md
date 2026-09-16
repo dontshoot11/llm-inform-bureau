@@ -93,6 +93,12 @@ A session's row says not only what it holds but whether the agent owes it an ans
 nothing owed, an answer owed and still expected (`.waiting`, the blinking light), and an answer
 owed for longer than the fuse (`.stalled`, the figure eight).
 
+Both services answer the question and neither answers it the same way, which is why each reader
+holds its own rule: Claude has to be read between the lines, Codex says it outright. The fuse
+under both is one threshold and one rule — `SessionActivity.replyWait`.
+
+#### Claude: the turn boundaries are inferred
+
 **Nothing on disk announces a request in flight.** Measured: while a turn is worked on, neither
 the transcript nor the statusLine payload is written — 25 seconds of a busy session moved
 neither file's modification time. So the state is not observed but derived, from the last thing
@@ -152,6 +158,34 @@ Two things this rule does not do, and both are honest rather than hidden:
   turn ended — so it gets a plain dot however long it stays quiet, and leaves by the activity
   window like any other. The same goes for a turn the person stopped: it is over, and staying
   over for longer does not make it something the agent owes an answer for.
+
+#### Codex: the turn boundaries are announced
+
+A rollout brackets every turn: `task_started` opens one, `task_complete` closes it, and
+`turn_aborted` closes the one the person cut short. So there is nothing to infer — the last
+boundary in the file is either an opening one, and the turn is running, or a closing one, and
+nobody is waiting on the agent. Counted over the 133 rollouts on this machine: 870 turns
+opened, 825 completed, 39 were aborted, every abort carrying `reason: "interrupted"`.
+
+Everything else about the wait is the same rule as Claude's, for the same reasons:
+
+- **The moment is the last line written, not the opening of the turn.** Codex writes all the
+  way through one — reasoning, tool calls, their output, a token count per response — so the
+  silence the fuse measures is the silence since the last of those. Measured over 32,804 gaps
+  between consecutive lines inside a turn: half under a second, 99% under 27, and 5 of them
+  (0.015%) past the ten-minute fuse. The fuse means the same thing here as it does for Claude.
+  A rollout's modification date would do as well — measured, it and the last line in the file
+  agree to the second, which a Claude transcript's does not — but the line's own timestamp is
+  what is read, so one reader's idea of when something happened is not two.
+- **The 6 rollouts that end on an opening** are the abandoned waits: terminals closed mid-turn,
+  processes killed. Verified on a session killed mid-turn with `SIGKILL` — the row reads as
+  waiting and turns to a stall the moment the fuse is up.
+- **A session that has not reported a `token_count` yet has no row**, so its first turn cannot
+  blink — the same limitation, arrived at from the other side: the row's tokens come from that
+  event, and a row with no tokens on it is the zero this app does not invent.
+- **A turn whose opening is further back than the half megabyte read from the end of the file
+  is not claimed as a wait.** That takes a tool output running to megabytes; on a guess the
+  light stays steady rather than blinking.
 
 ### Claude: the subagents of a session
 
@@ -275,7 +309,7 @@ run against fixtures instead of against whatever the machine happens to have.
 | --- | --- |
 | `SourceReading.swift` | The three outcomes every reader returns |
 | `UsageReader.swift` | Both services read at once, and the join between the two Claude sources |
-| `CodexRollouts.swift` | Codex limits and Codex sessions, out of the rollouts |
+| `CodexRollouts.swift` | Codex limits and Codex sessions, out of the rollouts — including whether one is waiting on its agent |
 | `ClaudeTranscripts.swift` | Claude sessions and the subagents running inside them, out of the transcripts — including whether one is waiting on its agent |
 | `ClaudeStatus.swift` | Claude limits and window sizes, out of what the wrapper leaves |
 | `SessionFiles.swift` | Finding the files a service has most recently written, and telling a session's transcript from a subagent's |

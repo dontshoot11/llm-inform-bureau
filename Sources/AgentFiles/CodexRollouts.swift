@@ -164,7 +164,7 @@ extension CodexRolloutStore {
         var snapshots: [SessionSnapshot] = []
         var unreadable = false
         for rollout in active {
-            switch session(in: rollout) {
+            switch session(in: rollout, activity: activity, now: now) {
             case .value(let snapshot): snapshots.append(snapshot)
             case .noData: continue
             case .unavailable: unreadable = true
@@ -176,7 +176,11 @@ extension CodexRolloutStore {
         return .value(activity.active(snapshots, now: now))
     }
 
-    private func session(in rollout: SessionFiles.Found) -> SourceReading<SessionSnapshot> {
+    private func session(
+        in rollout: SessionFiles.Found,
+        activity: SessionActivity,
+        now: Date
+    ) -> SourceReading<SessionSnapshot> {
         guard let lines = FileTail.lines(of: rollout.url, maxBytes: Self.tailSizes[0]) else {
             return .noData("unreadable file")
         }
@@ -201,9 +205,48 @@ extension CodexRolloutStore {
                 contextWindowTokens: last.element.contextWindow,
                 turnGrowthTokens: growth,
                 project: SessionFiles.projectName(fromWorkingDirectory: meta(of: rollout.url)?.workingDirectory),
-                lastActivityAt: rollout.modified
+                lastActivityAt: rollout.modified,
+                replyWait: activity.replyWait(
+                    since: Self.awaitingSince(events, writtenBy: rollout.modified),
+                    now: now
+                )
             )
         )
+    }
+
+    /// When the turn that still owes an answer was last written to, or `nil` when nothing is
+    /// owed.
+    ///
+    /// Codex is the easy half of this question. A Claude transcript never says a turn is
+    /// running, so the state is inferred from whose entry was last and whether it promised
+    /// another; a rollout announces it. `task_started` opens a turn, `task_complete` closes
+    /// it, and `turn_aborted` closes the one the person cut short — measured over 133 rollouts
+    /// here, 870 turns opened, 825 completed, 39 were interrupted, and every abort carried
+    /// `reason: "interrupted"`. So the wait is read rather than derived: the last boundary in
+    /// the file is either an opening one or a closing one.
+    ///
+    /// The 6 remaining files end on an opening with nothing after it — terminals closed
+    /// mid-turn, the same abandoned waits a Claude transcript leaves, and the same fuse
+    /// catches them.
+    ///
+    /// The moment is the last line of the file rather than the opening of the turn, because
+    /// Codex writes all the way through one: reasoning, tool calls, their output, a token
+    /// count per response. So the silence the fuse measures is the silence since the last of
+    /// those, exactly as it is for Claude — and it means the same thing at the same number.
+    /// Measured over 32,804 gaps between consecutive lines inside a turn: half were under a
+    /// second, 99% under 27, and 5 of them — 0.015% — ran past the ten-minute fuse.
+    ///
+    /// A turn whose boundary is further back than the tail this reads is not claimed as a
+    /// wait. Half a megabyte of rollout is many turns' worth; a turn longer than that is one
+    /// whose tool output ran to megabytes, and a light that blinks on a guess is worse than
+    /// one that stays steady.
+    private static func awaitingSince(_ events: [RolloutLine], writtenBy modified: Date) -> Date? {
+        guard let boundary = events.last(where: { $0.isTurnStart || $0.isTurnEnd }), boundary.isTurnStart
+        else { return nil }
+        // Every line of a rollout carries its own timestamp — measured, a rollout's
+        // modification date and the last line in it agree to the second — so the file's date
+        // is a floor under a line that stopped carrying one, not the usual answer.
+        return events.last(where: { $0.writtenAt != nil })?.writtenAt ?? modified
     }
 
     /// What the head of the rollout says the session is.
@@ -236,6 +279,10 @@ private struct RolloutLine {
         json = (try? JSONSerialization.jsonObject(with: Data(raw.utf8))) as? [String: Any]
     }
 
+    /// When Codex wrote this line. Parsed on demand rather than for every line of the tail:
+    /// only the last one of a file is ever asked.
+    var writtenAt: Date? { (json?["timestamp"] as? String).flatMap(Timestamps.date(fromISO8601:)) }
+
     private var payload: [String: Any]? { json?["payload"] as? [String: Any] }
 
     var isTokenCount: Bool { payload?["type"] as? String == "token_count" }
@@ -243,6 +290,13 @@ private struct RolloutLine {
     /// Codex starts every turn with this event, which is what makes a turn a thing this app
     /// can measure growth over.
     var isTurnStart: Bool { payload?["type"] as? String == "task_started" }
+
+    /// And ends every turn with one of these: the answer landed, or the person cut the turn
+    /// short. Either way nobody is waiting on the agent any more.
+    var isTurnEnd: Bool {
+        let type = payload?["type"] as? String
+        return type == "task_complete" || type == "turn_aborted"
+    }
 
     private var info: [String: Any]? { payload?["info"] as? [String: Any] }
 
