@@ -120,14 +120,15 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
     // The same line AGENTS.md draws for notifications: the app reports what it read, and
     // never grades the session.
     suite.test("nothing in the briefing claims to have measured quality") {
-        let said = ([Briefing.title, Briefing.intro, Briefing.closing,
-                     Briefing.marksTitle, Briefing.scaleHelp(config)]
-            + Briefing.levelKey.map(\.meaning)
-            + Briefing.marks(of: config).flatMap { [$0.title, $0.value, $0.note] }
-            + Briefing.items(for: nothing).flatMap { [$0.title, $0.detail] }
-            + Briefing.items(for: everything).flatMap { [$0.title, $0.detail] })
-            .joined(separator: " ")
-            .lowercased()
+        var lines: [String] = [
+            Briefing.title, Briefing.intro, Briefing.closing,
+            Briefing.marksTitle, Briefing.scaleHelp(config)
+        ]
+        lines += Briefing.levelKey.map(\.meaning)
+        lines += Briefing.marks(of: config).flatMap { [$0.title, $0.note] }
+        lines += Briefing.items(for: nothing).flatMap { [$0.title, $0.detail] }
+        lines += Briefing.items(for: everything).flatMap { [$0.title, $0.detail] }
+        let said = lines.joined(separator: " ").lowercased()
         suite.expect(!said.contains("quality:"), "a measured-quality claim: \(said)")
         suite.expect(!said.contains("health"), "a health score: \(said)")
         suite.expect(!said.contains("degraded"), "a verdict on the session: \(said)")
@@ -153,8 +154,31 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
                 note.scale.map(\.level) == [.notice, .elevated, .high],
                 "\(title): each mark must carry the light it turns on, got \(note.scale.map(\.level))"
             )
-            suite.expectEqual(note.value, "", "\(title): a scale says it with lights, not with a string")
         }
+    }
+
+    // The other half of the same list: a mark that is one number has no lights to show, and
+    // the window draws it as a field. A scale step appearing here would be the window offering
+    // a bar for something that is not a range.
+    suite.test("every mark that is one number reaches the window with no scale on it") {
+        let shown = Briefing.marks(of: config)
+
+        for mark in ThresholdMark.minutes {
+            guard let note = shown.first(where: { $0.mark == mark }) else {
+                suite.expect(false, "\(mark.rawValue) is missing from the window")
+                continue
+            }
+            suite.expect(note.scale.isEmpty, "\(mark.rawValue): a number is not a scale")
+            suite.expect(!note.title.isEmpty, "\(mark.rawValue): a mark with no title")
+            suite.expect(!note.note.isEmpty, "\(mark.rawValue): nothing says what this number does")
+            suite.expect(config.duration(of: mark) != nil, "\(mark.rawValue): no duration in the config")
+        }
+
+        // And the mark that decides nothing a person chooses stays out of the window.
+        suite.expect(
+            !shown.contains { $0.mark == .limitWindowNearlyReset },
+            "the quiet rule about a resetting window is not a setting"
+        )
     }
 
     // A colour nobody explained is a colour the reader gives a meaning of their own, and the

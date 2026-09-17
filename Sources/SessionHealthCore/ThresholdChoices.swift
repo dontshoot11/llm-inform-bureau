@@ -16,6 +16,16 @@ public enum ThresholdMark: String, CaseIterable, Sendable {
 
     /// The marks that are a scale of three rather than one number.
     public static let scales: [ThresholdMark] = [.windowFill, .limitUsage]
+
+    /// The marks that are one number of minutes, in the order the settings window shows them:
+    /// what the panel lists, when a wait stops expecting an answer, and how long a request for
+    /// the person waits before it is announced.
+    ///
+    /// Not every mark of the config that happens to be minutes — `limitWindowNearlyReset` is a
+    /// share of a window rather than a duration, and it is deliberately not here: it decides
+    /// nothing a person chooses, it only keeps the app from interrupting somebody over a
+    /// window about to come back on its own.
+    public static let minutes: [ThresholdMark] = [.abandonedWait, .attentionNotice, .sessionActivity]
 }
 
 /// The marks a person moved themselves, and what they become when the app's own marks are read.
@@ -36,14 +46,20 @@ public struct ThresholdChoices: Equatable, Sendable {
     /// The scales that were moved, by the mark they belong to.
     public var scales: [ThresholdMark: MarkScale]
 
-    public init(scales: [ThresholdMark: MarkScale] = [:]) {
+    /// The one-number marks that were set, in whole minutes.
+    public var minutes: [ThresholdMark: Int]
+
+    public init(scales: [ThresholdMark: MarkScale] = [:], minutes: [ThresholdMark: Int] = [:]) {
         self.scales = scales
+        self.minutes = minutes
     }
 
     /// `true` when nothing has been chosen — the ordinary state, and the one the app ships in.
-    public var isEmpty: Bool { scales.isEmpty }
+    public var isEmpty: Bool { scales.isEmpty && minutes.isEmpty }
 
     public func scale(of mark: ThresholdMark) -> MarkScale? { scales[mark] }
+
+    public func minutes(of mark: ThresholdMark) -> Int? { minutes[mark] }
 
     /// These choices with one more made.
     public func choosing(_ mark: ThresholdMark, _ scale: MarkScale) -> ThresholdChoices {
@@ -52,10 +68,25 @@ public struct ThresholdChoices: Equatable, Sendable {
         return chosen
     }
 
+    /// These choices with one more made, for a mark that is one number.
+    ///
+    /// A number outside what a mark may be is not written down: the same refusal the file gets
+    /// on the way back in, so a choice that could never be read is never made either.
+    public func choosing(_ mark: ThresholdMark, minutes: Int) -> ThresholdChoices {
+        guard let allowed = MinuteMark.value(minutes) else { return self }
+        var chosen = self
+        chosen.minutes[mark] = allowed
+        return chosen
+    }
+
     /// These choices with one taken back — the mark goes back to whatever the app ships.
+    ///
+    /// Both kinds at once, because a mark is one thing to the person putting it back: nothing
+    /// in the window offers to forget half of it.
     public func forgetting(_ mark: ThresholdMark) -> ThresholdChoices {
         var chosen = self
         chosen.scales[mark] = nil
+        chosen.minutes[mark] = nil
         return chosen
     }
 
@@ -67,9 +98,9 @@ public struct ThresholdChoices: Equatable, Sendable {
             windowFill: Self.marks(config.windowFill, chosen: scales[.windowFill]),
             limitUsage: Self.marks(config.limitUsage, chosen: scales[.limitUsage]),
             limitWindowNearlyReset: config.limitWindowNearlyReset,
-            sessionActivity: config.sessionActivity,
-            abandonedWait: config.abandonedWait,
-            attentionNotice: config.attentionNotice
+            sessionActivity: Self.duration(config.sessionActivity, chosen: minutes[.sessionActivity]),
+            abandonedWait: Self.duration(config.abandonedWait, chosen: minutes[.abandonedWait]),
+            attentionNotice: Self.duration(config.attentionNotice, chosen: minutes[.attentionNotice])
         )
     }
 
@@ -79,6 +110,16 @@ public struct ThresholdChoices: Equatable, Sendable {
             notice: chosen.notice,
             elevated: chosen.elevated,
             high: chosen.high,
+            rationale: chosenRationale,
+            provenance: nil,
+            isChosen: true
+        )
+    }
+
+    private static func duration(_ shipped: DurationThreshold, chosen: Int?) -> DurationThreshold {
+        guard let chosen, let minutes = MinuteMark.value(chosen) else { return shipped }
+        return DurationThreshold(
+            minutes: minutes,
             rationale: chosenRationale,
             provenance: nil,
             isChosen: true
@@ -108,6 +149,11 @@ public struct ThresholdChoices: Equatable, Sendable {
 public enum ThresholdChoicesStore {
     /// Version of *this* file's format, not the config's. The two move independently: the
     /// config file's shape is the app's business, and a choice names one mark and one value.
+    ///
+    /// It stayed at 1 when the one-number marks were added beside the scales, and that is what
+    /// the number is for: a version says a record has come to mean something else, and a new
+    /// section says nothing about the one already there. A file written before the minutes
+    /// existed reads as a scale chosen and no minutes, which is exactly what it is.
     public static let currentVersion = 1
 
     public static let fileName = "chosen-thresholds.json"
@@ -141,7 +187,21 @@ public enum ThresholdChoicesStore {
             else { continue }
             scales[mark] = scale
         }
-        return ThresholdChoices(scales: scales)
+
+        let storedMinutes = root["minutes"] as? [String: Any] ?? [:]
+        var minutes: [ThresholdMark: Int] = [:]
+        for mark in ThresholdMark.minutes {
+            guard
+                let number = storedMinutes[mark.rawValue] as? NSNumber,
+                // Whole minutes and nothing else: 10.5 is not a record this app ever wrote,
+                // and rounding somebody else's number would be the app choosing a mark.
+                Double(number.intValue) == number.doubleValue,
+                // The same rule the field in the window is held to.
+                let chosen = MinuteMark.value(number.intValue)
+            else { continue }
+            minutes[mark] = chosen
+        }
+        return ThresholdChoices(scales: scales, minutes: minutes)
     }
 
     /// Writes the choices, or removes the file when there are none left — so "put it back the
@@ -160,7 +220,11 @@ public enum ThresholdChoicesStore {
         for (mark, scale) in choices.scales {
             scales[mark.rawValue] = ["notice": scale.notice, "elevated": scale.elevated, "high": scale.high]
         }
-        let root: [String: Any] = ["version": currentVersion, "scales": scales]
+        var minutes: [String: Any] = [:]
+        for (mark, value) in choices.minutes {
+            minutes[mark.rawValue] = value
+        }
+        let root: [String: Any] = ["version": currentVersion, "scales": scales, "minutes": minutes]
         guard
             let data = try? JSONSerialization.data(
                 withJSONObject: root,

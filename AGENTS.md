@@ -66,8 +66,9 @@ Threshold updates land in the repository as commits.
    all, and the panel says nothing about any of it — a reader who never chose a number has
    nothing to do about one.
 
-   What a reader *can* do is move a mark in the settings window behind the gear (today: the
-   limit scale). That is kept as a choice against a named mark, in
+   What a reader *can* do is move a mark in the settings window behind the gear: either scale,
+   and the three marks that are one number of minutes. That is kept as a choice against a named
+   mark, in
    `chosen-thresholds.json`, and applied over whatever this file ships — so an edit here still
    reaches everybody who left that mark alone, and a moved mark keeps no rationale from here:
    it was written about the number that shipped.

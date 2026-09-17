@@ -28,7 +28,7 @@ the cases are plain functions and would port to swift-testing mechanically.
 | Suite | Covers |
 | --- | --- |
 | `ThresholdConfigTests` | The shipped config itself, and every way a file on disk can be broken without taking the app down |
-| `ThresholdChoiceTests` | Moving a mark: the arithmetic of the bar (a point on it, the stop against a neighbour, the ends), what a choice is kept as, and that a later release still reaches every mark nobody moved |
+| `ThresholdChoiceTests` | Moving a mark: the arithmetic of the bar (a point on it, the stop against a neighbour, the ends), the bounds of a mark that is one number of minutes, what a choice is kept as on disk, that a record no field could produce gives way to the marks the app ships, and that a later release still reaches every mark nobody moved |
 | `BudgetRulesTests` | The four marks, each boundary from both sides, both services |
 | `AlertMemoryTests` | One mark, one notification — and what makes a scope end |
 | `AlertDispatchTests` | What a whole reading has left to say: scopes, `/clear`, a rolled-over limit window, and the backlog found at launch |
@@ -45,7 +45,7 @@ the cases are plain functions and would port to swift-testing mechanically.
 | `AttentionNoticeTests` | Telling the person out loud that an agent is waiting on them: nothing said under the delay, one notification per wait however long it stands, the next wait announced again, a turn that ended announced never, and what the text owes — the project it names and the question cut to one line |
 | `SessionRaiseTests` | The road from a row to the window a session runs in: what a live process says about itself and what a pid nothing is using does not, that a pid travels only while the process behind it is the one the record named, that the chain above a process is walked to the top rather than to the first step that will not answer, and how far a click can get in each terminal — the tab, the window titled after the project, or the application — and what the panel says when it got no further than the application, which depends on how this copy is signed |
 | `CodexRolloutTests` | Reading limits and sessions out of rollout fixtures, including the shapes that mean "no data" and "source changed", and the request a rollout does not carry |
-| `SetupTests` | Which sources read as connected, what the first run says about the ones that do not, and showing that explanation once |
+| `SetupTests` | Which sources read as connected, what the first run says about the ones that do not, showing that explanation once, and that every mark the settings window offers arrives with the lights it turns on or as the plain number it is |
 | `StatusLineSlotTests` | `~/.claude/settings.json` edited from Swift: the key set and removed, every other byte of a hand-used file where it was, a command already in the slot saved and put back, the two branches that refuse to write, and taking over from the shell wrapper an earlier release installed |
 | `OfflineTests` | That no source file reaches for a network API — the reason the app works with the network off |
 

@@ -67,8 +67,18 @@ In order:
    copy is unreadable. A test fails if they ever drift from the shipped file.
 
 On top of whichever of those was read come **the marks the person moved themselves**, in the
-settings window behind the gear. Today that is the limit scale; the rest of the marks are shown
-there and not yet movable.
+settings window behind the gear: both scales, each on a bar of its own, and the three marks
+that are one number of minutes — how long a wait goes on expecting an answer, how long a
+request for the person stands before it is announced, and how long a session stays on the list.
+The quiet rule about a limit window about to reset is not among them: nothing there is anybody's
+choice, it only keeps the app from interrupting somebody over a window that comes back on its
+own.
+
+In the file both scales ship as the same three numbers on purpose, and what a person does with
+them afterwards is their own: a full context and a spent quota are different dangers, and
+somebody who wants to hear about them at different points is choosing their own colour language
+rather than breaking a rule. One scale for both **services** is the rule, and it is not theirs
+to change.
 
 **There is no editable copy of this file in Application Support**, nothing is created on a first
 launch, and one left behind by the release that had an installer is not read. Nobody was going

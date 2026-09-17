@@ -83,8 +83,8 @@ here it may rewrite the session, and what it drops first is the detail in the mi
 /context
 ```
 
-Three marks, shipped inside the app — the limit scale can be moved from the settings window
-behind the gear, and what you move stays yours across updates:
+Three marks, shipped inside the app — both scales and the marks that are one number can be
+moved from the settings window behind the gear, and what you move stays yours across updates:
 
 | Mark | Fires for | Default |
 | --- | --- | --- |
@@ -164,8 +164,9 @@ try them on. The command works on all of them.
 
 Open it from Launchpad or `/Applications`, or with `open -a LLMInformBureau`.
 
-It opens its settings window: the marks it watches — the limit scale is a bar you can move —
-and, folded up underneath, where each of its numbers comes from and what is not connected yet.
+It opens its settings window: the marks it watches — each scale is a bar you can move, and the
+marks that are one number are fields beside their names — and, folded up underneath, where each
+of its numbers comes from and what is not connected yet.
 That part opens by itself while something is still missing. The window carries the **Open at
 login** checkbox; afterwards it is reached again from the gear in the panel. Nothing is installed as a background service or a daemon: this is a
 normal application that happens to have no windows, and unticking the checkbox is all it takes

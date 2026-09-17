@@ -15,9 +15,10 @@ than fixtures.
 ## What it measures
 
 Four marks, all of them in `Resources/thresholds.json`, none of them in the code. The file
-ships inside the app and is nobody's to edit — but the marks are not the app's last word: the
-limit scale is moved in the settings window behind the gear, and what is kept is the choice
-rather than a copy of the file (`ThresholdChoices`, and "Marks the reader moved" below).
+ships inside the app and is nobody's to edit — but the marks are not the app's last word: both
+scales and the three marks that are one number of minutes are moved in the settings window
+behind the gear, and what is kept is the choice rather than a copy of the file
+(`ThresholdChoices`, and "Marks the reader moved" below).
 
 | Mark | Applies to | What it means | What the user can do |
 | --- | --- | --- | --- |
@@ -74,6 +75,11 @@ window — where a point along it falls, where a mark may go, what an arrow key 
 tests, because a mark that slips past its neighbour leaves three colours in no order and a
 widget that means nothing. The config file is read by the same rule, so a scale from a file and
 a scale from a person are held to one standard rather than two.
+
+`MinuteMark` is the same idea for a mark that is one number rather than a range: whole minutes,
+at least one and at most twelve hours. A field that accepted nought would silence a mark, and a
+record of it read back on the next launch would be refused — one rule in one place, met by the
+window and by the file alike.
 
 `ThresholdChoices` is what is kept: which mark was moved and where to, in
 `chosen-thresholds.json` beside the app's other files, and nothing else. Not a copy of the
@@ -213,6 +219,7 @@ Nothing in the loader throws: a broken config file degrades to the values below 
 | `ThresholdConfig.swift` | The marks, and the built-in copy of them |
 | `ThresholdConfigLoader.swift` | Reading the marks the app ships with, the choices over them, and the built-in values under both |
 | `MarkScale.swift` | A scale somebody can move: where a mark sits on the bar, how far it may go, and what a drag or an arrow key comes to |
+| `MinuteMark.swift` | The rule for a mark that is one number of minutes: how small and how large it may be, and what a typed number becomes |
 | `ThresholdChoices.swift` | The marks the reader moved — what is kept of them, where, and what they become when the app's own marks are read |
 | `SetupState.swift` | Which sources have written anything on this machine |
 | `StatusLineSlotState.swift` | Whose Claude Code's one status line slot is, and what taking it or giving it back would change |

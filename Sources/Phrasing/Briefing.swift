@@ -41,10 +41,9 @@ public struct MarkNote: Equatable, Sendable {
     /// Which mark this is — the identity the window moves, rather than the title it shows.
     public let mark: ThresholdMark
     public let title: String
-    /// The lights this mark turns on, when it is a scale. Empty for a mark that is one number.
+    /// The lights this mark turns on, when it is a scale. Empty for a mark that is one number,
+    /// which the window shows as the number itself.
     public let scale: [ScaleStep]
-    /// What this mark is set to, in words. Empty when `scale` carries it instead.
-    public let value: String
     private let unmeasuredNote: String
     public let provenance: ThresholdProvenance?
     /// `true` when the person moved this mark themselves.
@@ -54,7 +53,6 @@ public struct MarkNote: Equatable, Sendable {
         mark: ThresholdMark,
         title: String,
         scale: [ScaleStep] = [],
-        value: String = "",
         unmeasuredNote: String,
         provenance: ThresholdProvenance?,
         isChosen: Bool = false
@@ -62,7 +60,6 @@ public struct MarkNote: Equatable, Sendable {
         self.mark = mark
         self.title = title
         self.scale = scale
-        self.value = value
         self.unmeasuredNote = unmeasuredNote
         self.provenance = provenance
         self.isChosen = isChosen
@@ -188,6 +185,16 @@ public enum Briefing {
     /// not, and they are the only way to land on an exact number.
     public static let markEditHint = "Drag a mark to move it, or click one and use the arrow keys."
 
+    /// The unit of the marks that are one number. Beside the field rather than in the title,
+    /// because the number is what changes and the unit is what it is measured in.
+    public static let minuteUnit = "min"
+
+    /// What a field of minutes is called when it is read out rather than looked at: the number
+    /// on its own says nothing about which mark it belongs to.
+    public static func minuteFieldLabel(of markTitle: String) -> String {
+        "\(markTitle), in minutes"
+    }
+
     /// What a handle of a scale is called when it is read out rather than looked at — a mark
     /// is a colour, and a colour is exactly what a screen reader cannot pass on.
     public static func handleLabel(_ handle: MarkScale.Handle, of markTitle: String) -> String {
@@ -198,9 +205,10 @@ public enum Briefing {
         }
     }
 
-    /// The marks this window shows. Not every mark the app watches: the quiet rule about a
-    /// limit window that is about to reset does its work without anybody deciding anything
-    /// about it, and a settings window is a list of things to act on.
+    /// The marks this window shows, scales first and then the marks that are one number. Not
+    /// every mark the app watches: the quiet rule about a limit window that is about to reset
+    /// does its work without anybody deciding anything about it, and a settings window is a
+    /// list of things to act on.
     public static func marks(of config: ThresholdConfig) -> [MarkNote] {
         func steps(_ marks: PercentMarks) -> [ScaleStep] {
             [
@@ -233,6 +241,44 @@ public enum Briefing {
                     """,
                 provenance: config.limitUsage.provenance,
                 isChosen: config.limitUsage.isChosen
+            ),
+            MarkNote(
+                mark: .abandonedWait,
+                title: "Stop expecting an answer after",
+                unmeasuredNote: """
+                    How long a session may owe an answer in silence before one stops being \
+                    expected out of it: past this, its light stops blinking and is drawn as a \
+                    figure eight. Nothing on disk says a session died — a closed terminal and \
+                    an agent hard at work look the same — so this is how long the app goes on \
+                    promising an answer. Raise it if a long tool call stops the light while \
+                    you are still waiting.
+                    """,
+                provenance: config.abandonedWait.provenance,
+                isChosen: config.abandonedWait.isChosen
+            ),
+            MarkNote(
+                mark: .attentionNotice,
+                title: "Announce a request for you after",
+                unmeasuredNote: """
+                    How long the agent may be waiting on you before a notification is sent. \
+                    The pause sign in the panel appears the moment the request does; this \
+                    delays the notification alone, so a question answered by somebody sitting \
+                    at the terminal is never announced at all.
+                    """,
+                provenance: config.attentionNotice.provenance,
+                isChosen: config.attentionNotice.isChosen
+            ),
+            MarkNote(
+                mark: .sessionActivity,
+                title: "Keep a session on the list for",
+                unmeasuredNote: """
+                    How recently a session must have been written to for the panel to list it \
+                    at all. It warns about nothing and lights nothing: it decides what you are \
+                    looking at. Raise it if sessions you are still working on drop off the \
+                    list; lower it if finished ones linger.
+                    """,
+                provenance: config.sessionActivity.provenance,
+                isChosen: config.sessionActivity.isChosen
             )
         ]
     }

@@ -121,14 +121,26 @@ public struct DurationThreshold: Equatable, Sendable {
     public let rationale: String
     public let provenance: ThresholdProvenance?
 
+    /// `true` when this many minutes are where somebody put them rather than where they
+    /// shipped. The same thing `PercentMarks.isChosen` says, and for the same reason: a chosen
+    /// number has no measurement behind it and never will, so the window stops offering the
+    /// sentence that shipped with the other one.
+    public let isChosen: Bool
+
     public var isMeasured: Bool { provenance != nil }
 
     public var seconds: TimeInterval { TimeInterval(minutes) * 60 }
 
-    public init(minutes: Int, rationale: String, provenance: ThresholdProvenance?) {
+    public init(
+        minutes: Int,
+        rationale: String,
+        provenance: ThresholdProvenance?,
+        isChosen: Bool = false
+    ) {
         self.minutes = minutes
         self.rationale = rationale
         self.provenance = provenance
+        self.isChosen = isChosen
     }
 }
 
@@ -182,6 +194,30 @@ public struct ThresholdConfig: Equatable, Sendable {
         self.sessionActivity = sessionActivity
         self.abandonedWait = abandonedWait
         self.attentionNotice = attentionNotice
+    }
+
+    /// The three marks of a scale, for a mark that is a scale. `nil` for one that is not.
+    ///
+    /// The window works a list of marks rather than a list of fields, so it needs the value of
+    /// a mark it has only the name of. Here rather than in the window, because a mark and the
+    /// entry of the config it stands for are the same fact, and two places that both know it
+    /// is one place too many.
+    public func scaleMarks(of mark: ThresholdMark) -> PercentMarks? {
+        switch mark {
+        case .windowFill: windowFill
+        case .limitUsage: limitUsage
+        case .limitWindowNearlyReset, .sessionActivity, .abandonedWait, .attentionNotice: nil
+        }
+    }
+
+    /// The number of minutes a one-number mark is set to. `nil` for a mark that is not one.
+    public func duration(of mark: ThresholdMark) -> DurationThreshold? {
+        switch mark {
+        case .sessionActivity: sessionActivity
+        case .abandonedWait: abandonedWait
+        case .attentionNotice: attentionNotice
+        case .windowFill, .limitUsage, .limitWindowNearlyReset: nil
+        }
     }
 
     /// The floor under the floor: the values compiled into the app, used when even the

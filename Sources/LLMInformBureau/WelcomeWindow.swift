@@ -197,9 +197,12 @@ private struct WelcomeView: View {
 
     let close: () -> Void
 
-    /// Where the limit marks are right now, which is not always where the config says: the
-    /// person may have moved them since this window was built, and it is built once per run.
-    @State private var limitScale: MarkScale
+    /// Where the scales are right now, which is not always where the config says: the person
+    /// may have moved them since this window was built, and it is built once per run.
+    @State private var scales: [ThresholdMark: MarkScale]
+
+    /// The same, for the marks that are one number.
+    @State private var minutes: [ThresholdMark: Int]
 
     /// Whether the list of sources is open. Closed when every source has reported, because
     /// there is nothing to do about one that works; open while something is missing, because
@@ -210,18 +213,34 @@ private struct WelcomeView: View {
     /// that opens two screens tall makes the settings in it look like a footnote.
     @State private var readingOpen = false
 
-    /// Whether the limit marks are theirs rather than the app's. Kept beside the scale for the
-    /// same reason: the config in hand was read before they touched it, and the line under the
-    /// bar must stop offering the shipped explanation the moment it stops describing the mark.
-    @State private var limitChosen: Bool
+    /// Which marks are theirs rather than the app's. Kept beside the values for the same
+    /// reason: the config in hand was read before they touched anything, and the line under a
+    /// mark must stop offering the shipped explanation the moment it stops describing it.
+    @State private var chosen: Set<ThresholdMark>
 
     init(state: SetupState, marks: ThresholdConfigLoad, close: @escaping () -> Void) {
         self.state = state
         self.config = marks.config
         self.shipped = marks.shipped
         self.close = close
-        _limitScale = State(initialValue: MarkScale(of: marks.config.limitUsage))
-        _limitChosen = State(initialValue: marks.config.limitUsage.isChosen)
+
+        var scales: [ThresholdMark: MarkScale] = [:]
+        var minutes: [ThresholdMark: Int] = [:]
+        var chosen: Set<ThresholdMark> = []
+        // Seeded off the list the window shows rather than off the config as a whole: a mark
+        // this window has no row for is a mark nobody can move in it.
+        for note in Briefing.marks(of: marks.config) {
+            if let scale = marks.config.scaleMarks(of: note.mark) {
+                scales[note.mark] = MarkScale(of: scale)
+            }
+            if let duration = marks.config.duration(of: note.mark) {
+                minutes[note.mark] = duration.minutes
+            }
+            if note.isChosen { chosen.insert(note.mark) }
+        }
+        _scales = State(initialValue: scales)
+        _minutes = State(initialValue: minutes)
+        _chosen = State(initialValue: chosen)
         _sourcesOpen = State(initialValue: !state.isComplete)
     }
 
@@ -257,14 +276,7 @@ private struct WelcomeView: View {
             .padding(.bottom, 2)
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(Briefing.marks(of: config), id: \.mark) { mark in
-                    // The limit scale is the one a person can move here. The rest are shown as
-                    // they are set, and are not read-only on principle — they are the marks
-                    // this window has not grown a control for yet.
-                    if mark.mark == .limitUsage {
-                        editableMarkRow(mark)
-                    } else {
-                        markRow(mark)
-                    }
+                    markRow(mark)
                 }
             }
 
@@ -322,43 +334,92 @@ private struct WelcomeView: View {
         .onTapGesture { Welcome.releaseFocus() }
     }
 
-    /// The one mark this window hands over: the same title and the same line underneath, with
-    /// the scale itself in place of the three dots — a picture of the marks that is also the
-    /// way to move them.
-    private func editableMarkRow(_ mark: MarkNote) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+    /// One mark, as this window hands it over: what it is, the control that sets it, and the
+    /// line saying who put it where it is.
+    ///
+    /// One row for both kinds of mark. A scale gets the bar — a picture of the marks that is
+    /// also the way to move them — and a mark that is one number gets a field beside its title;
+    /// everything else about the row is the same, because to the reader they are the same kind
+    /// of thing.
+    private func markRow(_ mark: MarkNote) -> some View {
+        let scale = config.scaleMarks(of: mark.mark)
+        let isChosen = chosen.contains(mark.mark)
+        return VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline) {
                 Text(mark.title)
                     .font(WindowType.item)
-                Spacer()
+                    // Onto a second line rather than into an ellipsis: a row that reads
+                    // "Announce a request for…" beside a field of minutes says nothing.
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                if let duration = config.duration(of: mark.mark) {
+                    MinuteMarkField(
+                        title: mark.title,
+                        minutes: minutes(of: mark.mark, orShipped: duration.minutes),
+                        settled: { choose(mark.mark, minutes: $0) }
+                    )
+                }
                 // Only on a mark that was actually moved: a button with nothing to undo is one
                 // more control to read past, and this window is already a list of them.
-                if limitChosen {
-                    Button(Briefing.resetMark, action: resetLimitMarks)
+                if isChosen {
+                    Button(Briefing.resetMark) { reset(mark.mark) }
                         .buttonStyle(.link)
                         .font(WindowType.detail)
                 }
             }
-            MarkScaleBar(title: mark.title, scale: $limitScale, settled: choose)
+            if let scale {
+                MarkScaleBar(
+                    title: mark.title,
+                    scale: self.scale(of: mark.mark, orShipped: scale),
+                    settled: { choose(mark.mark, $0) }
+                )
                 // The title is the label of the bar, not a line of the bar: without the gap
                 // the two read as one crowded block.
                 .padding(.top, 4)
+            }
             // Nothing under a mark that was moved: what stood here explained a number that is
             // no longer there, and the Reset button beside the title is what says the mark is
             // the reader's own.
-            if !limitChosen {
-                Text(mark.note)
-                    .font(WindowType.detail)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            if !isChosen {
+                HStack(spacing: 6) {
+                    Text(mark.note)
+                        .font(WindowType.detail)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let source = mark.source {
+                        Link("source", destination: source)
+                            .font(WindowType.detail)
+                    }
+                }
             }
-            Text(Briefing.markEditHint)
-                .font(WindowType.detail)
-                .foregroundStyle(.tertiary)
+            // Under the bar alone: dragging is discoverable and the arrow keys are not, while
+            // a field with a stepper beside it says how it is worked by being one.
+            if scale != nil {
+                Text(Briefing.markEditHint)
+                    .font(WindowType.detail)
+                    .foregroundStyle(.tertiary)
+            }
         }
     }
 
-    /// Writes down a mark that has just been moved, keeping every other choice on disk: this
+    /// Where a scale is right now, falling back to what the app ships when this window has
+    /// somehow not seeded it — a mark with no state is a row that cannot be drawn, and the
+    /// shipped numbers are the right thing to draw instead of nothing.
+    private func scale(of mark: ThresholdMark, orShipped marks: PercentMarks) -> Binding<MarkScale> {
+        Binding(
+            get: { scales[mark] ?? MarkScale(of: marks) },
+            set: { scales[mark] = $0 }
+        )
+    }
+
+    private func minutes(of mark: ThresholdMark, orShipped value: Int) -> Binding<Int> {
+        Binding(
+            get: { minutes[mark] ?? value },
+            set: { minutes[mark] = $0 }
+        )
+    }
+
+    /// Writes down a scale that has just been moved, keeping every other choice on disk: this
     /// window is not the only thing that will ever write to that file, and a choice is a choice
     /// about one mark rather than a snapshot of all of them.
     ///
@@ -366,63 +427,34 @@ private struct WelcomeView: View {
     /// menu bar that redrew itself on every step of a drag would be a second path to the same
     /// reading; what closing the window does instead is ask for one pass, once
     /// (`Welcome.marksChanged`).
-    private func choose(_ scale: MarkScale) {
-        limitChosen = true
+    private func choose(_ mark: ThresholdMark, _ scale: MarkScale) {
+        chosen.insert(mark)
         Welcome.marksChanged()
-        let url = ThresholdChoicesStore.url()
-        ThresholdChoicesStore.write(ThresholdChoicesStore.read(at: url).choosing(.limitUsage, scale), to: url)
+        write { $0.choosing(mark, scale) }
     }
 
-    /// Puts the limit marks back where the app had them, and takes the choice off the disk
-    /// rather than writing the shipped numbers down as a choice of their own — the mark goes
-    /// back to following the app, including through the releases that move it.
-    private func resetLimitMarks() {
-        limitScale = MarkScale(of: shipped.limitUsage)
-        limitChosen = false
+    private func choose(_ mark: ThresholdMark, minutes value: Int) {
+        chosen.insert(mark)
         Welcome.marksChanged()
-        let url = ThresholdChoicesStore.url()
-        ThresholdChoicesStore.write(ThresholdChoicesStore.read(at: url).forgetting(.limitUsage), to: url)
+        write { $0.choosing(mark, minutes: value) }
     }
 
-    /// One mark: what it is, what it is set to, and who says so — with the source as a link
-    /// when there is one, and an admission when there is not.
-    private func markRow(_ mark: MarkNote) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(mark.title)
-                    .font(WindowType.item)
-                Spacer()
-                // A mark that is a scale shows the lights it actually turns on. Describing
-                // them in a sentence asks the reader to match a colour to a number in their
-                // head; a dot beside its percentage has already done it.
-                if mark.scale.isEmpty {
-                    Text(mark.value)
-                        .font(WindowType.number)
-                        .foregroundStyle(.secondary)
-                } else {
-                    HStack(spacing: 10) {
-                        ForEach(mark.scale, id: \.percent) { step in
-                            HStack(spacing: 4) {
-                                StatusLight(light: .level(step.level), diameter: 7)
-                                    .alignmentGuide(.firstTextBaseline) { $0.height * 0.5 + 2.5 }
-                                Text(step.label)
-                                    .font(WindowType.number)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-            }
-            HStack(spacing: 6) {
-                Text(mark.note)
-                    .font(WindowType.detail)
-                    .foregroundStyle(.secondary)
-                if let source = mark.source {
-                    Link("source", destination: source)
-                        .font(WindowType.detail)
-                }
-            }
-        }
+    /// Puts a mark back where the app had it, and takes the choice off the disk rather than
+    /// writing the shipped numbers down as a choice of their own — the mark goes back to
+    /// following the app, including through the releases that move it.
+    private func reset(_ mark: ThresholdMark) {
+        if let marks = shipped.scaleMarks(of: mark) { scales[mark] = MarkScale(of: marks) }
+        if let duration = shipped.duration(of: mark) { minutes[mark] = duration.minutes }
+        chosen.remove(mark)
+        Welcome.marksChanged()
+        write { $0.forgetting(mark) }
+    }
+
+    /// One change to what is on disk, made against whatever is there rather than against what
+    /// this window was built with.
+    private func write(_ change: (ThresholdChoices) -> ThresholdChoices) {
+        let url = ThresholdChoicesStore.url()
+        ThresholdChoicesStore.write(change(ThresholdChoicesStore.read(at: url)), to: url)
     }
 
     /// One piece of background: its title as a link, the year, and what it shows in a line.

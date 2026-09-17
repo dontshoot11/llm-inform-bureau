@@ -143,6 +143,84 @@ func runThresholdChoiceTests(_ suite: TestSuite, config: ThresholdConfig) {
         suite.expect(note.source == nil, "a moved mark has no published source to link to")
     }
 
+    // MARK: Marks that are one number
+
+    suite.test("a number of minutes outside what a mark may be is not a mark") {
+        suite.expect(MinuteMark.value(0) == nil, "a mark of no minutes at all")
+        suite.expect(MinuteMark.value(-5) == nil, "a mark of less than none")
+        suite.expect(MinuteMark.value(MinuteMark.allowed.upperBound + 1) == nil, "past the ceiling")
+        suite.expectEqual(MinuteMark.value(10), 10, "an ordinary mark")
+        suite.expectEqual(MinuteMark.clamped(0), MinuteMark.allowed.lowerBound, "walked up to the floor")
+        suite.expectEqual(MinuteMark.clamped(99999), MinuteMark.allowed.upperBound, "walked back to the ceiling")
+        for mark in ThresholdMark.minutes {
+            guard let shipped = config.duration(of: mark) else {
+                suite.expect(false, "\(mark.rawValue) is not a duration in the config")
+                continue
+            }
+            suite.expect(
+                MinuteMark.value(shipped.minutes) != nil,
+                "\(mark.rawValue): the app ships a number its own field would refuse — \(shipped.minutes)"
+            )
+        }
+    }
+
+    suite.test("a number nobody may choose is not written down as a choice") {
+        let refused = ThresholdChoices().choosing(.abandonedWait, minutes: 0)
+        suite.expect(refused.isEmpty, "nought minutes is not a mark")
+        suite.expect(
+            ThresholdChoices().choosing(.attentionNotice, minutes: 100_000).isEmpty,
+            "a number past the ceiling is not a mark"
+        )
+        suite.expectEqual(
+            ThresholdChoices().choosing(.abandonedWait, minutes: 25).minutes(of: .abandonedWait),
+            25,
+            "an ordinary number is"
+        )
+    }
+
+    suite.test("a chosen number of minutes is what the rules compare against") {
+        let applied = ThresholdChoices()
+            .choosing(.abandonedWait, minutes: 25)
+            .applied(to: config)
+        suite.expectEqual(applied.abandonedWait.minutes, 25, "the chosen wait")
+        suite.expectEqual(applied.abandonedWait.isChosen, true, "the window can say who chose it")
+        suite.expectEqual(applied.abandonedWait.isMeasured, false, "a chosen number is not a measured one")
+        suite.expect(
+            applied.abandonedWait.rationale != config.abandonedWait.rationale,
+            "the shipped sentence must not stand under somebody else's number"
+        )
+        suite.expectEqual(applied.attentionNotice, config.attentionNotice, "a mark nobody touched keeps everything")
+        suite.expectEqual(applied.sessionActivity, config.sessionActivity, "and so does the other one")
+
+        // The window says nothing under it either, the same as for a moved scale.
+        guard let note = Briefing.marks(of: applied).first(where: { $0.mark == .abandonedWait }) else {
+            suite.expect(false, "the wait is missing from the window")
+            return
+        }
+        suite.expectEqual(note.note, "", "nothing may stand under a chosen number")
+    }
+
+    suite.test("one number chosen leaves the rest to arrive with the next release") {
+        let choices = ThresholdChoices()
+            .choosing(.attentionNotice, minutes: 5)
+            .choosing(.windowFill, MarkScale(notice: 25, elevated: 45, high: 85) ?? MarkScale(of: config.windowFill))
+        let later = ThresholdConfig(
+            version: config.version,
+            windowFill: PercentMarks(notice: 11, elevated: 22, high: 33, rationale: "A later release.", provenance: nil),
+            limitUsage: PercentMarks(notice: 12, elevated: 24, high: 36, rationale: "A later release.", provenance: nil),
+            limitWindowNearlyReset: WindowResetThreshold(remainingSharePercent: 7, rationale: "A later release.", provenance: nil),
+            sessionActivity: DurationThreshold(minutes: 45, rationale: "A later release.", provenance: nil),
+            abandonedWait: DurationThreshold(minutes: 15, rationale: "A later release.", provenance: nil),
+            attentionNotice: DurationThreshold(minutes: 3, rationale: "A later release.", provenance: nil)
+        )
+        let applied = choices.applied(to: later)
+        suite.expectEqual(applied.attentionNotice.minutes, 5, "the number they chose is still theirs")
+        suite.expectClose(applied.windowFill.notice, 25, "and so is the scale they moved")
+        suite.expectEqual(applied.abandonedWait, later.abandonedWait, "the wait came with the release")
+        suite.expectEqual(applied.sessionActivity, later.sessionActivity, "the session window came with the release")
+        suite.expectEqual(applied.limitUsage, later.limitUsage, "the limit scale came with the release")
+    }
+
     // MARK: On disk
 
     withTemporaryDirectory(suite, named: "threshold-choices") { directory in
@@ -212,6 +290,90 @@ func runThresholdChoiceTests(_ suite: TestSuite, config: ThresholdConfig) {
                 suite
             )
             suite.expect(ThresholdChoicesStore.read(at: url).isEmpty, "an unordered scale is no choice")
+        }
+
+        suite.test("a chosen number comes back the way it was written") {
+            let choices = ThresholdChoices()
+                .choosing(.abandonedWait, minutes: 25)
+                .choosing(.sessionActivity, minutes: 60)
+            suite.expect(ThresholdChoicesStore.write(choices, to: url), "written")
+            let readBack = ThresholdChoicesStore.read(at: url)
+            suite.expectEqual(readBack.minutes(of: .abandonedWait), 25, "the wait")
+            suite.expectEqual(readBack.minutes(of: .sessionActivity), 60, "the session window")
+            suite.expect(readBack.minutes(of: .attentionNotice) == nil, "nothing was chosen for the notice")
+            suite.expect(readBack.scale(of: .limitUsage) == nil, "and no scale was moved")
+        }
+
+        // Both kinds live in one file, and a person moving a scale must not cost themselves the
+        // number they typed an hour earlier.
+        suite.test("a moved scale and a typed number keep each other's company") {
+            guard let scale = MarkScale(notice: 30, elevated: 55, high: 80) else {
+                suite.expect(false, "the fixture is not a scale")
+                return
+            }
+            ThresholdChoicesStore.write(ThresholdChoices().choosing(.abandonedWait, minutes: 25), to: url)
+            ThresholdChoicesStore.write(ThresholdChoicesStore.read(at: url).choosing(.limitUsage, scale), to: url)
+            let readBack = ThresholdChoicesStore.read(at: url)
+            suite.expectEqual(readBack.minutes(of: .abandonedWait), 25, "the number")
+            suite.expectEqual(readBack.scale(of: .limitUsage), scale, "the scale")
+        }
+
+        // The same rule the field in the window is held to, held on the way back in: a record
+        // the app could never have written is no choice at all.
+        suite.test("a number of minutes no mark may take gives way to the one the app ships") {
+            for (name, contents) in [
+                ("nought minutes", "{\"version\": 1, \"minutes\": {\"sessions.abandoned_wait_after_minutes\": 0}}"),
+                ("a negative number", "{\"version\": 1, \"minutes\": {\"sessions.abandoned_wait_after_minutes\": -10}}"),
+                ("past the ceiling", "{\"version\": 1, \"minutes\": {\"sessions.abandoned_wait_after_minutes\": 100000}}"),
+                ("half a minute", "{\"version\": 1, \"minutes\": {\"sessions.abandoned_wait_after_minutes\": 10.5}}"),
+                ("not a number", "{\"version\": 1, \"minutes\": {\"sessions.abandoned_wait_after_minutes\": \"ten\"}}")
+            ] {
+                writeText(contents, to: url, suite)
+                suite.expect(ThresholdChoicesStore.read(at: url).isEmpty, "\(name): nothing should be chosen")
+                suite.expectEqual(
+                    ThresholdConfigLoader.load(choicesAt: url).config.abandonedWait,
+                    config.abandonedWait,
+                    "\(name): the app runs on its own number"
+                )
+            }
+        }
+
+        // A file written before the one-number marks existed. The version says what a record
+        // means, and nothing about the scales changed when the minutes arrived beside them.
+        suite.test("a file written before there were numbers in it still carries its scale") {
+            writeText(
+                "{\"version\": 1, \"scales\": {\"limits.percent\": {\"notice\": 30, \"elevated\": 55, \"high\": 80}}}",
+                to: url,
+                suite
+            )
+            let readBack = ThresholdChoicesStore.read(at: url)
+            suite.expectEqual(readBack.scale(of: .limitUsage)?.elevated, 55, "the scale that was chosen then")
+            suite.expect(readBack.minutes.isEmpty, "and nothing was chosen that could not be")
+        }
+
+        suite.test("a chosen number on disk is what the app runs on") {
+            ThresholdChoicesStore.write(ThresholdChoices().choosing(.attentionNotice, minutes: 5), to: url)
+            let load = ThresholdConfigLoader.load(choicesAt: url)
+            suite.expectEqual(load.config.attentionNotice.minutes, 5, "the chosen delay")
+            suite.expectEqual(load.config.attentionNotice.isChosen, true, "the window can say who chose it")
+            suite.expectEqual(load.config.abandonedWait, config.abandonedWait, "the marks nobody touched")
+            suite.expectEqual(load.shipped, config, "what putting it back goes back to")
+        }
+
+        suite.test("putting a number back leaves no choice behind either") {
+            ThresholdChoicesStore.write(ThresholdChoices().choosing(.abandonedWait, minutes: 25), to: url)
+            let back = ThresholdChoicesStore.read(at: url).forgetting(.abandonedWait)
+            ThresholdChoicesStore.write(back, to: url)
+            suite.expect(ThresholdChoicesStore.read(at: url).isEmpty, "nothing is chosen any more")
+            suite.expect(
+                !FileManager.default.fileExists(atPath: url.path),
+                "the shipped number must not be written down as a choice of its own"
+            )
+            suite.expectEqual(
+                ThresholdConfigLoader.load(choicesAt: url).config,
+                config,
+                "the app is back on its own marks"
+            )
         }
 
         suite.test("putting a mark back leaves no choice behind, on disk or in the marks") {
