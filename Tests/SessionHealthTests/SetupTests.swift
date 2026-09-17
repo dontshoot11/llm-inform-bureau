@@ -121,7 +121,7 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
     // never grades the session.
     suite.test("nothing in the briefing claims to have measured quality") {
         var lines: [String] = [
-            Briefing.title, Briefing.intro, Briefing.closing,
+            CheckupPhrasing.title, CheckupPhrasing.intro, CheckupPhrasing.closing,
             Briefing.marksTitle, Briefing.scaleHelp(config)
         ]
         lines += Briefing.levelKey.map(\.meaning)

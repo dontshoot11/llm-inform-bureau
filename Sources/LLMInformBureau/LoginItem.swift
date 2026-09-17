@@ -1,4 +1,5 @@
 import Foundation
+import Phrasing
 import ServiceManagement
 import SwiftUI
 
@@ -77,8 +78,8 @@ final class LoginItem: ObservableObject {
     }
 }
 
-/// The control, in the one place that draws it: the first-run window offers it while the app
-/// is being set up, and the panel keeps it reachable afterwards.
+/// The control, in the one place that draws it: one line of the checkup in the settings
+/// window, where it stands as both what the state is and the way to change it.
 struct LoginItemToggle: View {
     @ObservedObject var loginItem: LoginItem
 
@@ -86,9 +87,9 @@ struct LoginItemToggle: View {
         VStack(alignment: .leading, spacing: 3) {
             switch loginItem.state {
             case .unavailable(let why):
-                note("Open at login: \(why)")
+                note(CheckupPhrasing.openAtLoginUnavailable(why))
             case .on, .off, .waitingForApproval:
-                Toggle("Open at login", isOn: Binding(
+                Toggle(CheckupPhrasing.openAtLogin, isOn: Binding(
                     get: { loginItem.state != .off },
                     set: { loginItem.set($0) }
                 ))

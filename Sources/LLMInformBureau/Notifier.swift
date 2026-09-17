@@ -1,6 +1,7 @@
 import Foundation
 import UserNotifications
 import Phrasing
+import SessionHealthCore
 
 
 /// Puts a notification on screen, without a sound.
@@ -28,16 +29,17 @@ import Phrasing
 /// there is anything to say is how an app gets refused.
 @MainActor
 final class Notifier {
-    private enum Channel {
-        case system
-        case script
-    }
-
     /// How many notifications may wait while the permission dialog is open. A crossed mark is
     /// worth saying late; twenty of them are worth saying once.
     private static let queueLimit = 5
 
-    private var channel: Channel?
+    /// Which channel this run settled on, or `nil` while nothing has been sent yet.
+    ///
+    /// Read by the checkup, which is the only honest thing it can say about notifications:
+    /// there is no tick to show for something whose availability is not decided until it is
+    /// used, and whose banners may arrive under somebody else's name.
+    private(set) var channel: NotificationChannel?
+
     private var asking = false
     private var queued: [NotificationText] = []
 
@@ -60,26 +62,26 @@ final class Notifier {
         // No bundle identifier means this is the bare SwiftPM executable, where the
         // notification centre is not merely unavailable but fatal to touch.
         guard Bundle.main.bundleIdentifier != nil else {
-            settle(on: .script)
+            settle(on: .scriptEditor)
             return
         }
 
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { [weak self] granted, _ in
-            Task { @MainActor in self?.settle(on: granted ? .system : .script) }
+            Task { @MainActor in self?.settle(on: granted ? .ownName : .scriptEditor) }
         }
     }
 
-    private func settle(on channel: Channel) {
+    private func settle(on channel: NotificationChannel) {
         self.channel = channel
         let waiting = queued
         queued = []
         for text in waiting { post(text, over: channel) }
     }
 
-    private func post(_ text: NotificationText, over channel: Channel) {
+    private func post(_ text: NotificationText, over channel: NotificationChannel) {
         switch channel {
-        case .system: postThroughCentre(text)
-        case .script: postThroughScript(text)
+        case .ownName: postThroughCentre(text)
+        case .scriptEditor: postThroughScript(text)
         }
     }
 

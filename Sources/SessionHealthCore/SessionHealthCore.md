@@ -89,6 +89,27 @@ moved mark loses its rationale and its provenance: the sentence under it was wri
 different number. `isChosen` is what is left — the flag the window turns into a "Reset to
 default" button beside that mark and into no explanation at all under it.
 
+## What this Mac has given the app
+
+The app depends on things it did not bring with it: a status line slot, a permission, a source
+that has written something. Every one of them fails quietly — a click raises the wrong window,
+a notification never comes, "Claude" stands with an em dash — and none of that looks like a
+missing permission. It looks like a broken widget. `CheckupState` is the list, and the rules in
+it are about what may be claimed:
+
+- A tick only for what is really there.
+- A **question mark** for what macOS will not answer until the app tries. Automation and the
+  notification centre are both like this, and a tick invented for either would be the app's
+  guess wearing the system's authority.
+- A **plain note** for a line that states a fact rather than reporting a permission: which copy
+  is running, and the login checkbox, which is its own answer.
+- Only a `missing` line unfolds the list. The two that state a fact never do — a window that
+  opened a list of eight to show a path is asking for attention it has no use for.
+
+Reading any of it is the app's job, not this module's, and the rule there is that **opening the
+window must not raise a permission dialog**: a dialog is a question, and the moment to ask one
+is when somebody's own click needs the answer.
+
 ## Marks are exclusive
 
 A session sitting exactly on 50% has not crossed it. Every rule follows this, so a test can
@@ -222,6 +243,7 @@ Nothing in the loader throws: a broken config file degrades to the values below 
 | `MinuteMark.swift` | The rule for a mark that is one number of minutes: how small and how large it may be, and what a typed number becomes |
 | `ThresholdChoices.swift` | The marks the reader moved — what is kept of them, where, and what they become when the app's own marks are read |
 | `SetupState.swift` | Which sources have written anything on this machine |
+| `CheckupState.swift` | Everything the app runs on that this Mac had to give it — the sources, the slot, the permissions, which copy is running — what each of those answers means, and the panes of System Settings where the answers are kept |
 | `StatusLineSlotState.swift` | Whose Claude Code's one status line slot is, and what taking it or giving it back would change |
 | `TerminalRaise.swift` | How far a click on a session's row can get — the tab, the window titled after the project, or the application — the AppleScript that asks for a tab, and which permission each answer costs |
 | `SupportDirectory.swift` | The directory this app keeps its own files in |

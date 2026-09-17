@@ -10,14 +10,23 @@ public enum TimeDisplay {
         let seconds = now.timeIntervalSince(date)
         if seconds < 60 { return "just now" }
         if seconds < 60 * 60 * 12 { return "\(compact(seconds)) ago" }
-        return "on " + date.formatted(date: .abbreviated, time: .shortened)
+        return "on " + moment(date)
     }
 
     public static func until(_ date: Date, now: Date = Date()) -> String {
         let seconds = date.timeIntervalSince(now)
         if seconds <= 0 { return "any moment" }
         if seconds < 60 * 60 * 24 { return "in \(compact(seconds))" }
-        return "on " + date.formatted(date: .abbreviated, time: .shortened)
+        return "on " + moment(date)
+    }
+
+    /// A moment named outright rather than measured against now.
+    ///
+    /// For the one date in the app that is not an age: when the running copy was built. "Two
+    /// hours ago" is the wrong shape for it — the question it answers is which of the bundles
+    /// on this disk is in the menu bar, and that is settled by a date and a time, not by a gap.
+    public static func moment(_ date: Date) -> String {
+        date.formatted(date: .abbreviated, time: .shortened)
     }
 
     /// The length of a limit window, as the service reports it in minutes.

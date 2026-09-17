@@ -67,12 +67,13 @@ look up a number instead.
 | File | Holds |
 | --- | --- |
 | `AlertPhrasing.swift` | A crossed mark — or an agent waiting on the person — as a notification: title, body, command |
-| `Wording.swift` | What a mark is called, what a subagent's row is called, which command shows more of it, what a folded row with no reading yet says, what a service is called — `service` where there is room to say it, `serviceInBar` where the budget is pixels — and what a clickable session row promises, plus the line and button shown when the permission for something closer than the application is missing — with the extra sentence an ad-hoc-signed copy adds, about a tick that belongs to the version before this one |
-| `Briefing.swift` | What the settings window says: what each colour is like to be in, where every number comes from, what is not connected, how a scale is worked and what each mark that is one number decides — and nothing at all under a mark the reader moved, because the reasoning that shipped was about another number |
+| `Wording.swift` | What a mark is called, what a subagent's row is called, which command shows more of it, what a folded row with no reading yet says, what a service is called — `service` where there is room to say it, `serviceInBar` where the budget is pixels — and what a clickable session row promises, plus the line and button shown when the permission for something closer than the application is missing, the name of the button that opens any pane of System Settings, and the sentence an ad-hoc-signed copy adds about a tick that belongs to the version before this one — said in one place because both the panel and the checkup say it |
+| `Briefing.swift` | What the settings window says about its marks: what each colour is like to be in, how a scale is worked, what each mark that is one number decides — and nothing at all under a mark the reader moved, because the reasoning that shipped was about another number — plus each source of readings, as the checkup lists it |
+| `CheckupPhrasing.swift` | The other half of that window: every thing the app uses on this Mac as one line — what it is, what the machine answered, what it costs while the answer is no, and the pane of System Settings where that answer is kept |
 | `TokenDisplay.swift` | Token counts and percentages, rounded the way the widget says them |
-| `TimeDisplay.swift` | Ages, reset times and window lengths |
+| `TimeDisplay.swift` | Ages, reset times and window lengths — and the one date that is not an age: when the running copy was built |
 | `StatusLineText.swift` | The one row the app prints when it holds Claude Code's status line and nothing was there before it |
 | `SlotPhrasing.swift` | The button that takes that slot, and what the change to `~/.claude/settings.json` is shown as before it is made |
 
-Tests: `Tests/SessionHealthTests/NotificationTextTests.swift`, `SetupTests.swift` and
-`StatusLineModeTests.swift`.
+Tests: `Tests/SessionHealthTests/NotificationTextTests.swift`, `SetupTests.swift`,
+`CheckupTests.swift` and `StatusLineModeTests.swift`.

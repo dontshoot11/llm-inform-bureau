@@ -161,18 +161,35 @@ public enum Wording {
             "Its application was brought up, but its windows could not be looked through, so the "
                 + "one in front is whichever you used last. Picking the right window needs this "
                 + "app allowed in Accessibility."
-                + (signedAdHoc
-                    ? " If it is ticked there already, that tick was given to the version "
-                        + "before this one — untick it and tick it again."
-                    : "")
+                + (signedAdHoc ? " " + tickFromAnEarlierBuild : "")
         }
     }
 
+    /// What a tick in a privacy pane is worth to a copy signed ad-hoc, said wherever such a
+    /// copy has to explain a permission that looks given and is not.
+    ///
+    /// One sentence in one place because two things say it: the panel, after a click that got
+    /// no further than the application, and the checkup, where a row reads "not given" under a
+    /// name the person can see ticked in System Settings. Measured 2026-09-17 — a tick given an
+    /// hour earlier, the system asking again on every click (`Scripts/Scripts.md`, "Why a
+    /// development Mac wants a certificate of its own").
+    public static let tickFromAnEarlierBuild = """
+        If it is ticked there already, that tick was given to the version before this one — \
+        untick it and tick it again.
+        """
+
     /// The button under the sentence above.
     public static func permissionSettings(_ permission: TerminalRaise.Permission) -> String {
-        switch permission {
+        openSettings(permission.pane)
+    }
+
+    /// The button that opens a pane of System Settings, named after the pane it opens. One
+    /// place, so the panel and the checkup cannot come to call the same pane two things.
+    public static func openSettings(_ pane: SystemSettingsPane) -> String {
+        switch pane {
         case .automation: "Open Automation settings"
         case .accessibility: "Open Accessibility settings"
+        case .notifications: "Open Notification settings"
         }
     }
 }

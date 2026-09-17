@@ -186,6 +186,12 @@ final class UsageModel: ObservableObject {
 
     private let notifier: Notifier
     private let statusLine: StatusLineSlot
+
+    /// Which channel the notifications have gone out over, or `nil` while none has been sent.
+    /// The checkup asks, because it is the only thing about notifications that is knowable
+    /// without sending one.
+    var notificationChannel: NotificationChannel? { notifier.channel }
+
     private let raiser = TerminalRaiser()
     private var dispatch = AlertDispatch()
     private var watcher: SourceWatcher?

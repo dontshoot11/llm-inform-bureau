@@ -122,35 +122,18 @@ public struct Reading: Equatable, Sendable {
     public var source: URL? { URL(string: url) }
 }
 
-/// What the app says about itself the first time it runs.
+/// What the settings window says about its marks, and about where each reading comes from.
 ///
-/// Two of its three sources connect themselves and one does not, and a person cannot tell
-/// which is which from a panel of em dashes. So the first launch says where every number comes
-/// from and names the one thing that has to be connected by hand — and says it again in the
-/// panel, where the button to do it stands, for as long as it is missing.
-///
-/// The claim about the network is in the first sentence on purpose: an app that reads the
-/// transcripts of two coding agents should say what it does with them before it is asked.
+/// Two of the three sources connect themselves and one does not, and a person cannot tell which
+/// is which from a panel of em dashes. So the window says where every number comes from and
+/// names the one thing that has to be connected by hand — and the panel says it again, where
+/// the button to do it stands, for as long as it is missing. Those three lines are the oldest
+/// part of the checkup and keep their own wording here; the rest of that list — the slot, the
+/// permissions, the copy that is running — is `CheckupPhrasing`'s.
 public enum Briefing {
     /// The window's own name. It is a settings window now — the marks are moved in it — and
     /// the explanation of where the readings come from is one of the things folded up inside.
     public static let windowTitle = "Settings"
-
-    public static let title = "Where the numbers come from"
-
-    public static let intro = """
-        Everything is read from files this Mac already has. The app makes no network calls and \
-        holds no credentials. It keeps its own files in Application Support, and the one thing \
-        it writes anywhere else is a single key in ~/.claude/settings.json — only if you \
-        connect the limits, and never without showing the change first.
-        """
-
-    /// Said at the end, because the alternative — a zero — is what every other widget shows
-    /// for something it does not know.
-    public static let closing = """
-        Until a source has reported, the panel says what it does not know rather than showing \
-        it as zero.
-        """
 
     /// How the one source that has to be connected is connected, named in one place so the
     /// window, the panel and the README cannot drift apart. The button itself is

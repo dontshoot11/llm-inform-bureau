@@ -4,12 +4,14 @@ import AgentFiles
 import Phrasing
 import SessionHealthCore
 
-/// The one window this app ever opens: what it reads, and what is not connected yet.
+/// The one window this app ever opens: the marks it watches, and everything it depends on.
 ///
 /// Shown once, on the first launch, and then never again unless asked for from the panel. The
 /// reason it exists at all is that two of the three sources connect themselves and one does
 /// not — so a first run with no explanation is a menu bar item showing an em dash next to
-/// "Claude" and no way to find out why.
+/// "Claude" and no way to find out why. What has grown around that is the rest of the list:
+/// every permission and every slot the app runs on fails the same quiet way, and none of it
+/// looks like a missing answer from the outside.
 ///
 /// AppKit rather than a SwiftUI `Window` scene: this app has `LSUIElement` set, so it is not
 /// active when it launches, and a window has to be ordered in front and the app activated by
@@ -45,7 +47,7 @@ enum Welcome {
     }
 
     static func show(
-        state: SetupState = SetupInspector.inspect(),
+        checkup: CheckupState = CheckupReader.read(),
         marks: ThresholdConfigLoad = ThresholdConfigLoader.load(),
         askForPass: (@MainActor () -> Void)? = nil
     ) {
@@ -67,7 +69,7 @@ enum Welcome {
             defer: false
         )
         window.title = Briefing.windowTitle
-        let content = NSHostingView(rootView: WelcomeView(state: state, marks: marks, close: close))
+        let content = NSHostingView(rootView: WelcomeView(checkup: checkup, marks: marks, close: close))
         window.contentView = content
         // Sized to what it actually holds — the marks come from the config and the list can
         // grow — but never taller than the screen it opens on.
@@ -183,11 +185,13 @@ private struct FoldingSection<Content: View>: View {
     }
 }
 
-/// What the first run says, in the order it matters: how the app gets its numbers, then each
-/// source with whether it is connected, then what an unconnected source looks like in the
-/// panel.
+/// The window, in the order it matters: the marks somebody came here to move, then the
+/// background they rest on, then the checkup — everything the app runs on that this Mac had to
+/// give it, folded away unless something in it is missing.
 private struct WelcomeView: View {
-    let state: SetupState
+    /// Everything this Mac has given the app, and what it has not.
+    let checkup: CheckupState
+
     let config: ThresholdConfig
 
     /// The marks as the app itself would run on them. What "Reset to default" goes back to,
@@ -204,10 +208,10 @@ private struct WelcomeView: View {
     /// The same, for the marks that are one number.
     @State private var minutes: [ThresholdMark: Int]
 
-    /// Whether the list of sources is open. Closed when every source has reported, because
-    /// there is nothing to do about one that works; open while something is missing, because
-    /// that is the one thing in this window somebody has to act on.
-    @State private var sourcesOpen: Bool
+    /// Whether the checkup is open. Closed when nothing in it is missing, because there is
+    /// nothing to do about a thing that works; open while something is, because that is the one
+    /// part of this window somebody has to act on.
+    @State private var checkupOpen: Bool
 
     /// Whether the reading list is open. Closed to begin with: it is background, and a window
     /// that opens two screens tall makes the settings in it look like a footnote.
@@ -218,8 +222,8 @@ private struct WelcomeView: View {
     /// mark must stop offering the shipped explanation the moment it stops describing it.
     @State private var chosen: Set<ThresholdMark>
 
-    init(state: SetupState, marks: ThresholdConfigLoad, close: @escaping () -> Void) {
-        self.state = state
+    init(checkup: CheckupState, marks: ThresholdConfigLoad, close: @escaping () -> Void) {
+        self.checkup = checkup
         self.config = marks.config
         self.shipped = marks.shipped
         self.close = close
@@ -241,7 +245,7 @@ private struct WelcomeView: View {
         _scales = State(initialValue: scales)
         _minutes = State(initialValue: minutes)
         _chosen = State(initialValue: chosen)
-        _sourcesOpen = State(initialValue: !state.isComplete)
+        _checkupOpen = State(initialValue: checkup.hasSomethingMissing)
     }
 
     var body: some View {
@@ -297,18 +301,19 @@ private struct WelcomeView: View {
 
             Divider()
 
-            // Where the readings come from. Folded away once every source has reported —
-            // there is nothing to do about a source that is working — and open by itself
-            // while one of them is missing, which is the whole reason this window exists:
-            // two of the three connect themselves and one does not.
-            FoldingSection(title: Briefing.title, isOpen: $sourcesOpen, spacing: 12) {
-                Text(Briefing.intro)
+            // Everything the app depends on and did not bring with it. Folded away once
+            // nothing in it is missing — there is nothing to do about what works — and open by
+            // itself while something is, which is the whole reason the list exists: every one
+            // of these fails quietly, and a widget that has not been allowed to do its job
+            // looks exactly like a broken one.
+            FoldingSection(title: CheckupPhrasing.title, isOpen: $checkupOpen, spacing: 12) {
+                Text(CheckupPhrasing.intro)
                     .font(WindowType.item)
                     .fixedSize(horizontal: false, vertical: true)
-                ForEach(Briefing.items(for: state), id: \.source) { item in
-                    row(item)
+                ForEach(CheckupPhrasing.rows(for: checkup), id: \.point) { row in
+                    checkupRow(row)
                 }
-                Text(Briefing.closing)
+                Text(CheckupPhrasing.closing)
                     .font(WindowType.detail)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -317,10 +322,6 @@ private struct WelcomeView: View {
             Divider()
 
             HStack(alignment: .firstTextBaseline) {
-                // The only place this setting lives. It belongs to the moment the app is being
-                // set up, and this window is reachable from the panel whenever it is wanted
-                // again.
-                LoginItemToggle(loginItem: .shared)
                 Spacer()
                 Button("Done", action: close)
                     .keyboardShortcut(.defaultAction)
@@ -479,18 +480,57 @@ private struct WelcomeView: View {
         }
     }
 
-    private func row(_ item: BriefingItem) -> some View {
+    /// One line of the checkup: what the machine says, what it is, what it costs while the
+    /// answer is no, and the pane where that answer is kept.
+    ///
+    /// One row for a source, a permission and a fact about this copy alike. To the reader they
+    /// are the same kind of thing — something the app runs on that it did not bring with it —
+    /// and a list that changed shape halfway down would read as two lists.
+    private func checkupRow(_ row: CheckupRow) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: item.isConnected ? "checkmark.circle.fill" : "circle.dashed")
-                .foregroundStyle(item.isConnected ? Color.green : Color.secondary)
+            standingMark(row.standing)
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.title)
-                    .font(WindowType.item)
-                Text(item.detail)
+                // The one line here that is a control rather than a reading: the checkbox is
+                // both what the row says and the way to change it, so it stands where the
+                // title would.
+                if row.point == .openAtLogin {
+                    LoginItemToggle(loginItem: .shared)
+                } else {
+                    Text(row.title)
+                        .font(WindowType.item)
+                }
+                Text(row.detail)
                     .font(WindowType.item)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    // The path of the running copy is in here, and the thing anybody does with
+                    // a path is copy it somewhere else.
+                    .textSelection(.enabled)
+                if let pane = row.settings {
+                    Button(Wording.openSettings(pane)) { SystemSettings.open(pane) }
+                        .buttonStyle(.link)
+                        .font(WindowType.detail)
+                }
             }
+        }
+    }
+
+    /// What the machine said, as one mark before the line.
+    ///
+    /// Four and not two: a question mark for what macOS will not answer until the app tries,
+    /// and a plain note for a line that states a fact rather than reporting a permission. A
+    /// tick invented for either would be the app's guess wearing the system's authority.
+    @ViewBuilder
+    private func standingMark(_ standing: CheckupState.Standing) -> some View {
+        switch standing {
+        case .given:
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.green)
+        case .missing:
+            Image(systemName: "circle.dashed").foregroundStyle(Color.secondary)
+        case .settledOnUse:
+            Image(systemName: "questionmark.circle").foregroundStyle(Color.secondary)
+        case .stated:
+            Image(systemName: "info.circle").foregroundStyle(.tertiary)
         }
     }
 }

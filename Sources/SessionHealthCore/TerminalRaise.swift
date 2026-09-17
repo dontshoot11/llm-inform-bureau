@@ -55,6 +55,17 @@ public enum TerminalRaise {
         /// Security → Accessibility, and a dialog can only offer to open that pane. Measured:
         /// without it the attempt comes back "not allowed assistive access".
         case accessibility
+
+        /// Where the answer is kept, which is the pane the app offers to open. Named here
+        /// rather than at the border: the checkup offers the same two panes for the same two
+        /// reasons, and a second mapping of permission to pane would be a second place to get
+        /// one wrong.
+        public var pane: SystemSettingsPane {
+            switch self {
+            case .automation: .automation
+            case .accessibility: .accessibility
+            }
+        }
     }
 
     /// The terminals that can be asked which tab a terminal device belongs to, by bundle

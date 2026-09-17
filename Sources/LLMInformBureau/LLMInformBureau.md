@@ -371,7 +371,10 @@ Two things about the delivery are worth knowing:
   silently, attributed to Script Editor. Permission is still asked for first, so a build with a
   real signature starts using the centre without a code change. One consequence of borrowing
   Script Editor's identity: several notifications in a row collapse into one stack in the
-  Notification Center, and only the newest shows on top of it.
+  Notification Center, and only the newest shows on top of it. Which of the two it turned out
+  to be is what the checkup's notifications line reports — `Notifier` keeps the channel it
+  settled on, and that line is the only honest thing there is to say about notifications before
+  one has been sent.
 
 The state found at launch is recorded rather than announced. The app starts at login and finds
 whatever the day has already spent; a handful of notifications about the past every morning is
@@ -403,12 +406,43 @@ reading, and a control that takes a number away does not belong under that numbe
 ## The first run, and the one window
 
 A first launch with no explanation is a menu bar item showing an em dash next to "Claude" and
-no way to find out why. So the app opens one window, once, listing every source with whether it
-has reported and, for the one that has not, where the button is. `SetupInspector` finds the facts, `Briefing` in `Phrasing` says
-them, and `WelcomeRecord` is the note in Application Support that keeps it to once. Deleting
-that note brings the window back, and so does the gear in the panel — a gear rather than a
-question mark, because that window holds a setting and the list of what is connected, and a
-question mark promises reading rather than doing.
+no way to find out why. So the app opens one window, once, and `WelcomeRecord` is the note in
+Application Support that keeps it to once. Deleting that note brings the window back, and so
+does the gear in the panel — a gear rather than a question mark, because that window holds the
+settings and the checkup, and a question mark promises reading rather than doing.
+
+### The checkup
+
+The window's second half is one list of everything the app runs on and did not bring with it:
+the three sources, Claude Code's status line slot, the Accessibility permission a click on a
+session needs, which name the notifications arrive under, the login checkbox, and which copy of
+the app this is. One shape per line — what the machine answered, what it is, what it costs
+while the answer is no, and the button that opens the pane where the answer is kept. To the
+reader a source, a permission and a fact about the running bundle are the same kind of thing,
+and a list that changed shape halfway down would read as two lists.
+
+`CheckupReader` reads it, `CheckupState` in `SessionHealthCore` holds it, and `CheckupPhrasing`
+says it. The one rule the reader is written to: **opening this window must not raise a
+permission dialog.** A dialog is a question, and the moment to ask one is when somebody's own
+click needs the answer — so accessibility is asked for with the plain `AXIsProcessTrusted()`,
+the notification centre is not touched at all, and everything else is a file or a fact about
+this process. A test holds the prompting call to the one file that is allowed to make it.
+
+Two lines earn their place by being the ones nothing else on the Mac will give:
+
+- **Which copy is running**, by path and by the date its executable was built. Several bundles
+  of the same name sit on one disk — a build directory, `/Applications`, a download — and the
+  system's privacy panes list them as one name with no way to tell which is which. The date
+  comes off the executable rather than out of `Info.plist`, whose version keys do not move from
+  build to build; `ditto` preserves it, so it survives being copied into `/Applications`.
+- **Notifications**, which get no tick. Signed ad-hoc the app is refused by the notification
+  centre outright and falls back to `osascript`, which the system credits to Script Editor —
+  and which of the two it will be is not knowable until the first notification is sent. So the
+  line says the channel it got, and before that says it is settled on first use.
+
+The slot reads as held when another copy of this app is in it: the limits are arriving, which
+is what that line is about, and which copy is doing the job is the panel's offer to take over
+rather than a gap in the checkup.
 
 The marks come with a key above them: what each colour is like to be in, green included. The
 marks say where a colour begins, which is the half a dot cannot show; being told neither leaves
@@ -436,10 +470,11 @@ its panel is opened — which is exactly the moment that is too late.
 
 ## Starting with the Mac
 
-`SMAppService.mainApp`, the supported route since macOS 13, offered as a checkbox in the
-first-run window — the one place it lives, reachable from the panel's `?` whenever it is wanted
-again. A panel of readings is not where a checkbox belongs, and one copy of a control cannot
-disagree with another. It is measured to work from an ad-hoc signed bundle, unlike
+`SMAppService.mainApp`, the supported route since macOS 13, offered as a checkbox on its own
+line of the checkup — the one place it lives, reachable from the panel's gear whenever it is
+wanted again. A panel of readings is not where a checkbox belongs, and one copy of a control
+cannot disagree with another. It stands where that line's title would: the checkbox is both
+what the row says and the way to change it. It is measured to work from an ad-hoc signed bundle, unlike
 the notification centre.
 
 The state is read back from the system every time the control appears rather than remembered:
@@ -459,6 +494,7 @@ the drag first and the first launch after it.
 | `Notifier.swift` | Putting a notification on screen, silently, over whichever channel works |
 | `TerminalRaiser.swift` | Taking a person to the window their session runs in: the tab where the terminal can name one, the application otherwise, and the settings pane after a refusal |
 | `OwnSignature.swift` | How this copy is signed, which decides whether the panel explains a tick left over from an earlier build |
+| `Checkup.swift` | Reading what this Mac has given the app without asking it for anything, and the one line that opens a pane of System Settings |
 | `WelcomeWindow.swift` | The first-run explanation, the only window this app has, and the marks it hands over |
 | `MarkScaleBar.swift` | A scale as something to move: the bar in the colours of its own lights, a handle on each mark and the number under it |
 | `MinuteMarkField.swift` | A mark that is one number as something to set: the field, the stepper beside it and the unit after them |

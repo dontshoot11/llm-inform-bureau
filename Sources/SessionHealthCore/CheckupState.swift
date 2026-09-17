@@ -1,0 +1,173 @@
+import Foundation
+
+/// Which copy of the app is running, as the checkup names it.
+///
+/// A fact about the app rather than about anything it reads, and the one fact nothing else on
+/// the machine will give a person: several copies of a bundle with the same name can sit on one
+/// disk — a build directory, `/Applications`, a download — and the system's own privacy panes
+/// list them all as one name with no way to tell which is which. The panel shows numbers and
+/// says nothing about where it is running from, so when a permission looks given and behaves as
+/// if it were not, there is nothing to check against. This is that something.
+public struct RunningCopy: Equatable, Sendable {
+    /// The bundle, as a path a person can go and look at.
+    public let path: String
+
+    /// When it was built. The date of the executable inside the bundle rather than a version
+    /// string: `CFBundleShortVersionString` does not move from build to build, and what is
+    /// being told apart here is two builds of the same version. `nil` when the file cannot be
+    /// asked — a missing date is worth showing as missing, not as a guess.
+    public let builtAt: Date?
+
+    /// Whether this copy carries an ad-hoc signature, which is what decides whether a
+    /// permission survives the app being replaced.
+    public let isAdHoc: Bool
+
+    public init(path: String, builtAt: Date?, isAdHoc: Bool) {
+        self.path = path
+        self.builtAt = builtAt
+        self.isAdHoc = isAdHoc
+    }
+}
+
+/// How a notification reached the screen.
+///
+/// Two channels because the first one is not always available: signed ad-hoc, the app is
+/// refused by the notification centre outright and falls back to `osascript`, which the system
+/// credits to Script Editor. Which one it will be is not knowable in advance — it is settled at
+/// the first notification — so the checkup says the channel it got rather than a tick.
+public enum NotificationChannel: Equatable, Sendable {
+    /// The notification centre, under the app's own name and icon.
+    case ownName
+    /// `osascript`, which the system attributes to Script Editor.
+    case scriptEditor
+}
+
+/// A pane of System Settings the app can open for somebody.
+///
+/// The app never answers a permission question on anybody's behalf; what it can do is put the
+/// pane where the answer is kept in front of them, because a step described in prose is a step
+/// half the people never take. Here rather than at the border so the URL that opens each one is
+/// covered by a test: a pane identifier that stops working fails silently — the URL opens the
+/// front page of Settings and the person is left looking for a list nobody named.
+public enum SystemSettingsPane: String, CaseIterable, Sendable {
+    /// Privacy & Security → Accessibility: looking through another app's windows.
+    case accessibility
+    /// Privacy & Security → Automation: controlling another app, which is what asking a
+    /// terminal about its tabs is.
+    case automation
+    /// Notifications, where the banners of whoever sends them are switched on and off.
+    case notifications
+
+    /// The URL that opens it. Optional rather than force-unwrapped: a typo here is not worth a
+    /// crash in a widget that runs all day.
+    public var url: URL? {
+        switch self {
+        case .accessibility:
+            URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+        case .automation:
+            URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")
+        case .notifications:
+            URL(string: "x-apple.systempreferences:com.apple.preference.notifications")
+        }
+    }
+}
+
+/// Everything the app depends on and did not bring with it, in one list.
+///
+/// The app runs on what this machine has given it — a status line slot, a permission, a source
+/// that has written something — and until now a person found out which of those was missing
+/// only when something failed to happen: a click raised the wrong window, a notification never
+/// came, "Claude" stood with an em dash. The sources were the half of this that already
+/// existed (`SetupState`); this grows around them rather than beside them, so there is one list
+/// and not two.
+///
+/// Facts only: reading the machine is the app's, the English is `Phrasing`'s. Every one of
+/// these is read without asking the system for anything — opening a window that raised a
+/// permission dialog would be the app demanding an answer for its own convenience.
+public struct CheckupState: Equatable, Sendable {
+    /// One thing the app depends on, in the order the list shows them: what it reads, then
+    /// what it was allowed to do, then what it is.
+    public enum Point: String, CaseIterable, Sendable {
+        case claudeLimits
+        case claudeSessions
+        case codex
+        case statusLineSlot
+        case accessibility
+        case notifications
+        case openAtLogin
+        case runningCopy
+
+        /// The source this point is about, for the three that are sources.
+        public var source: SetupState.Source? { SetupState.Source(rawValue: rawValue) }
+    }
+
+    /// What the machine says about one point.
+    public enum Standing: Equatable, Sendable {
+        /// There, and the app is using it.
+        case given
+        /// Not there. Every one of these has a line saying what it costs and, where there is
+        /// one, a button.
+        case missing
+        /// macOS will not say until the app tries. A tick invented for one of these is worse
+        /// than its absence: it would be the app's guess wearing the system's authority.
+        case settledOnUse
+        /// Nothing to tick — the row states a fact or carries its own control.
+        case stated
+    }
+
+    /// Which sources have written something this app can read.
+    public let sources: SetupState
+
+    /// Whose Claude Code's one status line slot is.
+    public let slot: StatusLineSlotState
+
+    /// Whether the app is allowed to look through other applications' windows.
+    public let isAccessibilityTrusted: Bool
+
+    /// Which channel the notifications went out over, or `nil` while none has been sent.
+    public let notifications: NotificationChannel?
+
+    public let copy: RunningCopy
+
+    public init(
+        sources: SetupState,
+        slot: StatusLineSlotState,
+        isAccessibilityTrusted: Bool,
+        notifications: NotificationChannel?,
+        copy: RunningCopy
+    ) {
+        self.sources = sources
+        self.slot = slot
+        self.isAccessibilityTrusted = isAccessibilityTrusted
+        self.notifications = notifications
+        self.copy = copy
+    }
+
+    public func standing(of point: Point) -> Standing {
+        switch point {
+        case .claudeLimits, .claudeSessions, .codex:
+            // The three sources answer for themselves; a point with no source behind it cannot
+            // be in this branch, and reading as missing is the honest answer if it ever is.
+            guard let source = point.source else { return .missing }
+            return sources.isConnected(source) ? .given : .missing
+        case .statusLineSlot:
+            // Another copy of this app in the slot counts as held: the limits are arriving,
+            // which is what this row is about. Which copy is doing it is the panel's offer to
+            // take over, not a gap in the checkup.
+            return slot.isOurs || slot.needsTakingOver ? .given : .missing
+        case .accessibility:
+            return isAccessibilityTrusted ? .given : .missing
+        case .notifications:
+            return notifications == nil ? .settledOnUse : .given
+        case .openAtLogin, .runningCopy:
+            return .stated
+        }
+    }
+
+    /// Whether anything in the list is waiting on the person — which is what decides whether
+    /// the window opens with this list unfolded. Nothing missing means nothing to do about it,
+    /// and a list of ticks is not what somebody opened a settings window for.
+    public var hasSomethingMissing: Bool {
+        Point.allCases.contains { standing(of: $0) == .missing }
+    }
+}

@@ -101,15 +101,7 @@ final class TerminalRaiser {
     /// the limits button installs the status line itself: a step described in prose is a step
     /// half of the people never take.
     static func openSettings(for permission: TerminalRaise.Permission) {
-        let pane: String
-        switch permission {
-        case .automation: pane = "Privacy_Automation"
-        case .accessibility: pane = "Privacy_Accessibility"
-        }
-        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") else {
-            return
-        }
-        NSWorkspace.shared.open(url)
+        SystemSettings.open(permission.pane)
     }
 
     // MARK: The border itself
