@@ -525,11 +525,17 @@ are one number get a field and a stepper beside their title instead: there is no
 divide, and typing is the only honest way to reach an exact number on a mark that runs to
 twelve hours. Each of them carries a "Reset to default" beside it once it has been moved, and
 the marks are one list to the reader — a scale and a number are the same kind of thing to
-somebody deciding when the app should speak. The panel reads
-the marks on every pass of its own, so nothing has to be restarted — but a pass is up to half a
-minute away, and half a minute of the old colour after pressing Done reads as the app having
-ignored you, so closing the window asks for one pass right then. Only after a mark was actually
-moved: closing a window nobody touched is not a reason to read anything. The
+somebody deciding when the app should speak.
+
+A moved mark keeps the line saying what it decides: that line is about the mark rather than
+about the number standing on it, and the reader who has just dragged a handle is the one who
+most needs it. What gives way is the line under it — where the number came from — because that
+sentence was written about the number the app ships. "Chosen by you" stands there instead.
+
+The panel reads the marks on every pass of its own, so nothing has to be restarted — but a
+pass is up to half a minute away, and half a minute of the old colour after pressing Done reads
+as the app having ignored you, so closing the window asks for one pass right then. Only after a
+mark was actually moved: closing a window nobody touched is not a reason to read anything. The
 arithmetic belongs to `MarkScale` in `SessionHealthCore` and not to the view: a mark that slips
 past its neighbour is a rule broken, and rules are tested.
 

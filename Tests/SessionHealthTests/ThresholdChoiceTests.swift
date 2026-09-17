@@ -137,9 +137,16 @@ func runThresholdChoiceTests(_ suite: TestSuite, config: ThresholdConfig) {
             suite.expect(false, "the limit mark is missing from the window")
             return
         }
-        // Nothing is said under it, and that is the point: the sentence that shipped was about
-        // the number the app chose, and the reader's own number needs no defending.
-        suite.expectEqual(note.note, "", "nothing may stand under a moved mark")
+        // What the mark decides still stands under it — that describes the mark and not the
+        // number on it, and somebody who has just moved a handle is the reader who most needs
+        // it. What goes is the provenance: the sentence that shipped was about the number the
+        // app chose, and what replaces it says whose the number is now.
+        suite.expect(!note.what.isEmpty, "a moved mark must still say what it decides")
+        suite.expectEqual(note.origin, MarkNote.chosen, "a moved mark says who chose it")
+        suite.expect(
+            note.origin.lowercased().contains("you"),
+            "and says it to the reader: \(note.origin)"
+        )
         suite.expect(note.source == nil, "a moved mark has no published source to link to")
     }
 
@@ -192,12 +199,14 @@ func runThresholdChoiceTests(_ suite: TestSuite, config: ThresholdConfig) {
         suite.expectEqual(applied.attentionNotice, config.attentionNotice, "a mark nobody touched keeps everything")
         suite.expectEqual(applied.sessionActivity, config.sessionActivity, "and so does the other one")
 
-        // The window says nothing under it either, the same as for a moved scale.
+        // The window keeps the same two lines under it as under a moved scale: what the mark
+        // decides, and that the number is the reader's own.
         guard let note = Briefing.marks(of: applied).first(where: { $0.mark == .abandonedWait }) else {
             suite.expect(false, "the wait is missing from the window")
             return
         }
-        suite.expectEqual(note.note, "", "nothing may stand under a chosen number")
+        suite.expect(!note.what.isEmpty, "a chosen number must still say what it decides")
+        suite.expectEqual(note.origin, MarkNote.chosen, "a chosen number says who chose it")
     }
 
     suite.test("one number chosen leaves the rest to arrive with the next release") {

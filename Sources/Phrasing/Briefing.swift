@@ -44,7 +44,17 @@ public struct MarkNote: Equatable, Sendable {
     /// The lights this mark turns on, when it is a scale. Empty for a mark that is one number,
     /// which the window shows as the number itself.
     public let scale: [ScaleStep]
-    private let unmeasuredNote: String
+
+    /// What this mark decides: which light it turns on, what stops or starts when it is
+    /// crossed, and which way to move it when the app is getting it wrong.
+    ///
+    /// Said under every mark, whether the app placed it or the reader did. It describes the
+    /// mark rather than the number standing on it, so moving that number does not make a word
+    /// of it untrue — and a person who has just dragged a handle is the one who most needs to
+    /// know what they have moved.
+    public let what: String
+
+    private let unmeasuredOrigin: String
     public let provenance: ThresholdProvenance?
     /// `true` when the person moved this mark themselves.
     public let isChosen: Bool
@@ -53,30 +63,35 @@ public struct MarkNote: Equatable, Sendable {
         mark: ThresholdMark,
         title: String,
         scale: [ScaleStep] = [],
-        unmeasuredNote: String,
+        what: String,
+        unmeasuredOrigin: String = "",
         provenance: ThresholdProvenance?,
         isChosen: Bool = false
     ) {
         self.mark = mark
         self.title = title
         self.scale = scale
-        self.unmeasuredNote = unmeasuredNote
+        self.what = what
+        self.unmeasuredOrigin = unmeasuredOrigin
         self.provenance = provenance
         self.isChosen = isChosen
     }
 
-    /// The line under the number, or nothing at all.
+    /// Where the number itself came from, or nothing when there is nothing honest to say.
     ///
-    /// A measured mark names its date; an unmeasured one says it is a guess, because a number
-    /// with an invented source lies silently and nothing catches it. A mark somebody moved says
-    /// neither: the reasoning that shipped was written about a different number, and what has
-    /// replaced it is the button beside the mark, which only appears when the mark is not where
-    /// the app put it. A line saying the same thing in words was one line too many.
-    public var note: String {
-        if isChosen { return "" }
-        guard let provenance else { return unmeasuredNote }
+    /// A measured mark names its date; an unmeasured one may admit it is a guess, because a
+    /// number with an invented source lies silently and nothing catches it. A mark somebody
+    /// moved says the only true thing left: they chose it. What stood there was written about
+    /// the number the app ships, and repeating it under theirs would be the app inventing a
+    /// justification for a mark nobody measured.
+    public var origin: String {
+        if isChosen { return Self.chosen }
+        guard let provenance else { return unmeasuredOrigin }
         return "Published \(provenance.measuredAt)"
     }
+
+    /// Said where the provenance of a shipped mark would be.
+    public static let chosen = "Chosen by you — the reasoning that shipped was about another number."
 
     /// No source under a mark the person set: there is nothing published about a number
     /// somebody chose for themselves.
@@ -206,10 +221,14 @@ public enum Briefing {
                 mark: .windowFill,
                 title: "Context window filled",
                 scale: steps(config.windowFill),
-                unmeasuredNote: """
+                what: """
                     How much of the window a session is holding. The fuller it gets, the more \
                     of it is history that has stopped earning its place — and the more of that \
                     there is, the more it weighs on what the model concludes.
+                    """,
+                unmeasuredOrigin: """
+                    Not measured: what is published about long contexts says the effect is \
+                    real, not where to put a mark.
                     """,
                 provenance: config.windowFill.provenance,
                 isChosen: config.windowFill.isChosen
@@ -218,9 +237,14 @@ public enum Briefing {
                 mark: .limitUsage,
                 title: "Subscription limit spent",
                 scale: steps(config.limitUsage),
-                unmeasuredNote: """
-                    The same scale, so a colour means one thing everywhere in the widget. Not \
-                    measured: nobody publishes where a quota starts being worth planning around.
+                what: """
+                    How much of a subscription's quota has gone. The app ships this scale and \
+                    the one above it alike, so a colour means one thing everywhere in the \
+                    widget; moved here, it becomes your own colour language for the two.
+                    """,
+                unmeasuredOrigin: """
+                    Not measured: nobody publishes where a quota starts being worth planning \
+                    around.
                     """,
                 provenance: config.limitUsage.provenance,
                 isChosen: config.limitUsage.isChosen
@@ -228,7 +252,7 @@ public enum Briefing {
             MarkNote(
                 mark: .abandonedWait,
                 title: "Stop expecting an answer after",
-                unmeasuredNote: """
+                what: """
                     How long a session may owe an answer in silence before one stops being \
                     expected out of it: past this, its light stops blinking and is drawn as a \
                     figure eight. Nothing on disk says a session died — a closed terminal and \
@@ -242,7 +266,7 @@ public enum Briefing {
             MarkNote(
                 mark: .attentionNotice,
                 title: "Announce a request for you after",
-                unmeasuredNote: """
+                what: """
                     How long the agent may be waiting on you before a notification is sent. \
                     The pause sign in the panel appears the moment the request does; this \
                     delays the notification alone, so a question answered by somebody sitting \
@@ -254,7 +278,7 @@ public enum Briefing {
             MarkNote(
                 mark: .sessionActivity,
                 title: "Keep a session on the list for",
-                unmeasuredNote: """
+                what: """
                     How recently a session must have been written to for the panel to list it \
                     at all. It warns about nothing and lights nothing: it decides what you are \
                     looking at. Raise it if sessions you are still working on drop off the \

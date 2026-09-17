@@ -574,14 +574,20 @@ private struct WelcomeView: View {
                 // the two read as one crowded block.
                 .padding(.top, 4)
             }
-            // Nothing under a mark that was moved: what stood here explained a number that is
-            // no longer there, and the Reset button beside the title is what says the mark is
-            // the reader's own.
-            if !isChosen {
+            // What the mark decides stands under every one of them, moved or not: it describes
+            // the mark rather than the number on it, and somebody who has just dragged a handle
+            // is the reader who most needs it. Under it, where the number itself came from —
+            // which is the half a moved mark takes with it, because what shipped here was
+            // written about the app's number and not about theirs.
+            Text(mark.what)
+                .font(WindowType.detail)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if !mark.origin.isEmpty {
                 HStack(spacing: 6) {
-                    Text(mark.note)
+                    Text(mark.origin)
                         .font(WindowType.detail)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
                     if let source = mark.source {
                         Link("source", destination: source)

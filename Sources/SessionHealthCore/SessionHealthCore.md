@@ -87,7 +87,9 @@ config with one number changed — that would quietly freeze every later release
 somebody edited once. `applied(to:)` is where a choice meets the marks that shipped, and where a
 moved mark loses its rationale and its provenance: the sentence under it was written about a
 different number. `isChosen` is what is left — the flag the window turns into a "Reset to
-default" button beside that mark and into no explanation at all under it.
+default" button beside that mark and into "Chosen by you" where the provenance stood. What the
+mark *decides* stays under it either way: that line is about the mark and not about the number
+standing on it, and the reader who has just moved a handle is the one who most needs it.
 
 ## Saying nothing at all
 

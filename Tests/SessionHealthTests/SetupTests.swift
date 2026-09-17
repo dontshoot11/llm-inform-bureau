@@ -125,7 +125,7 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
             Briefing.marksTitle, Briefing.scaleHelp(config)
         ]
         lines += Briefing.levelKey.map(\.meaning)
-        lines += Briefing.marks(of: config).flatMap { [$0.title, $0.note] }
+        lines += Briefing.marks(of: config).flatMap { [$0.title, $0.what, $0.origin] }
         lines += Briefing.items(for: nothing).flatMap { [$0.title, $0.detail] }
         lines += Briefing.items(for: everything).flatMap { [$0.title, $0.detail] }
         let said = lines.joined(separator: " ").lowercased()
@@ -170,7 +170,7 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
             }
             suite.expect(note.scale.isEmpty, "\(mark.rawValue): a number is not a scale")
             suite.expect(!note.title.isEmpty, "\(mark.rawValue): a mark with no title")
-            suite.expect(!note.note.isEmpty, "\(mark.rawValue): nothing says what this number does")
+            suite.expect(!note.what.isEmpty, "\(mark.rawValue): nothing says what this number does")
             suite.expect(config.duration(of: mark) != nil, "\(mark.rawValue): no duration in the config")
         }
 
@@ -179,6 +179,39 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
             !shown.contains { $0.mark == .limitWindowNearlyReset },
             "the quiet rule about a resetting window is not a setting"
         )
+    }
+
+    // The line that used to disappear the moment somebody dragged a handle. What a mark decides
+    // is about the mark and not about the number standing on it, so moving the number cannot
+    // make it untrue — and a window that took it away left three fields of minutes with nothing
+    // but their titles, which is exactly the reader who has just changed something and wants to
+    // know what.
+    suite.test("every mark says what it decides, whether the app placed it or the reader did") {
+        let mine = ThresholdChoices()
+            .choosing(.windowFill, MarkScale(notice: 25, elevated: 45, high: 85) ?? MarkScale(of: config.windowFill))
+            .choosing(.limitUsage, MarkScale(notice: 15, elevated: 35, high: 75) ?? MarkScale(of: config.limitUsage))
+            .choosing(.abandonedWait, minutes: 25)
+            .choosing(.attentionNotice, minutes: 5)
+            .choosing(.sessionActivity, minutes: 45)
+        let moved = Briefing.marks(of: mine.applied(to: config))
+
+        suite.expectEqual(moved.count, Briefing.marks(of: config).count, "marks shown")
+        for note in moved {
+            suite.expect(note.isChosen, "\(note.mark.rawValue): the fixture moved every mark")
+            suite.expect(!note.what.isEmpty, "\(note.mark.rawValue): nothing says what this mark decides")
+            suite.expectEqual(note.origin, MarkNote.chosen, "\(note.mark.rawValue) origin")
+            suite.expect(note.source == nil, "\(note.mark.rawValue): nothing published backs a moved mark")
+        }
+
+        // And a mark nobody moved keeps saying both things — what it decides and where its
+        // number came from, which is the half the reader takes over by moving it.
+        for note in Briefing.marks(of: config) {
+            suite.expect(!note.what.isEmpty, "\(note.mark.rawValue): nothing says what this mark decides")
+            suite.expect(
+                note.origin != MarkNote.chosen,
+                "\(note.mark.rawValue): a shipped mark must not claim the reader chose it"
+            )
+        }
     }
 
     // A colour nobody explained is a colour the reader gives a meaning of their own, and the
