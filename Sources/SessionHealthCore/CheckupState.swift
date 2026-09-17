@@ -94,6 +94,7 @@ public struct CheckupState: Equatable, Sendable {
         case statusLineSlot
         case accessibility
         case automation
+        case sessionRecords
         case notifications
         case openAtLogin
         case runningCopy
@@ -125,6 +126,10 @@ public struct CheckupState: Equatable, Sendable {
     /// Whether the app is allowed to look through other applications' windows.
     public let isAccessibilityTrusted: Bool
 
+    /// Whether Claude Code is leaving records of its running sessions where this app can read
+    /// them — which is what a click on a session row runs on.
+    public let hasSessionRecords: Bool
+
     /// Which channel the notifications went out over, or `nil` while none has been sent.
     public let notifications: NotificationChannel?
 
@@ -134,12 +139,14 @@ public struct CheckupState: Equatable, Sendable {
         sources: SetupState,
         slot: StatusLineSlotState,
         isAccessibilityTrusted: Bool,
+        hasSessionRecords: Bool,
         notifications: NotificationChannel?,
         copy: RunningCopy
     ) {
         self.sources = sources
         self.slot = slot
         self.isAccessibilityTrusted = isAccessibilityTrusted
+        self.hasSessionRecords = hasSessionRecords
         self.notifications = notifications
         self.copy = copy
     }
@@ -167,6 +174,14 @@ public struct CheckupState: Equatable, Sendable {
             // would be saying it of every terminal on the machine because one of them
             // answered.
             return .settledOnUse
+        case .sessionRecords:
+            // Stated and never missing, whether records are being read this minute or not.
+            // Nothing on this machine is waiting on the person here: the records are written
+            // by a running Claude Code and by nothing else, there is no pane to open and no
+            // button to press, and a dashed circle would make the ordinary state of a Mac with
+            // no session open — or a CLI too old to write them — look like a fault. What the
+            // row is for is the sentence, which says what a click needs and what is there now.
+            return .stated
         case .notifications:
             return notifications == nil ? .settledOnUse : .given
         case .openAtLogin, .runningCopy:
@@ -179,5 +194,49 @@ public struct CheckupState: Equatable, Sendable {
     /// and a list of ticks is not what somebody opened a settings window for.
     public var hasSomethingMissing: Bool {
         Point.allCases.contains { standing(of: $0) == .missing }
+    }
+}
+
+/// A place in the panel that cannot do its job, and the line of the checkup that says why.
+///
+/// The panel is a page of readings, and when a reading is missing or a click leads nowhere it
+/// has room for a sentence and no room for the paragraph behind it. That paragraph is already
+/// written — it is a row of the checkup — so the panel's dead ends become roads into the window
+/// rather than places where the app goes quiet.
+///
+/// A rule and not an `if` in a view, for the reason the rest of this file is here: which row
+/// answers which dead end is a decision that can be got wrong silently, and a road that leads
+/// to the wrong line is worse than no road — it tells a person to go and fix something that was
+/// never the problem.
+public enum CheckupRoad: Equatable, Sendable {
+    /// A service's subscription limits, where the numbers should be and are not.
+    case limits(AgentService)
+    /// A session row that cannot bring up the window it is running in.
+    case sessionClick
+    /// A click that got the application and no further, and said which permission it wanted.
+    case permission(TerminalRaise.Permission)
+
+    /// The row of the checkup this leads to.
+    ///
+    /// - Parameter slot: whose Claude Code's status line slot is — the one thing a dead end
+    ///   cannot tell about itself. Missing Claude limits are two different stories: nothing
+    ///   holds the slot, so no number was ever going to arrive, or the slot is held and the
+    ///   source has simply not reported yet. They are fixed in different places, so they are
+    ///   two different rows.
+    public func point(slot: StatusLineSlotState) -> CheckupState.Point {
+        switch self {
+        case .limits(.claude):
+            // The same question the slot's own row answers with a tick, asked in one place:
+            // a second reading of what "held" means is a second chance to disagree.
+            return slot.isOurs || slot.needsTakingOver ? .claudeLimits : .statusLineSlot
+        case .limits(.codex):
+            return .codex
+        case .sessionClick:
+            return .sessionRecords
+        case .permission(.accessibility):
+            return .accessibility
+        case .permission(.automation):
+            return .automation
+        }
     }
 }

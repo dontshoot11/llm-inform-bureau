@@ -653,7 +653,7 @@ run against fixtures instead of against whatever the machine happens to have.
 | `CodexRollouts.swift` | Codex limits and Codex sessions, out of the rollouts — including whether one is waiting on its agent |
 | `ClaudeTranscripts.swift` | Claude sessions and the subagents running inside them, out of the transcripts — including whether one is waiting on its agent |
 | `ClaudeStatus.swift` | Claude limits and window sizes, out of the payloads the status line command leaves |
-| `ClaudeSessionRecords.swift` | Which Claude sessions have stopped and are waiting on the person, out of the records the running processes keep |
+| `ClaudeSessionRecords.swift` | Which Claude sessions have stopped and are waiting on the person, out of the records the running processes keep — and whether the CLI is leaving any such records at all, which is what the settings window's line about clicking a session says |
 | `StatusLineMode.swift` | The app run as that command: the payload saved, and the command that held the slot before called |
 | `StatusLineSlot.swift` | Getting into Claude Code's one status line slot and back out of it, keeping whatever was there |
 | `ClaudeSettings.swift` | `~/.claude/settings.json`: what it says about the slot, and the only writes this app makes to it |

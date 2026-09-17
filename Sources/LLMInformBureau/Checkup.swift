@@ -21,6 +21,7 @@ enum CheckupReader {
     static func read(
         sources: SetupState = SetupInspector.inspect(),
         slot: StatusLineSlotState = StatusLineSlot().state(),
+        hasSessionRecords: Bool = ClaudeSessionRecordStore().hasAny(),
         notifications: NotificationChannel? = nil
     ) -> CheckupState {
         CheckupState(
@@ -32,6 +33,9 @@ enum CheckupReader {
             // answer. A test holds it to that one place, so naming the sibling here would be
             // this file failing it.
             isAccessibilityTrusted: AXIsProcessTrusted(),
+            // Asked here rather than taken from the pass: the panel keeps no such fact, and a
+            // listing bounded to one file is cheaper than a second way of remembering it.
+            hasSessionRecords: hasSessionRecords,
             notifications: notifications,
             copy: runningCopy()
         )

@@ -415,8 +415,9 @@ settings and the checkup, and a question mark promises reading rather than doing
 
 The window's second half is one list of everything the app runs on and did not bring with it:
 the three sources, Claude Code's status line slot, the Accessibility permission a click on a
-session needs, the permission to ask a terminal about its tabs, which name the notifications
-arrive under, the login checkbox, and which copy of the app this is. One shape per line — what the machine answered, what it is, what it costs
+session needs, the permission to ask a terminal about its tabs, the records a click on a session
+runs on at all, which name the notifications arrive under, the login checkbox, and which copy of
+the app this is. One shape per line — what the machine answered, what it is, what it costs
 while the answer is no, and the button that opens the pane where the answer is kept. To the
 reader a source, a permission and a fact about the running bundle are the same kind of thing,
 and a list that changed shape halfway down would read as two lists.
@@ -457,6 +458,32 @@ Two lines earn their place by being the ones nothing else on the Mac will give:
 The slot reads as held when another copy of this app is in it: the limits are arriving, which
 is what that line is about, and which copy is doing the job is the panel's offer to take over
 rather than a gap in the checkup.
+
+### The roads into it
+
+The panel has places where it can say nothing useful: limits with no numbers behind them, a
+session row with no process to raise, a click that got the application and no further. Each of
+those is now the way to the line of this window that explains it — `CheckupRoad` picks the
+line, `Welcome.show(showing:)` opens the window on it, and the row is marked for a few seconds
+so a person who arrived from a click can see which of ten similar lines was the point.
+
+What leads where, and what deliberately does not:
+
+- The **lit name** of a limits entry, folded or open, while there is no number in it. The name
+  and not the whole entry: what stands under it is often the button that takes the status line
+  slot, and a control inside a control is neither. That button stays the first answer — a road
+  to an explanation is what is offered where there is nothing to press.
+- A **session row with no live process**. It used to answer a click with nothing at all, which
+  is indistinguishable from the app having failed; it now goes to the row about the records a
+  click runs on. Every session row wears the plate under the pointer now, and the sentence
+  under the pointer is what says which of the two things it does.
+- The **sentence after a click that got partway**, beside the button that opens the pane
+  directly. Two errands and not one: the button is for somebody who knows what to do in that
+  pane, and the sentence is for somebody who needs to know why a tick already sitting in it
+  grants nothing (a copy signed ad-hoc).
+
+Nothing new appears in the panel for any of this: no row, no icon, no question. A person who
+never opens the window sees exactly the panel they saw before.
 
 The marks come with a key above them: what each colour is like to be in, green included. The
 marks say where a colour begins, which is the half a dot cannot show; being told neither leaves

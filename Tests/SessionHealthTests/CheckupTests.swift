@@ -14,6 +14,7 @@ func runCheckupTests(_ suite: TestSuite) {
         sources: SetupState(connected: []),
         slot: .free,
         isAccessibilityTrusted: false,
+        hasSessionRecords: false,
         notifications: nil,
         copy: RunningCopy(path: "/Applications/LLM Inform Bureau.app", builtAt: nil, isAdHoc: true)
     )
@@ -23,6 +24,7 @@ func runCheckupTests(_ suite: TestSuite) {
         sources: SetupState(connected: Set(SetupState.Source.allCases)),
         slot: .ours,
         isAccessibilityTrusted: true,
+        hasSessionRecords: true,
         notifications: .ownName,
         copy: RunningCopy(
             path: "/Applications/LLM Inform Bureau.app",
@@ -325,6 +327,112 @@ func runCheckupTests(_ suite: TestSuite) {
             "the dialog belongs to a click that needed the answer, and nowhere else: \(prompting)"
         )
     }
+    // MARK: The roads into this list
+
+    // Which row answers which dead end is the whole of `CheckupRoad`, and getting it wrong is
+    // silent: the window opens, scrolls somewhere, and tells a person to go and fix something
+    // that was never the problem.
+    suite.test("a dead end in the panel leads to the row that explains it") {
+        suite.expectEqual(CheckupRoad.limits(.codex).point(slot: .ours), .codex, "codex limits")
+        suite.expectEqual(
+            CheckupRoad.sessionClick.point(slot: .ours),
+            .sessionRecords,
+            "a session that cannot be brought up"
+        )
+        suite.expectEqual(
+            CheckupRoad.permission(.accessibility).point(slot: .ours),
+            .accessibility,
+            "a click that could not look through the windows"
+        )
+        suite.expectEqual(
+            CheckupRoad.permission(.automation).point(slot: .ours),
+            .automation,
+            "a click that could not ask for the tab"
+        )
+    }
+
+    // The one dead end with two stories behind it: no limits because nothing holds the slot,
+    // and no limits because the slot is held and nothing has reported yet. They are fixed in
+    // different places, so they are different rows.
+    suite.test("missing Claude limits lead to the slot, or to the source that holds it") {
+        let unheld: [StatusLineSlotState] = [
+            .free,
+            .somebodyElse("~/.claude/statusline.sh"),
+            .unreadable("~/.claude/settings.json")
+        ]
+        for slot in unheld {
+            suite.expectEqual(CheckupRoad.limits(.claude).point(slot: slot), .statusLineSlot, "\(slot)")
+        }
+        for slot in [StatusLineSlotState.ours, .oursElsewhere] {
+            suite.expectEqual(CheckupRoad.limits(.claude).point(slot: slot), .claudeLimits, "\(slot)")
+        }
+    }
+
+    // A road to a row the list does not show would scroll the window to nothing at all — the
+    // one failure of this feature a person could not tell from the app having ignored them.
+    suite.test("every road lands on a row the list actually shows") {
+        let roads: [CheckupRoad] = [
+            .limits(.claude),
+            .limits(.codex),
+            .sessionClick,
+            .permission(.accessibility),
+            .permission(.automation)
+        ]
+        let shown = Set(CheckupPhrasing.rows(for: bare).map(\.point))
+        for slot in [StatusLineSlotState.free, .ours, .oursElsewhere] {
+            for road in roads {
+                let point = road.point(slot: slot)
+                suite.expect(shown.contains(point), "\(road) leads to \(point.rawValue), which is not in the list")
+            }
+        }
+    }
+
+    // MARK: What a click on a session runs on
+
+    suite.test("the records row says what a click needs, whether they are there or not") {
+        for state in [with(bare, records: false), with(settled, records: true)] {
+            guard let row = row(.sessionRecords, of: state) else {
+                suite.expect(false, "no row about the session records")
+                continue
+            }
+            suite.expect(
+                row.detail.contains("~/.claude/sessions"),
+                "the file a click runs on is not named: \(row.detail)"
+            )
+            suite.expect(
+                row.detail.contains("Codex"),
+                "the one service whose sessions never click is not named: \(row.detail)"
+            )
+            suite.expect(row.settings == nil, "nothing on this Mac takes an answer about these")
+        }
+        suite.expect(
+            row(.sessionRecords, of: with(bare, records: false))?.detail
+                != row(.sessionRecords, of: with(bare, records: true))?.detail,
+            "the row reads the same whether records are there or not"
+        )
+    }
+
+    // Stated and never missing. The records appear while an interactive Claude Code is running
+    // and at no other time: a dashed circle would make an ordinary quiet Mac look like a fault,
+    // and — because a missing point is what unfolds this list — would open the checkup at every
+    // person who had simply closed their sessions.
+    suite.test("records nobody is writing are not a fault and do not unfold the list") {
+        suite.expectEqual(
+            with(settled, records: false).standing(of: .sessionRecords),
+            .stated,
+            "standing with no records"
+        )
+        suite.expectEqual(
+            with(settled, records: true).standing(of: .sessionRecords),
+            .stated,
+            "standing with records"
+        )
+        suite.expect(
+            !with(settled, records: false).hasSomethingMissing,
+            "a Mac with no session running has nothing for this window to open itself about"
+        )
+    }
+
 }
 
 /// The same machine with one answer changed. Written out because `CheckupState` is a value
@@ -333,6 +441,7 @@ func runCheckupTests(_ suite: TestSuite) {
 private func with(
     _ state: CheckupState,
     slot: StatusLineSlotState? = nil,
+    records: Bool? = nil,
     notifications: NotificationChannel?? = nil,
     copy: RunningCopy? = nil
 ) -> CheckupState {
@@ -340,6 +449,7 @@ private func with(
         sources: state.sources,
         slot: slot ?? state.slot,
         isAccessibilityTrusted: state.isAccessibilityTrusted,
+        hasSessionRecords: records ?? state.hasSessionRecords,
         notifications: notifications ?? state.notifications,
         copy: copy ?? state.copy
     )

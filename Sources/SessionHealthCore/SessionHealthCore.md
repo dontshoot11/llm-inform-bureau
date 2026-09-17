@@ -102,9 +102,20 @@ it are about what may be claimed:
   notification centre are both like this, and a tick invented for either would be the app's
   guess wearing the system's authority.
 - A **plain note** for a line that states a fact rather than reporting a permission: which copy
-  is running, and the login checkbox, which is its own answer.
-- Only a `missing` line unfolds the list. The two that state a fact never do — a window that
+  is running, the login checkbox, which is its own answer, and the records Claude Code leaves
+  while a session is running — they appear on their own and nothing on the Mac takes an answer
+  about them, so a dashed circle would make an ordinary quiet machine look like a fault.
+- Only a `missing` line unfolds the list. The three that state a fact never do — a window that
   opened the whole list to show a path is asking for attention it has no use for.
+
+`CheckupRoad` is the other direction through the same list. The panel is a page of readings,
+and where a reading is missing or a click leads nowhere it has room for a sentence and none for
+the paragraph behind it — but that paragraph is already written, as a row of this list. So each
+dead end names the row that answers it, and missing Claude limits name two different rows
+depending on who holds the slot: nothing was ever going to arrive, or the slot is held and the
+source has simply not reported. A road that led to the wrong line would be worse than none —
+it would send somebody to fix what was never the problem — so the mapping is a rule here rather
+than an `if` in a view.
 
 Reading any of it is the app's job, not this module's, and the rule there is that **opening the
 window must not raise a permission dialog**: a dialog is a question, and the moment to ask one
@@ -243,7 +254,7 @@ Nothing in the loader throws: a broken config file degrades to the values below 
 | `MinuteMark.swift` | The rule for a mark that is one number of minutes: how small and how large it may be, and what a typed number becomes |
 | `ThresholdChoices.swift` | The marks the reader moved — what is kept of them, where, and what they become when the app's own marks are read |
 | `SetupState.swift` | Which sources have written anything on this machine |
-| `CheckupState.swift` | Everything the app runs on that this Mac had to give it — the sources, the slot, the permissions, which copy is running — what each of those answers means, and the panes of System Settings where the answers are kept |
+| `CheckupState.swift` | Everything the app runs on that this Mac had to give it — the sources, the slot, the permissions, the records a click on a session runs on, which copy is running — what each of those answers means, the panes of System Settings where the answers are kept, and which row answers each dead end in the panel (`CheckupRoad`) |
 | `StatusLineSlotState.swift` | Whose Claude Code's one status line slot is, and what taking it or giving it back would change |
 | `TerminalRaise.swift` | How far a click on a session's row can get — the tab, the window titled after the project, or the application — the AppleScript that asks for a tab, and which permission each answer costs |
 | `SupportDirectory.swift` | The directory this app keeps its own files in |

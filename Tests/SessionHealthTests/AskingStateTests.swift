@@ -449,6 +449,34 @@ func runAskingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
     withTemporaryDirectory(suite, named: "record-memory") { root in
         // The records are small, but they are read on every one of the dozens of events a turn
         // makes, and the point of the memory is that "small" never gets multiplied by that.
+        // The checkup's question, and the cheapest one this store answers: a session row that
+        // does not click has no other way to say whether the CLI is writing these at all.
+        suite.test("whether records are being written is answered without reading one") {
+            let empty = makeDirectory(root, "none-written", suite)
+            suite.expect(
+                !ClaudeSessionRecordStore(directory: empty).hasAny(),
+                "an empty directory has no records in it"
+            )
+            suite.expect(
+                !ClaudeSessionRecordStore(directory: root.appendingPathComponent("never-made")).hasAny(),
+                "a directory the CLI never made is the same answer, not a failure"
+            )
+
+            let written = makeDirectory(root, "written", suite)
+            writeSessionRecord(
+                sessionRecord(pid: 501, session: "abc", status: "busy", statusUpdatedAt: now),
+                to: written, named: "501.json", modified: now, suite
+            )
+            suite.expect(ClaudeSessionRecordStore(directory: written).hasAny(), "one record is enough")
+
+            withoutPermissions(everyFile(under: written), suite) {
+                suite.expect(
+                    ClaudeSessionRecordStore(directory: written).hasAny(),
+                    "the file is listed and never opened, so a record it cannot read still counts"
+                )
+            }
+        }
+
         suite.test("a record that has not changed is not read again") {
             let directory = makeDirectory(root, "unchanged", suite)
             writeSessionRecord(

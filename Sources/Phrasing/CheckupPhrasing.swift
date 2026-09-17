@@ -104,6 +104,13 @@ public enum CheckupPhrasing {
                     // would tell them where that answer is kept.
                     settings: .automation
                 )
+            case .sessionRecords:
+                return CheckupRow(
+                    point: point,
+                    title: "Records of the sessions running now",
+                    standing: standing,
+                    detail: sessionRecordsDetail(state.hasSessionRecords)
+                )
             case .notifications:
                 return CheckupRow(
                     point: point,
@@ -180,6 +187,36 @@ public enum CheckupPhrasing {
         case .unreadable(let path):
             return "\(why) \(SlotPhrasing.unreadable(path))"
         }
+    }
+
+    /// What a click on a session row runs on, and why some of those rows do not click.
+    ///
+    /// The row a person arrives at from a session that led nowhere, so it answers that question
+    /// first: a click needs a live record naming the process, and the two permissions above it
+    /// decide only how close that click lands. Neither of them is why nothing happened at all.
+    ///
+    /// No button and no pane, because nothing on this Mac accepts an answer here. The records
+    /// appear while an interactive Claude Code is running and at no other time, which is why
+    /// the row states what is there rather than reporting a permission.
+    private static func sessionRecordsDetail(_ present: Bool) -> String {
+        let why = """
+            A click on a session brings up the window it is running in, and getting there needs \
+            the process behind it. Claude Code writes one small file per interactive session in \
+            ~/.claude/sessions, and that file is the only thing on this machine that names that \
+            process — a transcript never does. Codex writes nothing of the kind, so its sessions \
+            are readings and never click.
+            """
+        return present
+            ? """
+                \(why) They are there and being read, so a Claude session running right now \
+                leads to its window.
+                """
+            : """
+                \(why) Nothing in ~/.claude/sessions at the moment: no interactive Claude Code \
+                is running, or the one in use is old enough not to write them. Nothing to \
+                connect — the file appears by itself, and a session shown without one is read \
+                exactly as it was before this app could read them at all.
+                """
     }
 
     /// Why the app asks a terminal anything, and why this row has a question mark where every

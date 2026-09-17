@@ -130,6 +130,20 @@ public enum Wording {
     /// promised, which is the only direction this app is allowed to surprise anybody in.
     public static let raiseSession = "Click to bring up the window this session is running in."
 
+    /// What the panel's dead ends promise when the pointer is on them.
+    ///
+    /// Three sentences and not one, because a dead end is only worth pressing if a person can
+    /// tell what they are about to get: a reading that never arrived, a row that cannot be
+    /// clicked through, and a click that got partway. Each says what is wrong before it says
+    /// where it leads — the window is the answer, not the news.
+    public static let whyNoNumbers = "No numbers here. Click to see what they are waiting on."
+
+    public static let whyNoRaise = """
+        This session cannot be brought up. Click to see what a click on a session needs.
+        """
+
+    public static let whereThisIsExplained = "Click for the line that explains this in full."
+
     /// Said after a click got the application but not the tab or window inside it.
     ///
     /// Careful about what it claims, because the app cannot tell a refused permission from a

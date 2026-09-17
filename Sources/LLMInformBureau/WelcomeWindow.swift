@@ -59,10 +59,15 @@ enum Welcome {
     /// and comes back to the same window. What they come back to has to be read again
     /// (`LiveCheckup`), and only the caller knows how — the panel is where the slot and the
     /// notification channel are known.
+    /// - Parameter point: the row of the checkup to bring the person to, when they were sent
+    ///   here by something in the panel that could not do its job rather than by the gear. The
+    ///   window is long and the answer is one line of it; scrolling to that line is the
+    ///   difference between an explanation and a search.
     static func show(
         checkup: @escaping @MainActor () -> CheckupState = { CheckupReader.read() },
         marks: ThresholdConfigLoad = ThresholdConfigLoader.load(),
-        askForPass: (@MainActor () -> Void)? = nil
+        askForPass: (@MainActor () -> Void)? = nil,
+        showing point: CheckupState.Point? = nil
     ) {
         // Remembered whenever it is offered rather than only on the first showing: the first
         // run opens this window before there is a panel to ask, and the gear that opens it
@@ -74,12 +79,17 @@ enum Welcome {
             // running all the while this window was closed, and the gear is the same gesture
             // as opening it the first time.
             live?.readAgain(with: checkup)
+            if let point { live?.want(point) }
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
 
         let live = LiveCheckup(reading: checkup)
+        // Asked for before the view is built, so the first layout already knows the checkup has
+        // to be open: a section unfolding a moment after the window appears reads as the window
+        // still loading.
+        if let point { live.want(point) }
         Self.live = live
 
         let window = NSWindow(
@@ -181,6 +191,24 @@ private final class WindowWatcher: NSObject, NSWindowDelegate {
 @MainActor
 final class LiveCheckup: ObservableObject {
     @Published private(set) var state: CheckupState
+
+    /// The row somebody was sent here to read, and which journey sent them.
+    ///
+    /// A count beside the row and not the row alone: the same dead end pressed twice is two
+    /// journeys, and the second one has to bring the window back to a row the person has since
+    /// scrolled away from. Without it the second press would change nothing and read as the
+    /// panel having ignored the click.
+    struct WantedRow: Equatable {
+        let point: CheckupState.Point
+        let journey: Int
+    }
+
+    @Published private(set) var wanted: WantedRow?
+
+    /// Sends whoever opens this window to one row of the checkup.
+    func want(_ point: CheckupState.Point) {
+        wanted = WantedRow(point: point, journey: (wanted?.journey ?? 0) + 1)
+    }
 
     /// How to read the machine again. Kept rather than called once, and replaced when the
     /// window is opened afresh, because the reading belongs to whoever opened this window: the
@@ -317,14 +345,50 @@ private struct WelcomeView: View {
         // Off the reading the window opened with. It is not re-decided when the list is read
         // again: a section folding itself away under somebody who has just given a permission
         // would take away the row they came back to look at.
-        _checkupOpen = State(initialValue: live.state.hasSomethingMissing)
+        // Open for a person who was sent to a row in it, whatever the machine says: they were
+        // sent there to read that line.
+        _checkupOpen = State(initialValue: live.wanted != nil || live.state.hasSomethingMissing)
     }
 
+    /// The row the window was opened on, while the mark that says which one is still showing.
+    ///
+    /// Scrolling alone is not an answer: the row it stops at is one of ten that look alike, and
+    /// a person who arrived from a click needs to be told which line was the point. It fades by
+    /// itself, because after a few seconds it is no longer news and a window that stays marked
+    /// is a window with a stuck highlight in it.
+    @State private var arrivedAt: LiveCheckup.WantedRow?
+
     var body: some View {
-        ScrollView {
-            content
+        ScrollViewReader { scroll in
+            ScrollView {
+                content
+            }
+            // Both, and for two different arrivals: a window built for this journey has its row
+            // waiting before it appears, and a window already open is told about the next one.
+            .onAppear { go(to: live.wanted, with: scroll) }
+            .onChange(of: live.wanted) { go(to: $0, with: scroll) }
         }
         .frame(width: 460)
+    }
+
+    /// Brings the window to the row somebody was sent to.
+    private func go(to wanted: LiveCheckup.WantedRow?, with scroll: ScrollViewProxy) {
+        guard let wanted else { return }
+        checkupOpen = true
+        arrivedAt = wanted
+        // The rows of a folded section are not in the view tree to scroll to yet: unfolding it
+        // is a change SwiftUI applies when this run loop is over, and a scroll asked for before
+        // then lands on whatever was there instead.
+        DispatchQueue.main.async {
+            withAnimation { scroll.scrollTo(wanted.point, anchor: .center) }
+        }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            // Compared whole, journey and all: a second click on the same dead end while this
+            // one is still counting down must not have its mark taken away by the first.
+            guard arrivedAt == wanted else { return }
+            withAnimation { arrivedAt = nil }
+        }
     }
 
     private var content: some View {
@@ -559,7 +623,8 @@ private struct WelcomeView: View {
     /// are the same kind of thing — something the app runs on that it did not bring with it —
     /// and a list that changed shape halfway down would read as two lists.
     private func checkupRow(_ row: CheckupRow) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        let arrived = arrivedAt?.point == row.point
+        return HStack(alignment: .firstTextBaseline, spacing: 8) {
             standingMark(row.standing)
             VStack(alignment: .leading, spacing: 2) {
                 // The one line here that is a control rather than a reading: the checkbox is
@@ -585,6 +650,18 @@ private struct WelcomeView: View {
                 }
             }
         }
+        // What a person sent here from the panel is looking for. Taken back off the outside so
+        // that a marked row keeps its place in the column with the rest of them.
+        .padding(6)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color.accentColor.opacity(arrived ? 0.15 : 0))
+        )
+        .padding(-6)
+        // The anchor a journey scrolls to. On the row rather than on the section: the section
+        // is most of the window by the time it is open, and stopping at its top leaves the line
+        // that was the point somewhere below the fold.
+        .id(row.point)
     }
 
     /// What the machine said, as one mark before the line.

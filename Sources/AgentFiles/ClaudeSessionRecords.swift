@@ -119,6 +119,16 @@ public struct ClaudeSessionRecordStore: Sendable {
         self.filesToScan = filesToScan
     }
 
+    /// Whether the CLI is leaving records here at all, without reading one.
+    ///
+    /// The checkup's question rather than a pass's: a click on a session row runs on these
+    /// files, and a row that does not click has no other way to explain itself. One directory
+    /// listing bounded to a single file — what is inside it does not matter here, the same way
+    /// it does not matter to `SetupInspector`, which asks the three sources this same question.
+    public func hasAny() -> Bool {
+        !SessionFiles.newest(in: directory, limit: 1) { $0.pathExtension == "json" }.isEmpty
+    }
+
     /// One walk of the directory: every record it could read, newest first.
     ///
     /// An empty list is the ordinary answer on a machine whose Claude Code does not write

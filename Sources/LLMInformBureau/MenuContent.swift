@@ -119,21 +119,10 @@ struct MenuContent: View {
 
                 Button {
                     // The window is where a mark is moved, and the panel is what reads the
-                    // marks — so it hands the window a way to ask for a pass when it closes.
-                    // The checkup is read here rather than inside the window: the slot and
-                    // the notification channel are the panel's own knowledge, and reading them
-                    // twice is how two parts of one app come to disagree about the same fact.
-                    // Handed over as a way of reading rather than as a reading, because the
-                    // window reads it again every time it comes back to the front.
-                    Welcome.show(
-                        checkup: {
-                            CheckupReader.read(
-                                slot: model.slot,
-                                notifications: model.notificationChannel
-                            )
-                        },
-                        askForPass: { Task { await model.refresh() } }
-                    )
+                    // marks — so it hands the window a way to ask for a pass when it closes
+                    // (`openTheWindow`). No row named: the gear is somebody coming to look
+                    // rather than somebody sent.
+                    openTheWindow()
                 } label: {
                     Image(systemName: "gearshape").modifier(Hoverable())
                 }
@@ -158,6 +147,52 @@ struct MenuContent: View {
             model.cancelChange()
             model.forgetPermissionOffer()
         }
+    }
+
+    // MARK: The way out of a dead end
+
+    /// Opens the settings window — and, when the click came from something this panel could not
+    /// do, on the row of the checkup that says why.
+    ///
+    /// The one place this panel opens that window, so the gear and a dead end hand it the same
+    /// way of reading the checkup. The reading is the panel's own: the slot and the
+    /// notification channel are known here, and a window reading them for itself is how two
+    /// parts of one app come to disagree about the same fact.
+    private func openTheWindow(showing point: CheckupState.Point? = nil) {
+        Welcome.show(
+            checkup: {
+                CheckupReader.read(
+                    slot: model.slot,
+                    notifications: model.notificationChannel
+                )
+            },
+            askForPass: { Task { await model.refresh() } },
+            showing: point
+        )
+    }
+
+    /// A sentence that stands where a reading would be, and is also the way to the line of the
+    /// window that explains it.
+    ///
+    /// It keeps the look of the explanation it replaces and gains the plate this panel's
+    /// controls wear under the pointer (`Hoverable`): a sentence that leads somewhere has to
+    /// say so, and a sentence set apart from the ones beside it would read as a different kind
+    /// of news rather than as the same news with a way out.
+    private func wayOut(_ text: String, to road: CheckupRoad) -> some View {
+        Button {
+            openTheWindow(showing: road.point(slot: model.slot))
+        } label: {
+            Text(text)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .modifier(Hoverable())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, -4)
+        .padding(.vertical, -2)
+        .help(Wording.whereThisIsExplained)
     }
 
     // MARK: The limits half, folded and opened out
@@ -218,13 +253,25 @@ struct MenuContent: View {
     /// different things. A service with nothing reported shows no number at all rather than a
     /// zero, the way everything else in this panel does — two words in its place instead, so
     /// that a row with nothing in it is never mistaken for a row that failed.
-    @ViewBuilder
+    ///
+    /// With nothing to show, the name becomes the way to the line of the window that says what
+    /// the numbers are waiting on. The name and not the row: the offer to connect stands at the
+    /// right edge of this same row, and a control inside a control is neither.
     private func limitsSummary(_ service: AgentService) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            StatusLight(light: model.lights(of: service).limits, diameter: 6)
-                .alignmentGuide(.firstTextBaseline) { $0.height * 0.5 + 2.5 }
-            Text(Wording.service(service))
-                .font(.callout)
+            if let road = summaryRoad(of: service) {
+                Button {
+                    openTheWindow(showing: road.point(slot: model.slot))
+                } label: {
+                    foldedName(service).modifier(Hoverable())
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, -4)
+                .padding(.vertical, -2)
+                .help(Wording.whyNoNumbers)
+            } else {
+                foldedName(service)
+            }
             Spacer()
             // The offer to connect keeps its place even folded away. It is the only thing in
             // this half that cannot wait to be opened out — until it is pressed there are no
@@ -251,6 +298,26 @@ struct MenuContent: View {
                     .foregroundStyle(.tertiary)
             }
         }
+    }
+
+    /// The lit name of a folded row, which is all of it that is the same in both halves.
+    private func foldedName(_ service: AgentService) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            StatusLight(light: model.lights(of: service).limits, diameter: 6)
+                .alignmentGuide(.firstTextBaseline) { $0.height * 0.5 + 2.5 }
+            Text(Wording.service(service))
+                .font(.callout)
+        }
+    }
+
+    /// Where a folded row leads, or nowhere while it has a number in it.
+    ///
+    /// Not before the first reading has landed: at that point nothing has looked at the slot
+    /// yet, and a road named from a slot nobody has read would point at the wrong line of the
+    /// window for as long as the first pass takes.
+    private func summaryRoad(of service: AgentService) -> CheckupRoad? {
+        guard model.usage != nil, summary(of: service) == nil else { return nil }
+        return .limits(service)
     }
 
     /// What a folded service says on the right: which window, and how much of it is gone.
@@ -296,7 +363,11 @@ struct MenuContent: View {
             name: Wording.service(service),
             badge: reading.value?.planType,
             help: "This service's subscription limits — the first of its two dots in the menu bar. "
-                + Briefing.scaleHelp(model.thresholds)
+                + Briefing.scaleHelp(model.thresholds),
+            // Only while there is no number in it, and not before the first pass: an entry
+            // showing what it was built to show has nothing to explain, and a road named from
+            // a slot nobody has read yet would point at the wrong line of the window.
+            road: model.usage != nil && reading.value == nil ? .limits(service) : nil
         ) {
             if model.usage?.isInstalled(service) == false {
                 explanation(Wording.notInstalled)
@@ -403,28 +474,30 @@ struct MenuContent: View {
     /// way to the window it is running in.
     ///
     /// The plate under the pointer is the only thing that says a row is a control. It is the
-    /// same plate every other control in this panel wears (`Hoverable`), and it appears only
-    /// on rows that lead somewhere: a session with no process behind it is a reading like any
-    /// other, and lighting it under the pointer would promise a window this app cannot find.
-    @ViewBuilder
+    /// same plate every other control in this panel wears (`Hoverable`), and every session row
+    /// now wears it — but they do two different things, and what says which is the sentence
+    /// under the pointer. A row with a live process behind it brings that process's window up.
+    /// A row without one cannot, and it used to answer a click with nothing at all; it now
+    /// leads to the line of the window that says what a click on a session runs on, which is
+    /// the one question a row that did nothing leaves a person with.
     private func sessionEntry(_ session: SessionView) -> some View {
-        if session.snapshot.processID != nil {
-            Button {
+        Button {
+            if session.snapshot.processID != nil {
                 model.raise(session.snapshot)
-            } label: {
-                sessionReadings(session).modifier(Hoverable())
+            } else {
+                openTheWindow(showing: CheckupRoad.sessionClick.point(slot: model.slot))
             }
-            .buttonStyle(.plain)
-            .help(Wording.raiseSession)
-            // The plate needs room around what it sits behind, and that room would move this
-            // row's light out of line with the rows that have no plate. Taken back off the
-            // outside, the column of lights stays a column — the same trick the disclosure
-            // below the limits uses.
-            .padding(.horizontal, -4)
-            .padding(.vertical, -2)
-        } else {
-            sessionReadings(session)
+        } label: {
+            sessionReadings(session).modifier(Hoverable())
         }
+        .buttonStyle(.plain)
+        .help(session.snapshot.processID != nil ? Wording.raiseSession : Wording.whyNoRaise)
+        // The plate needs room around what it sits behind, and that room would move this
+        // row's light out of line with the rows that have no plate. Taken back off the
+        // outside, the column of lights stays a column — the same trick the disclosure
+        // below the limits uses.
+        .padding(.horizontal, -4)
+        .padding(.vertical, -2)
     }
 
     /// The readings themselves, laid out exactly like a limit window: what is being spent on
@@ -576,6 +649,11 @@ struct MenuContent: View {
     // MARK: The shape both halves share
 
     /// One entry of either half: a lit name, something secondary on the right, rows beneath.
+    ///
+    /// - Parameter road: where the window explains this entry, for an entry with no reading in
+    ///   it. The name becomes the way there rather than the whole entry: what stands under it
+    ///   is often an offer to fix the thing outright — the button that takes the status line
+    ///   slot — and a control inside a control is neither.
     private func entry(
         light: Light,
         blinkedOut: Bool = false,
@@ -584,38 +662,83 @@ struct MenuContent: View {
         tag: String? = nil,
         badge: String?,
         help: String,
+        road: CheckupRoad? = nil,
         @ViewBuilder rows: () -> some View
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                StatusLight(light: light, sign: sign)
-                    // Hidden rather than removed: the row must not shift sideways while it
-                    // blinks, or the blink reads as the layout moving instead of the light.
-                    .opacity(blinkedOut ? 0 : 1)
-                    .help(help)
-                Text(name)
-                    .font(.headline)
-                if let tag {
-                    // In the font the command hints are set in, and for the same reason: it is
-                    // the identifier the CLI itself uses, not prose about the session. Set
-                    // against the name rather than off to the right, because it says what this
-                    // "Claude" currently is — the right edge belongs to the project, and is the
-                    // first thing to be truncated on a narrow panel.
-                    Text(tag)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
+            if let road {
+                Button {
+                    openTheWindow(showing: road.point(slot: model.slot))
+                } label: {
+                    heading(
+                        light: light,
+                        blinkedOut: blinkedOut,
+                        sign: sign,
+                        name: name,
+                        tag: tag,
+                        badge: badge,
+                        help: help
+                    )
+                    .modifier(Hoverable())
                 }
-                Spacer()
-                if let badge {
-                    Text(badge)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.head)
-                }
+                .buttonStyle(.plain)
+                // The same trick the session rows use: the plate needs room around it, and the
+                // room would push this row's light out of the column the others stand in.
+                .padding(.horizontal, -4)
+                .padding(.vertical, -2)
+                .help(Wording.whyNoNumbers)
+            } else {
+                heading(
+                    light: light,
+                    blinkedOut: blinkedOut,
+                    sign: sign,
+                    name: name,
+                    tag: tag,
+                    badge: badge,
+                    help: help
+                )
             }
             rows()
+        }
+    }
+
+    /// The lit name at the top of an entry, with whatever the right edge carries.
+    private func heading(
+        light: Light,
+        blinkedOut: Bool,
+        sign: LightSign?,
+        name: String,
+        tag: String?,
+        badge: String?,
+        help: String
+    ) -> some View {
+        HStack(spacing: 6) {
+            StatusLight(light: light, sign: sign)
+                // Hidden rather than removed: the row must not shift sideways while it
+                // blinks, or the blink reads as the layout moving instead of the light.
+                .opacity(blinkedOut ? 0 : 1)
+                .help(help)
+            Text(name)
+                .font(.headline)
+            if let tag {
+                // In the font the command hints are set in, and for the same reason: it is
+                // the identifier the CLI itself uses, not prose about the session. Set
+                // against the name rather than off to the right, because it says what this
+                // "Claude" currently is — the right edge belongs to the project, and is the
+                // first thing to be truncated on a narrow panel.
+                Text(tag)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            if let badge {
+                Text(badge)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.head)
+            }
         }
     }
 
@@ -656,7 +779,14 @@ struct MenuContent: View {
     /// line slot itself.
     private func permissionOffer(_ permission: TerminalRaise.Permission) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            explanation(Wording.permissionOffer(permission, signedAdHoc: OwnSignature.isAdHoc))
+            // Two ways on from one sentence, and they are not the same errand. The button goes
+            // straight to the pane, for somebody who knows what they are doing there; the
+            // sentence leads to the line of the window that says what the permission buys and —
+            // for a copy signed ad-hoc — why a tick already in that pane grants nothing.
+            wayOut(
+                Wording.permissionOffer(permission, signedAdHoc: OwnSignature.isAdHoc),
+                to: .permission(permission)
+            )
             Button(Wording.permissionSettings(permission)) { model.openSettings(for: permission) }
                 .controlSize(.small)
         }
