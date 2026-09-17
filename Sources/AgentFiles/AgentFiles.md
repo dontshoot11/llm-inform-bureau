@@ -216,7 +216,14 @@ began: nothing rewrites the record while the person is away. `sessionId` ties it
 `cwd` to a project.
 
 What the record does *not* carry is the question itself — the `needs` field is empty for this
-kind of dialog — so what is being asked still comes out of the transcript.
+kind of dialog — so what is being asked still comes out of the transcript. That is the other
+half of the same entry: the `tool_use` block named `AskUserQuestion` carries the whole of what
+was asked, and the first of its `questions` is what a notification says. Measured over 395
+transcripts here: 217 entries call it and none carries two tool calls at once, so "the last
+entry has such a block" and "the last entry is the request" are the same statement on this
+data. The name of the tool is the whole of that rule and the vendor's to change — a renamed
+one costs the wording of a notification and nothing else, because whether anybody is waiting is
+the record's answer and not this one's.
 
 Four things bound what this source is allowed to do, and all four are about a file written by a
 process that may no longer exist:

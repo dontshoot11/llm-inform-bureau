@@ -136,6 +136,18 @@ public struct SessionSnapshot: Equatable, Sendable {
     /// beside `lastActivityAt`.
     public let replyWait: ReplyWait
 
+    /// What the agent last asked the person for, in its own words, or `nil` when nothing in
+    /// the transcript is waiting on an answer from them.
+    ///
+    /// Carried beside `replyWait` rather than inside its `.asking` case, because the two come
+    /// from two different files and the transcript is read first: the transcript knows what
+    /// was asked and cannot tell a question from a running tool, and the session record tells
+    /// them apart and does not carry the question. Whoever reads both puts them together.
+    ///
+    /// The question as it was written, whole. Shortening it is the interface's business, and
+    /// the notification is the only thing that has to.
+    public let request: String?
+
     /// Set when this reading is a subagent's rather than a session's. Everything above means
     /// the same thing either way — the difference is what it is allowed to do, which is why
     /// the rules and the panel ask this question and the reader does not answer it twice.
@@ -153,6 +165,7 @@ public struct SessionSnapshot: Equatable, Sendable {
         project: String? = nil,
         lastActivityAt: Date = Date(),
         replyWait: ReplyWait = .none,
+        request: String? = nil,
         subagent: SubagentOrigin? = nil
     ) {
         self.sessionID = sessionID
@@ -164,6 +177,7 @@ public struct SessionSnapshot: Equatable, Sendable {
         self.project = project
         self.lastActivityAt = lastActivityAt
         self.replyWait = replyWait
+        self.request = request
         self.subagent = subagent
     }
 
@@ -182,6 +196,7 @@ public struct SessionSnapshot: Equatable, Sendable {
             project: project,
             lastActivityAt: lastActivityAt,
             replyWait: replyWait,
+            request: request,
             subagent: subagent
         )
     }
@@ -204,6 +219,7 @@ public struct SessionSnapshot: Equatable, Sendable {
             project: project,
             lastActivityAt: lastActivityAt,
             replyWait: .asking(since: since),
+            request: request,
             subagent: subagent
         )
     }

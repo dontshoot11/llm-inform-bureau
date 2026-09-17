@@ -84,6 +84,59 @@ func runAskingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
             suite.expectEqual(snapshot.replyWait, .waiting, "the behaviour of the release before this one")
         }
 
+        // The other half of the request, and the other file it comes from: the record says the
+        // person is being waited on, and only the transcript says what about.
+        suite.test("what was asked is read from the transcript, beside the record's verdict") {
+            let askedTurn = [
+                userPrompt("do the thing"),
+                assistant(
+                    input: 1, cacheCreation: 0, cacheRead: 40_000,
+                    stopReason: "tool_use", blocks: ["thinking", "tool_use"],
+                    asking: "Which approach should I take?"
+                )
+            ]
+            guard let snapshot = pass(
+                root, "asked-about",
+                transcript: askedTurn,
+                records: [sessionRecord(pid: 501, session: "abc", status: "waiting", statusUpdatedAt: now)]
+            ) else { return }
+            suite.expectEqual(snapshot.request, "Which approach should I take?", "the question")
+            suite.expectEqual(snapshot.replyWait, .asking(since: now), "and the state it belongs to")
+        }
+
+        // The rule is the name of one tool, which is the vendor's to change. What a renamed
+        // tool costs is the wording of a notification and nothing else.
+        suite.test("a tool call that is not a question to the person leaves nothing to say") {
+            guard let snapshot = pass(
+                root, "asked-nothing",
+                transcript: askedTurn,
+                records: [sessionRecord(pid: 501, session: "abc", status: "waiting", statusUpdatedAt: now)]
+            ) else { return }
+            suite.expectEqual(snapshot.request, nil, "a running tool is not a question")
+            suite.expectEqual(snapshot.replyWait, .asking(since: now), "and the record is still believed")
+        }
+
+        // Answered, and the question with it: what is carried is the request in flight, not the
+        // last one the session ever had.
+        suite.test("an answered question is no longer what the session is asking") {
+            let answered = [
+                userPrompt("do the thing"),
+                assistant(
+                    input: 1, cacheCreation: 0, cacheRead: 40_000,
+                    stopReason: "tool_use", blocks: ["tool_use"],
+                    asking: "Which approach should I take?"
+                ),
+                toolResult(),
+                assistant(input: 1, cacheCreation: 0, cacheRead: 60_000, stopReason: "end_turn", blocks: ["text"])
+            ]
+            guard let snapshot = pass(
+                root, "answered-question",
+                transcript: answered,
+                records: [sessionRecord(pid: 501, session: "abc", status: "idle", statusUpdatedAt: now)]
+            ) else { return }
+            suite.expectEqual(snapshot.request, nil, "the question the person already answered")
+        }
+
         suite.test("a record that says busy leaves the transcript's verdict alone") {
             guard let snapshot = pass(
                 root, "busy",

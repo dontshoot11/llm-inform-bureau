@@ -127,7 +127,7 @@ public struct DurationThreshold: Equatable, Sendable {
 /// Format, current values and how to change them: `Thresholds.md` next to this file.
 public struct ThresholdConfig: Equatable, Sendable {
     /// Format version, so a changed schema is detected rather than mis-read.
-    public static let currentVersion = 6
+    public static let currentVersion = 7
 
     public let version: Int
 
@@ -148,13 +148,22 @@ public struct ThresholdConfig: Equatable, Sendable {
     /// out of it. The fuse under the blinking light — `SessionActivity.replyWait`.
     public let abandonedWait: DurationThreshold
 
+    /// How long the agent may be waiting on the person before the app says so out loud.
+    ///
+    /// Not a fuse and not a mark on a scale: the pause sign is drawn the moment the request
+    /// appears, and this is the delay on the notification alone. A question answered by
+    /// somebody sitting at the terminal never reaches a notification at all — `BudgetRules`
+    /// does not make the alert until the request is older than this.
+    public let attentionNotice: DurationThreshold
+
     public init(
         version: Int,
         windowFill: PercentMarks,
         limitUsage: PercentMarks,
         limitWindowNearlyReset: WindowResetThreshold,
         sessionActivity: DurationThreshold,
-        abandonedWait: DurationThreshold
+        abandonedWait: DurationThreshold,
+        attentionNotice: DurationThreshold
     ) {
         self.version = version
         self.windowFill = windowFill
@@ -162,6 +171,7 @@ public struct ThresholdConfig: Equatable, Sendable {
         self.limitWindowNearlyReset = limitWindowNearlyReset
         self.sessionActivity = sessionActivity
         self.abandonedWait = abandonedWait
+        self.attentionNotice = attentionNotice
     }
 
     /// The floor under the floor: the values compiled into the app, used when even the
@@ -242,6 +252,22 @@ public struct ThresholdConfig: Equatable, Sendable {
                 short enough that nobody watches a dead session blink. Raise it if a long \
                 tool call stops the light while you are still waiting; lower it if a closed \
                 terminal keeps blinking too long afterwards.
+                """,
+            provenance: nil
+        ),
+        attentionNotice: DurationThreshold(
+            minutes: 2,
+            rationale: """
+                Not measured — a sensible default. How long the agent may be waiting on the \
+                person before the app says so out loud. The pause sign in the menu bar appears \
+                the moment the request does; this is the delay on the notification alone, and \
+                it exists so that a question answered by somebody sitting at the terminal is \
+                never announced at all. Two minutes is about as long as that person takes to \
+                answer by themselves, so what is left for a notification is the wait they are \
+                not going to close. Raise it if notifications arrive about questions you were \
+                about to answer anyway; lower it if you keep learning about a question too \
+                late. Unlike the fuse under the blinking light, nothing here expires: a \
+                request does not go stale, and it is announced once however long it stands.
                 """,
             provenance: nil
         )

@@ -44,11 +44,29 @@ Last line, alone, is the command — because at the moment of the interruption t
 questions, and the second one is "and how do I see the rest". The two services do not share
 one: context is `/context` in Claude Code and `/status` in Codex, limits are `/usage` in both.
 
+## The one notification with no command
+
+An agent waiting on the person is the other thing worth interrupting them for, and it reads
+differently on purpose:
+
+```
+Claude is waiting on you in llm-inform-bureau
+Which approach should I take — the reader, or the join?
+```
+
+**The title names the project**, because that is how the person finds the row: the panel lists
+sessions by project, and a notification that named only the service would point at the whole
+app. **The body is the question**, flattened to one line and cut on a word if it runs long — a
+question is written for a terminal and arrives with line breaks in it. **And there is no
+command**, for the same reason the others have one: what the reader can do about this is
+answer, in a terminal that is already open, and a slash command at the end would send them to
+look up a number instead.
+
 ## Files
 
 | File | Holds |
 | --- | --- |
-| `AlertPhrasing.swift` | A crossed mark as a notification: title, body, command |
+| `AlertPhrasing.swift` | A crossed mark — or an agent waiting on the person — as a notification: title, body, command |
 | `Wording.swift` | What a mark is called, what a subagent's row is called, which command shows more of it, what a folded row with no reading yet says, and what a service is called — `service` where there is room to say it, `serviceInBar` where the budget is pixels |
 | `Briefing.swift` | What the first run says: where every number comes from, and what is not connected |
 | `TokenDisplay.swift` | Token counts and percentages, rounded the way the widget says them |

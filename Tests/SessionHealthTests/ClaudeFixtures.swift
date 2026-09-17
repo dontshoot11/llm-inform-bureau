@@ -32,6 +32,11 @@ func stamp(_ moment: Date) -> String {
 /// One assistant entry. `blocks` names the kinds of content block it carries, because one
 /// response is written as several of these — `thinking`, then `text`, then `tool_use` — and all
 /// of them carry the same `stop_reason`, which is the thing the waiting rule reads.
+///
+/// `asking` fills a `tool_use` block in: the call to `AskUserQuestion` and the question inside
+/// it, which is where a notification's wording comes from. Without it the block is left
+/// nameless, which is the case the reader has to survive alongside it — a tool that is merely
+/// running is written exactly like that.
 func assistant(
     input: Int,
     cacheCreation: Int,
@@ -41,9 +46,15 @@ func assistant(
     model: String = "claude-opus-5",
     stopReason: String = "tool_use",
     blocks: [String] = ["text"],
+    asking: String? = nil,
     at: Date = fixtureAnsweredAt
 ) -> String {
-    let content = blocks.map { "{\"type\":\"\($0)\"}" }.joined(separator: ",")
+    let content = blocks.map { kind -> String in
+        guard kind == "tool_use", let asking else { return "{\"type\":\"\(kind)\"}" }
+        return "{\"type\":\"tool_use\",\"id\":\"toolu_1\",\"name\":\"AskUserQuestion\","
+            + "\"input\":{\"questions\":[{\"header\":\"Approach\",\"question\":\"\(asking)\","
+            + "\"options\":[{\"label\":\"One\"},{\"label\":\"Two\"}]}]}}"
+    }.joined(separator: ",")
     return """
     {"type":"assistant","isSidechain":\(sidechain),"cwd":"\(cwd)",\
     "timestamp":"\(stamp(at))",\

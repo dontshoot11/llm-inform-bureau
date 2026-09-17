@@ -7,9 +7,10 @@ import Foundation
 /// turns that into notifications — it decides what is news, which is two decisions:
 ///
 /// - **Scope.** A mark is news once per the thing that has to end before it can be news again:
-///   a session for a context mark, a limit window for a limit mark. `/clear` starts a new
-///   session file with a new identifier and a limit window ends at its reset time, so both
-///   scopes end by themselves and nothing here has to watch for either event.
+///   a session for a context mark, a limit window for a limit mark, one wait for a request to
+///   the person. `/clear` starts a new session file with a new identifier, a limit window ends
+///   at its reset time, and a wait ends when it is answered — so every scope ends by itself and
+///   nothing here has to watch for any of those events.
 /// - **The first pass.** The app is started at login and finds whatever the day has already
 ///   spent. Announcing that backlog would teach the user to dismiss the notification that
 ///   matters — the one that arrives the moment a mark is crossed with the app watching — so
@@ -49,7 +50,7 @@ public struct AlertDispatch: Sendable {
         let ofSessions = sessions.filter { !$0.isSubagent }
         for assessment in ofSessions {
             for alert in assessment.alerts {
-                append(alert, to: &grouped, scope: AlertScope.session(assessment.sessionID))
+                append(alert, to: &grouped, scope: Self.scope(of: alert, in: assessment.sessionID))
             }
         }
 
@@ -113,7 +114,19 @@ public struct AlertDispatch: Sendable {
             ("window:\(alert.service.rawValue)", mark)
         case .limitUsage(let window, let mark):
             ("limit:\(alert.service.rawValue):\(window.rawValue)", mark)
+        case .attention:
+            nil
         }
+    }
+
+    /// The scope one session's alert is remembered in: the session, or — for a request to the
+    /// person — the wait it belongs to. A wait ends by itself, which is what lets the next
+    /// request in the same session be announced without anything watching for the answer.
+    private static func scope(of alert: BudgetAlert, in sessionID: String) -> String {
+        guard case .attention = alert.kind, let request = alert.request else {
+            return AlertScope.session(sessionID)
+        }
+        return AlertScope.asking(session: sessionID, since: request.since)
     }
 
     private static func scope(ofLimit alert: BudgetAlert) -> String {

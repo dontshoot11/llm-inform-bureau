@@ -83,6 +83,9 @@ already been delivered inside a *scope*:
   id, so the memory resets by itself and the same mark may fire again in the new session.
 - a **limit window**, identified by the moment it resets. Once it rolls over, its usage is a
   new story and may be reported again.
+- one **wait on the person**, identified by the moment the agent stopped and asked. The person
+  answers, the agent asks again, and the new wait is a scope of its own — so it is announced
+  again without anything here having to notice the answer.
 
 There is no exception to that rule. There used to be one — a mark for a single turn that
 grew the context a lot, an event rather than a line that stays crossed — and it was removed on
@@ -90,6 +93,24 @@ grew the context a lot, an event rather than a line that stays crossed — and i
 it spoke on nearly all of them. How much the last turn added is still in the panel, under the
 session it belongs to. A reading nobody is interrupted by is worth more than a mark nobody
 reads.
+
+## The one alert that is not a mark
+
+An agent that has asked the person something and is standing still is not a number crossing a
+line, and it is announced through the same dispatcher all the same (`BudgetAlert.Kind`
+`.attention`). What makes a crossed mark bearable is exactly what a request needs: said once,
+never on behalf of a subagent, and never about the backlog the app found when it started. A
+second road to the same notification centre would have to grow all three again.
+
+Two things are its own. The delay (`sessions.attention_notice_after_minutes`) is not a scope
+and not a memory: the alert is simply not made while the request is younger than the mark, so a
+question answered at the keyboard never reaches a notification instead of being announced and
+taken back. And what was asked rides beside the kind rather than inside it — the kind is the
+identity the memory remembers, and a question rephrased mid-wait must not read as a second
+request.
+
+The pause sign in the bar does not wait for any of this. It is drawn from `ReplyWait.asking`
+the moment the request appears; the delay belongs to the interruption alone.
 
 ## Which mark made the bar that colour
 
@@ -159,8 +180,8 @@ Nothing in the loader throws: a broken config file degrades to the values below 
 | `SessionActivity.swift` | Which sessions count as the ones being worked on right now |
 | `SessionSnapshot.swift` | The input: a session's tokens, window, last turn and the model that answered it, who it is waiting on (nobody, its agent, its agent for a long time, or the person it has asked something) — and, for a subagent, where it came from |
 | `LimitsSnapshot.swift` | The input: one service's limit windows and when they were reported |
-| `BudgetAlert.swift` | What a crossed mark is, and the identity the memory remembers |
-| `AlertMemory.swift` | One mark, one notification — scopes and what ends them |
+| `BudgetAlert.swift` | What a crossed mark is — and a request to the person, which is not one — plus the identity the memory remembers |
+| `AlertMemory.swift` | One mark, one notification — scopes (a session, a limit window, one wait) and what ends them |
 | `AlertDispatch.swift` | What is news: scoping every alert of a whole reading, and staying quiet about the backlog found at launch |
 | `BudgetRules.swift` | The rules themselves, and the two assessments they return |
 | `ThresholdConfig.swift` | The marks, and the built-in copy of them |

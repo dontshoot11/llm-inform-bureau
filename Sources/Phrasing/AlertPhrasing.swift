@@ -19,6 +19,12 @@ public struct NotificationText: Equatable, Sendable {
 /// command is the last thing in the body for exactly that reason, and it is not the same
 /// command for both services.
 ///
+/// A request to the person is the one notification with no command at the end, and that is the
+/// same rule read the other way: what they have to do about it is answer, and the session
+/// asking them is already open in a terminal somewhere. What that one owes instead is the
+/// project — the panel lists sessions by project, so naming it is how the notification points
+/// at a row rather than at the whole app.
+///
 /// What the wording never does is grade the session. The marks are Anthropic's compaction
 /// point, two shares of a window, and two shares of a subscription; none of them is a
 /// measurement of how good the answers have become, and the notification says so in the words
@@ -69,13 +75,51 @@ public enum AlertPhrasing {
                     command: command
                 )
             )
+
+        // Not a mark and not a number: the agent has stopped and the next move is the
+        // person's. The title says that in as many words — "waiting on you", not "the session
+        // stopped" — because the difference between the two is the whole reason this arrives
+        // at all.
+        case .attention:
+            let asked = alert.request?.about.flatMap { Self.oneLine($0) }
+            return NotificationText(
+                title: alert.request?.project.map { "\(service) is waiting on you in \($0)" }
+                    ?? "\(service) is waiting on you",
+                body: detail(
+                    [asked ?? "The agent has stopped and is waiting for an answer."],
+                    command: command
+                )
+            )
         }
     }
 
     /// The body of every notification: a sentence or two, then the command, last and alone, so
     /// that a glance at the end of the notification answers "and how do I see the rest".
-    private static func detail(_ sentences: [String?], command: String) -> String {
-        (sentences.compactMap { $0 }.joined(separator: " ") + "\n" + command)
+    ///
+    /// No command is the legitimate answer for a request to the person, and then the body is
+    /// the sentences alone — see the type's own comment for why.
+    private static func detail(_ sentences: [String?], command: String?) -> String {
+        let said = sentences.compactMap { $0 }.joined(separator: " ")
+        guard let command else { return said }
+        return said + "\n" + command
+    }
+
+    /// A question as a notification can carry it: one line, and short enough to be read at a
+    /// glance rather than opened.
+    ///
+    /// A question is written to be read in a terminal, so it arrives with line breaks in it and
+    /// sometimes with a paragraph around it. Both are flattened here rather than at the source:
+    /// the panel and any later reader get the question whole, and only the line that has to fit
+    /// in a banner is cut. Cut on a word, with an ellipsis, so that what is shown never reads
+    /// as the whole of what was asked.
+    private static func oneLine(_ text: String, limit: Int = 120) -> String? {
+        let flattened = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard !flattened.isEmpty else { return nil }
+        guard flattened.count > limit else { return flattened }
+        let head = flattened.prefix(limit)
+        let lastSpace = head.lastIndex(of: " ")
+        let kept = lastSpace.map { head[head.startIndex..<$0] } ?? head
+        return kept + "…"
     }
 
     private static func percent(_ value: Double?) -> String {

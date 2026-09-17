@@ -19,7 +19,8 @@ func runThresholdConfigTests(_ suite: TestSuite, config: ThresholdConfig) {
             ("limits.percent", config.limitUsage.provenance, config.limitUsage.rationale),
             ("limits.quiet_when_window_remaining_percent", config.limitWindowNearlyReset.provenance, config.limitWindowNearlyReset.rationale),
             ("sessions.active_within_minutes", config.sessionActivity.provenance, config.sessionActivity.rationale),
-            ("sessions.abandoned_wait_after_minutes", config.abandonedWait.provenance, config.abandonedWait.rationale)
+            ("sessions.abandoned_wait_after_minutes", config.abandonedWait.provenance, config.abandonedWait.rationale),
+            ("sessions.attention_notice_after_minutes", config.attentionNotice.provenance, config.attentionNotice.rationale)
         ]
         for (path, provenance, rationale) in measured {
             suite.expect(!rationale.isEmpty, "\(path): a number without a rationale is a guess")
@@ -40,6 +41,9 @@ func runThresholdConfigTests(_ suite: TestSuite, config: ThresholdConfig) {
         // Waits were counted here to place this one, and counting them here is exactly why it
         // ships unmeasured: one machine's sessions are not the sessions it will be read on.
         suite.expectEqual(config.abandonedWait.isMeasured, false, "the abandoned-wait fuse")
+        // Waits on the *person* were counted here too — a median of 64 seconds over 215 of
+        // them — and for the same reason that count is in the research and not in the file.
+        suite.expectEqual(config.attentionNotice.isMeasured, false, "the notice delay")
     }
 
     // The red mark is the one number placed against something published, and the rationale is
@@ -272,6 +276,11 @@ private func configJSON(
         },
         "abandoned_wait_after_minutes": {
           "minutes": 10,
+          \(rationale)
+          "measurement": null
+        },
+        "attention_notice_after_minutes": {
+          "minutes": 2,
           \(rationale)
           "measurement": null
         }

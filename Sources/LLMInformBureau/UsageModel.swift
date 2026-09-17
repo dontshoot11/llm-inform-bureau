@@ -53,8 +53,12 @@ struct ServiceLights: Equatable {
 /// A refresh happens when a source file changes, which is when a turn ends — that is what
 /// makes a notification arrive at the moment a mark is crossed rather than within an interval.
 /// The heartbeat underneath it is not a second way of noticing changes: it is for what changes
-/// without anything being written, which is every age and every reset time in the panel, and a
-/// session going quiet long enough to fall off the list.
+/// without anything being written, which is every age and every reset time in the panel, a
+/// session going quiet long enough to fall off the list, and a question that has now gone
+/// unanswered for longer than `sessions.attention_notice_after_minutes`. That last one is the
+/// heartbeat's alone — nothing is written to any of these files while the person is away from
+/// the keyboard — so that notification arrives up to a heartbeat after the mark instead of on
+/// it, which is half a minute onto a wait already minutes long.
 @MainActor
 final class UsageModel: ObservableObject {
     /// How often the panel is refreshed with nothing having changed on disk. Long enough to

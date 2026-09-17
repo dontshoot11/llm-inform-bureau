@@ -95,7 +95,7 @@ case, and it is covered by a test.
 
 ```json
 {
-  "version": 6,
+  "version": 7,
   "context": {
     "window_fill_percent": { "notice": 40, "elevated": 60, "high": 90, "rationale": "…" }
   },
@@ -105,7 +105,8 @@ case, and it is covered by a test.
   },
   "sessions": {
     "active_within_minutes": { "minutes": 30, "rationale": "…" },
-    "abandoned_wait_after_minutes": { "minutes": 10, "rationale": "…" }
+    "abandoned_wait_after_minutes": { "minutes": 10, "rationale": "…" },
+    "attention_notice_after_minutes": { "minutes": 2, "rationale": "…" }
   }
 }
 ```
@@ -127,12 +128,13 @@ case, and it is covered by a test.
 | `limits.quiet_when_window_remaining_percent` | 5 | **Not measured.** Below this share of a window's own length, its marks stay quiet: a window about to come back on its own is not worth interrupting anyone for. A share rather than a number of minutes, because five hours and a week are not comparable in absolute time. |
 | `sessions.active_within_minutes` | 30 | **Not measured — a sensible default.** Thirty minutes is where a session being worked on stops looking like one that is finished. |
 | `sessions.abandoned_wait_after_minutes` | 10 | **Not measured — a sensible default.** A session owing an answer this long without a word stops being one an answer is expected out of: the light stops blinking and is drawn as a figure eight. It only has to be longer than the longest silence inside a turn that is really running, and short enough that nobody watches a dead session blink. |
+| `sessions.attention_notice_after_minutes` | 2 | **Not measured — a sensible default.** How long an agent may be waiting on the person before a notification says so. The pause sign appears at once; only the notification waits, so that a question answered at the keyboard is never announced at all. Two minutes is about as long as somebody sitting at the terminal takes to answer by themselves. |
 
-Not one of the six carries a `measurement`, and that is the honest state of this subject
+Not one of the seven carries a `measurement`, and that is the honest state of this subject
 rather than a gap to be filled. The alternative — inventing a date and a link so every field
 looks equally solid — is exactly the silent lie `AGENTS.md` forbids.
 
-## The two entries that are not marks
+## The three entries that are not marks
 
 `sessions.active_within_minutes` decides which sessions the widget lists, not what it warns
 about. It is here because it has the same problem as the marks: it will need correcting, and a
@@ -149,11 +151,26 @@ measured on this machine, a transcript's modification date runs ahead of the las
 it by a median of a minute and a half, and by more than ten minutes in 87 files of 385, because
 housekeeping keeps touching a file long after the conversation in it stopped.
 
-The two are deliberately far apart, and the shorter one is the blink. A session that has gone
+Those two are deliberately far apart, and the shorter one is the blink. A session that has gone
 quiet is still a session being worked on and keeps its row for the full half hour; what it
 loses after ten minutes is only the claim that an answer is on its way. The answer is still
 owed, the sign says so, and nothing here decides when that stops being true — an answer
 arriving does, or the half hour running out.
+
+`sessions.attention_notice_after_minutes` decides nothing about a light at all: the pause sign
+is drawn the moment the agent asks for something, and this is the delay on the notification
+alone. The delay is the whole of the rule — under it no alert is made, so a question the person
+answers without leaving the terminal is never announced rather than announced and then taken
+back. Waits on the person were counted while this was placed — 215 of them on the machine it
+was written on, half answered inside 64 seconds and a quarter running past five minutes — and
+that count lives in the task's research rather than here, for the reason step 4 of "How to
+update" gives. What makes the number wrong is visible from the outside, and that is what is
+worth saying: notifications about questions you were about to answer anyway means it is too
+short, learning about a question long after it was asked means it is too long.
+
+Unlike the fuse above, nothing here expires. A request does not go stale — the person simply
+has not come back yet — so one wait is announced once, however long it stands, and the next
+request in the same session is announced again as the new thing it is.
 
 ## What is no longer here
 

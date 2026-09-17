@@ -212,6 +212,12 @@ enum ThresholdConfigParser {
                 at: "sessions.abandoned_wait_after_minutes",
                 fallback: fallback.abandonedWait,
                 problems: &problems
+            ),
+            attentionNotice: duration(
+                sessions?["attention_notice_after_minutes"],
+                at: "sessions.attention_notice_after_minutes",
+                fallback: fallback.attentionNotice,
+                problems: &problems
             )
         )
         return Result(config: config, problems: problems)

@@ -74,6 +74,11 @@ public enum Wording {
             "\(self.service(service)) context window past \(TokenDisplay.percent(percent))"
         case .limitUsage(let window, let percent):
             "\(self.service(service)) \(limitWindow(window, minutes: nil)) past \(TokenDisplay.percent(percent))"
+        // A request lights nothing — form carries the state and colour carries the budget — so
+        // nothing asks this of a request today. It answers all the same, and truthfully: the
+        // alternative is a stand-in sentence waiting for the first reading that does ask.
+        case .attention:
+            "\(self.service(service)) is waiting on you"
         }
     }
 
@@ -99,12 +104,18 @@ public enum Wording {
 
     /// How a reading is followed up in the CLI. Said at the end of a notification and under the
     /// same reading in the panel — from here in both cases, so the two cannot drift apart.
-    public static func command(for kind: BudgetAlert.Kind, service: AgentService) -> String {
+    ///
+    /// `nil` for a request to the person: there is no command that answers a question. The
+    /// session is already on screen somewhere waiting for them, and a slash command at the end
+    /// of that notification would send them to look at a number instead of answering.
+    public static func command(for kind: BudgetAlert.Kind, service: AgentService) -> String? {
         switch kind {
         case .limitUsage:
             limitsCommand(service)
         case .windowFill:
             contextCommand(service)
+        case .attention:
+            nil
         }
     }
 

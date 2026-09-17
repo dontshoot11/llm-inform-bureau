@@ -119,7 +119,8 @@ public struct ClaudeTranscriptStore: Sendable {
                         fromWorkingDirectory: home(of: file) ?? reading.workingDirectory
                     ),
                     lastActivityAt: file.modified,
-                    replyWait: activity.replyWait(since: reading.awaitingSince, now: now)
+                    replyWait: activity.replyWait(since: reading.awaitingSince, now: now),
+                    request: reading.request
                 )
                 snapshots.append(session)
                 snapshots.append(
@@ -217,6 +218,11 @@ public struct ClaudeTranscriptStore: Sendable {
         /// owed. A moment rather than a flag: how long a wait has been silent is what decides
         /// whether it is still a wait, and that threshold belongs to the rule and not here.
         let awaitingSince: Date?
+        /// What the agent asked the person in the entry that owes an answer, or `nil` when
+        /// the entry owing one is an ordinary tool call. Read here and judged nowhere: what
+        /// the transcript cannot say is whether the agent is *waiting* on that answer — see
+        /// `requested`.
+        let request: String?
         let workingDirectory: String?
         /// The model on the last answer. A session's is what its agents inherit from; an
         /// agent's is what tells the inheritance to stop.
@@ -268,6 +274,7 @@ public struct ClaudeTranscriptStore: Sendable {
                     contextTokens: held,
                     turnGrowthTokens: growth,
                     awaitingSince: Self.awaitingSince(entries, role: role, writtenBy: file.modified),
+                    request: role == .session ? Self.requested(entries) : nil,
                     workingDirectory: lastAnswer.workingDirectory,
                     model: lastAnswer.model
                 )
@@ -391,6 +398,26 @@ public struct ClaudeTranscriptStore: Sendable {
         return last.writtenAt ?? modified
     }
 
+    /// What the agent is asking the person for, as the last entry of the conversation words
+    /// it — or `nil` when the last entry asks them nothing.
+    ///
+    /// One tool and one field: a `tool_use` block named `AskUserQuestion`, and the first of the
+    /// `questions` it carries. Measured over 395 transcripts on this machine: 217 entries call
+    /// it, and not one of them carries two tool calls in the same entry, so "the last entry has
+    /// such a block" and "the last entry is the request" are the same statement on this data.
+    ///
+    /// **The name of the tool is the whole of the rule, and it is the vendor's to change.** A
+    /// renamed tool costs the wording of a notification and nothing else: this goes back to
+    /// `nil`, the notification says which project is waiting without saying what about, and
+    /// every other reading of the session is untouched. Nothing here decides *whether* the
+    /// person is being waited on — that is the session record's answer (`ClaudeSessionRecord`),
+    /// and a transcript cannot tell a question from a tool that is merely slow.
+    /// A session's own entries and never a subagent's: an agent asks the person nothing — see
+    /// `UsageReader.withAsking` — so reading one would be answering a question nobody asks.
+    private static func requested(_ entries: [TranscriptLine]) -> String? {
+        entries.last(where: { $0.isTurnEntry(sidechain: false) })?.questionAsked
+    }
+
     /// Growth over the turn in progress, or `nil` when its beginning is not in what was read.
     private static func growth(to held: Int, in entries: [TranscriptLine]) -> Int? {
         guard let promptIndex = entries.lastIndex(where: { $0.isMainSessionPrompt }) else { return nil }
@@ -471,6 +498,29 @@ private struct TranscriptLine {
         default:
             return false
         }
+    }
+
+    /// The question this entry puts to the person, or `nil` when it puts none.
+    ///
+    /// The whole of the input is written into the block — every question, its short header and
+    /// the options offered — and only the first question is taken: a notification has room for
+    /// one line, and the rest is in the terminal the person is being sent back to anyway.
+    var questionAsked: String? {
+        guard
+            json?["type"] as? String == "assistant",
+            let blocks = (json?["message"] as? [String: Any])?["content"] as? [[String: Any]]
+        else { return nil }
+        for block in blocks
+        where block["type"] as? String == "tool_use" && block["name"] as? String == "AskUserQuestion" {
+            guard
+                let input = block["input"] as? [String: Any],
+                let questions = input["questions"] as? [[String: Any]],
+                let asked = questions.first?["question"] as? String,
+                !asked.isEmpty
+            else { continue }
+            return asked
+        }
+        return nil
     }
 
     /// The moment this entry was written, as it says itself. Housekeeping lines carry no

@@ -88,7 +88,12 @@ public struct BudgetRules: Sendable {
             .max()
     }
 
-    public func assess(_ snapshot: SessionSnapshot) -> ContextAssessment {
+    /// What the rules make of one session.
+    ///
+    /// `now` is a parameter for the same reason the limits assessment takes one: the one thing
+    /// here that is not a share of a window is how long the agent has been waiting on the
+    /// person, and a rule that read the clock itself could not be tested against a moment.
+    public func assess(_ snapshot: SessionSnapshot, now: Date = Date()) -> ContextAssessment {
         var alerts: [BudgetAlert] = []
         var level = BudgetLevel.normal
         var levelSource: BudgetAlert.Kind?
@@ -114,6 +119,26 @@ public struct BudgetRules: Sendable {
                     )
                 )
             }
+        }
+
+        // Not a mark and not a level: a request says nothing about how full anything is, so
+        // it colours no light. It is the one alert the app makes about a session standing
+        // still rather than about a number, and the delay is the whole of the rule — under it
+        // the alert is never made at all, which is what leaves a question answered at the
+        // keyboard unannounced without anything having to take it back.
+        if let since = snapshot.replyWait.askingSince,
+           now.timeIntervalSince(since) > config.attentionNotice.seconds {
+            alerts.append(
+                BudgetAlert(
+                    kind: .attention,
+                    service: snapshot.service,
+                    request: BudgetAlert.Request(
+                        since: since,
+                        project: snapshot.project,
+                        about: snapshot.request
+                    )
+                )
+            )
         }
 
         return ContextAssessment(

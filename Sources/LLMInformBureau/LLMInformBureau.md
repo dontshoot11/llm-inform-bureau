@@ -99,7 +99,7 @@ looks in the bar exactly like one hard at work — the same blinking light, and 
 for the opposite situation. So its light is drawn as a pause sign instead: two upright bars, the
 shape everybody already reads as *stopped, and it is your move*. It appears the moment the
 request does and goes in the pass that reads the answer; the bar then answers "who are we
-waiting on" without the panel and without a notification. Which sessions those are comes from a
+waiting on" without the panel and before any notification. Which sessions those are comes from a
 file Claude Code keeps per running process (`AgentFiles.md`), and a session it says nothing
 about behaves exactly as it did before that file was read.
 
@@ -268,7 +268,10 @@ first, because one turn writes to several files.
 Underneath it a 30-second heartbeat refreshes anyway. It is not a second way of noticing
 changes: it is for everything that changes with nothing being written — the age of every
 reading, the time until a window resets, a session going quiet long enough to fall off the
-list.
+list, and a question that has now gone unanswered long enough to be worth saying out loud.
+Nothing is written while somebody is away from the keyboard, so that last one is the heartbeat's
+alone, and it is what puts the notification up to half a minute past the mark rather than on
+it. Half a minute into a wait that has already run for minutes is not worth a timer of its own.
 
 Reading happens off the main actor and the published values are replaced only once a reading is
 complete, so the panel shows the previous numbers rather than a blank while the next ones are
@@ -291,6 +294,13 @@ A mark crossed while the app is watching is said once, silently, and the last li
 notification is the CLI command that shows the rest. What is worth saying is
 `AlertDispatch`'s decision (in `SessionHealthCore`), the words are `Phrasing`'s, and `Notifier`
 is only the delivery.
+
+The other thing worth interrupting somebody for is an agent standing still waiting on them, and
+it is the one notification that waits before it arrives: `sessions.attention_notice_after_minutes`
+after the request, so a question answered without leaving the terminal is never announced at
+all. Nothing about the sign in the bar waits — that appears with the request — and one wait is
+announced once however long it stands, with the next request in the same session announced
+again. The rule and the delay are `SessionHealthCore`'s, the wording is in `Phrasing.md`.
 
 Two things about the delivery are worth knowing:
 
