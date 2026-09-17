@@ -39,6 +39,64 @@ public struct ClaudeStatusPayload: Equatable, Sendable {
     }
 }
 
+/// Everything one walk of the payload directory has to say.
+///
+/// The app asks the status line two questions — what the subscription limits are, and how big
+/// each session's context window is — and they are answered by the same files. They used to be
+/// asked one after the other, which meant walking the directory twice and parsing every payload
+/// in it twice on every pass. One walk answers both.
+public struct ClaudeStatusReading: Sendable {
+    /// The payloads that could be read, newest first.
+    public let payloads: [ClaudeStatusPayload]
+
+    /// Whether the walk found a file at all. What separates a status line that has not
+    /// reported yet from one whose report this app cannot read.
+    let foundFiles: Bool
+
+    /// Whether a file the walk did find would not parse.
+    let sawUnreadableFile: Bool
+
+    /// The freshest limits any session has reported.
+    ///
+    /// Age matters more than which session: every session of the same account reports the same
+    /// subscription windows, so the most recently written payload is simply the most current.
+    public var limits: LimitsReading {
+        guard foundFiles else { return .noData(ClaudeStatusStore.nothingReported) }
+        for payload in payloads {
+            if let limits = payload.limits { return .value(limits) }
+        }
+        if sawUnreadableFile { return .unavailable(ClaudeStatusStore.unreadablePayload) }
+        return .noData("""
+            Claude reported no limits: the rate_limits field is for Pro and Max subscriptions \
+            and arrives with the first answer of a session.
+            """)
+    }
+
+    /// The sessions the status line has seen that are still being worked on.
+    ///
+    /// Only sessions whose context the payload actually carried: a payload written before the
+    /// first answer has no numbers in it, and a session with no numbers is nothing to show.
+    public func sessions(activity: SessionActivity, now: Date = Date()) -> SessionsReading {
+        guard foundFiles else { return .noData(ClaudeStatusStore.nothingReported) }
+
+        let snapshots = payloads.compactMap { payload -> SessionSnapshot? in
+            guard let tokens = payload.contextTokens else { return nil }
+            return SessionSnapshot(
+                sessionID: payload.sessionID,
+                service: .claude,
+                contextTokens: tokens,
+                contextWindowTokens: payload.contextWindowTokens,
+                project: payload.project,
+                lastActivityAt: payload.writtenAt
+            )
+        }
+        if snapshots.isEmpty, sawUnreadableFile {
+            return .unavailable(ClaudeStatusStore.unreadablePayload)
+        }
+        return .value(activity.active(snapshots, now: now))
+    }
+}
+
 /// Reads what the status line command leaves on disk.
 ///
 /// Claude Code runs a status line command on every new assistant message and hands it a JSON
@@ -50,7 +108,7 @@ public struct ClaudeStatusPayload: Equatable, Sendable {
 /// Usage:
 /// ```swift
 /// let store = ClaudeStatusStore()
-/// switch store.latestLimits() {
+/// switch store.read().limits {
 /// case .value(let snapshot): show(snapshot)
 /// case .noData(let why), .unavailable(let why): show(why)
 /// }
@@ -87,74 +145,47 @@ public struct ClaudeStatusStore: Sendable {
     /// How many session payloads to read. More than a person has sessions open at once.
     public let filesToScan: Int
 
+    /// What each payload said last time it was read. The status line rewrites a session's
+    /// payload on every answer, so between answers every pass used to parse the same JSON
+    /// again — see `FileMemory` for what a hit is allowed to mean and what bounds the memory.
+    ///
+    /// A file that would not parse is remembered as such. Otherwise the one payload this app
+    /// cannot read would be the one file it opens on every pass, for the same disappointment.
+    private let readings = FileMemory<ClaudeStatusPayload?>()
+
+    /// Kept for the life of the app rather than made per pass: what the memory above is worth
+    /// depends on outliving a pass. `directory` is the tests' way in, and the measuring rig's.
     public init(directory: URL = ClaudeStatusStore.defaultDirectory, filesToScan: Int = 20) {
         self.directory = directory
         self.filesToScan = filesToScan
     }
 
-    /// The freshest limits any session has reported.
-    ///
-    /// Age matters more than which session: every session of the same account reports the same
-    /// subscription windows, so the most recently written payload is simply the most current.
-    public func latestLimits() -> LimitsReading {
-        let files = newestFiles()
-        guard !files.isEmpty else { return .noData(Self.nothingReported) }
+    /// One walk of the directory, and everything that walk can answer.
+    public func read() -> ClaudeStatusReading {
+        // The end of a pass is what bounds the memory: whatever was not asked about is not in
+        // the walk any more.
+        defer { readings.forgetUnasked() }
 
-        var unreadable = false
-        for file in files {
-            guard let payload = payload(at: file) else {
-                unreadable = true
-                continue
-            }
-            if let limits = payload.limits { return .value(limits) }
-        }
-        if unreadable {
-            return .unavailable(Self.unreadablePayload)
-        }
-        return .noData("""
-            Claude reported no limits: the rate_limits field is for Pro and Max subscriptions \
-            and arrives with the first answer of a session.
-            """)
+        let files = newestFiles()
+        let payloads = files.map { payload(at: $0) }
+        return ClaudeStatusReading(
+            payloads: payloads.compactMap { $0 },
+            foundFiles: !files.isEmpty,
+            sawUnreadableFile: payloads.contains { $0 == nil }
+        )
     }
 
-    /// The sessions the status line has seen that are still being worked on.
-    ///
-    /// Only sessions whose context the payload actually carried: a payload written before the
-    /// first answer has no numbers in it, and a session with no numbers is nothing to show.
-    public func sessions(activity: SessionActivity, now: Date = Date()) -> SessionsReading {
-        let files = newestFiles()
-        guard !files.isEmpty else { return .noData(Self.nothingReported) }
+    /// The freshest limits any session has reported.
+    public func latestLimits() -> LimitsReading { read().limits }
 
-        var snapshots: [SessionSnapshot] = []
-        var unreadable = false
-        for file in files {
-            guard let payload = payload(at: file) else {
-                unreadable = true
-                continue
-            }
-            guard let tokens = payload.contextTokens else { continue }
-            snapshots.append(
-                SessionSnapshot(
-                    sessionID: payload.sessionID,
-                    service: .claude,
-                    contextTokens: tokens,
-                    contextWindowTokens: payload.contextWindowTokens,
-                    project: payload.project,
-                    lastActivityAt: payload.writtenAt
-                )
-            )
-        }
-        if snapshots.isEmpty, unreadable {
-            return .unavailable(Self.unreadablePayload)
-        }
-        return .value(activity.active(snapshots, now: now))
+    /// The sessions the status line has seen that are still being worked on.
+    public func sessions(activity: SessionActivity, now: Date = Date()) -> SessionsReading {
+        read().sessions(activity: activity, now: now)
     }
 
     /// Every payload on disk, newest first — how a transcript session learns the size of its
     /// context window, which the transcript itself never says.
-    public func payloads() -> [ClaudeStatusPayload] {
-        newestFiles().compactMap { payload(at: $0) }
-    }
+    public func payloads() -> [ClaudeStatusPayload] { read().payloads }
 
     // MARK: Files
 
@@ -163,6 +194,16 @@ public struct ClaudeStatusStore: Sendable {
     }
 
     private func payload(at file: SessionFiles.Found) -> ClaudeStatusPayload? {
+        if let remembered = readings.value(of: file.url, unchangedSince: file.stamp) {
+            return remembered
+        }
+        let payload = parse(file)
+        readings.remember(payload, of: file.url, as: file.stamp)
+        return payload
+    }
+
+    /// What the file itself says, with nothing remembered.
+    private func parse(_ file: SessionFiles.Found) -> ClaudeStatusPayload? {
         guard
             let data = try? Data(contentsOf: file.url),
             let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]

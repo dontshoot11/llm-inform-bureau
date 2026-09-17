@@ -1,6 +1,7 @@
 import Foundation
 
-/// Transcript lines as Claude Code writes them, trimmed to the fields this app reads.
+/// What Claude Code writes: the lines of a transcript and the payload of the status line,
+/// both trimmed to the fields this app reads.
 ///
 /// Shared by the session tests and the subagent tests on purpose: a subagent's file holds the
 /// same lines as a session's, differing only in `isSidechain` and in where it lies on disk. Two
@@ -193,5 +194,50 @@ private func write(_ lines: [String], to url: URL, modified: Date?, _ suite: Tes
         }
     } catch {
         suite.expect(false, "could not write \(url.lastPathComponent): \(error)")
+    }
+}
+
+// MARK: What the status line leaves behind
+
+/// A statusLine payload, trimmed to the fields this app reads.
+func payload(
+    session: String,
+    fiveHour: Double?,
+    sevenDay: Double?,
+    contextTokens: Int? = 15_500,
+    windowSize: Int? = 200_000
+) -> String {
+    var parts: [String] = [
+        "\"session_id\": \"\(session)\"",
+        "\"cwd\": \"/Users/nobody/petProjects/llm-inform-bureau\"",
+        "\"model\": {\"id\": \"claude-opus-5\", \"display_name\": \"Opus\"}"
+    ]
+    var context: [String] = []
+    if let contextTokens { context.append("\"total_input_tokens\": \(contextTokens)") }
+    if let windowSize { context.append("\"context_window_size\": \(windowSize)") }
+    parts.append("\"context_window\": {\(context.joined(separator: ", "))}")
+    if let fiveHour, let sevenDay {
+        parts.append("""
+            "rate_limits": {\
+            "five_hour": {"used_percentage": \(fiveHour), "resets_at": 1738425600}, \
+            "seven_day": {"used_percentage": \(sevenDay), "resets_at": 1738857600}}
+            """)
+    }
+    return "{\(parts.joined(separator: ", "))}"
+}
+
+func writeStatus(
+    _ contents: String,
+    to directory: URL,
+    named name: String,
+    modified: Date,
+    _ suite: TestSuite
+) {
+    let url = directory.appendingPathComponent(name)
+    do {
+        try Data(contents.utf8).write(to: url)
+        try FileManager.default.setAttributes([.modificationDate: modified], ofItemAtPath: url.path)
+    } catch {
+        suite.expect(false, "could not write \(name): \(error)")
     }
 }

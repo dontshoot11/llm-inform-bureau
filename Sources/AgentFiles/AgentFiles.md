@@ -277,7 +277,9 @@ to re-read every active file from the beginning whichever one had moved. Measure
 six sessions: one pass cost 1.2–1.4 s of CPU, and a working agent held the app at a third of a
 core with nothing on screen changing. Measured again on twenty real transcripts: a pass that
 finds nothing changed now costs 0.005 s against 1.27 s, and a pass where one file grew costs
-0.08 s — the price of what moved, which is the whole point.
+0.08 s — the price of what moved, which is the whole point. The rule is the same for all three
+sources: the transcripts are the expensive one, but an event that moved no file has no business
+opening one anywhere.
 
 **A file is the same file when its identifier, its size and its modification date all are.**
 The date carries nanoseconds on APFS (`1787242588.223001172`), so appending always moves it;
@@ -297,6 +299,11 @@ answer. It is kept until the file is not that file any more. A head with no `cwd
 not remembered at all: a transcript one line long would otherwise keep its fallback name for
 as long as it lives.
 
+**What is remembered is what the file said, never what time it was.** A session that has been
+waiting three minutes has been waiting four a minute later, with the file standing still — so
+what a reader keeps is the moment the wait began, and the rule is applied to it afresh on every
+pass. Nothing with a clock in it is ever stored.
+
 **Nothing bounds it but the walk.** Entries are made only for files a walk found, and the walk
 is bounded — the newest `filesToScan`, plus the subagents of each active session. At the end of
 a pass, everything that pass did not ask about is dropped, so a session that ended or fell off
@@ -312,6 +319,28 @@ answers the whole of it.
 
 The reader has to outlive a pass for any of this to be worth anything, which is why `UsageModel`
 owns one `UsageReader` for the life of the app instead of making one per refresh.
+
+**One walk of each tree per pass, not two.** Two of the three sources are asked two questions
+every pass — the status line for the limits and for the window sizes, Codex for the limits and
+for the sessions — and each used to answer them one at a time: two walks of the same directory,
+and every file in it parsed twice. `ClaudeStatusStore.read()` and
+`CodexRolloutStore.read(activity:now:)` answer both out of one walk, and those are what
+`UsageReader` calls. The older single-question methods still stand, because a caller that wants
+only the limits should not have to say what time it is.
+
+What each source keeps between passes:
+
+| Source | Remembers | Keyed by |
+| --- | --- | --- |
+| Claude transcripts | what the tail said about the session | identifier, size, date |
+| | the directory the session started in | identifier |
+| the status line | the payload as parsed, *including* one that would not parse | identifier, size, date |
+| Codex rollouts | what the tail said about the limits | identifier, size, date |
+| | what the tail said about the session | identifier, size, date |
+| | the session id and directory in the head | identifier |
+
+A payload that would not parse is remembered as such on purpose: otherwise the one file this
+app cannot read would be the one file it opens on every pass, for the same disappointment.
 
 ## Noticing that something changed
 

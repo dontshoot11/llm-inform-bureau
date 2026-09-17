@@ -64,20 +64,27 @@ public struct UsageReader: Sendable {
         self.codexRollouts = codexRollouts
     }
 
+    /// One pass: one walk of each of the three trees, and nothing opened that has not changed.
+    ///
+    /// Each source answers everything it is asked in a single call, because each of them is
+    /// asked about twice — Claude for its limits and its window sizes, Codex for its limits and
+    /// its sessions — and asking separately meant walking the same tree twice and parsing the
+    /// same files twice, on every one of the dozens of events a single turn produces.
     public func read(config: ThresholdConfig, now: Date = Date()) -> UsageReading {
         let activity = SessionActivity(config: config)
         let transcripts = claudeTranscripts.activeSessions(activity: activity, now: now)
-        let payloads = claudeStatus.payloads()
+        let status = claudeStatus.read()
+        let codex = codexRollouts.read(activity: activity, now: now)
 
         var installed: Set<AgentService> = []
         if exists(claudeTranscripts.projectsDirectory) { installed.insert(.claude) }
         if exists(codexRollouts.sessionsDirectory) { installed.insert(.codex) }
 
         return UsageReading(
-            claudeLimits: claudeStatus.latestLimits(),
-            codexLimits: codexRollouts.latestLimits(),
-            claudeSessions: Self.withWindowSizes(transcripts, from: payloads),
-            codexSessions: codexRollouts.activeSessions(activity: activity, now: now),
+            claudeLimits: status.limits,
+            codexLimits: codex.limits,
+            claudeSessions: Self.withWindowSizes(transcripts, from: status.payloads),
+            codexSessions: codex.sessions,
             installed: installed
         )
     }

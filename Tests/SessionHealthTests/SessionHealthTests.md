@@ -38,6 +38,7 @@ the cases are plain functions and would port to swift-testing mechanically.
 | `ClaudeStatusTests` | Reading the payloads the status line command leaves, and the join between the two Claude sources |
 | `ClaudeTranscriptTests` | Reading a session out of a transcript: tokens held, turn growth, sidechains, `/clear` |
 | `TranscriptMemoryTests` | What the reader remembers between passes: a file whose stamp has not moved is not opened again — checked by taking its permissions away rather than by counting — and one that grew, got shorter or had its date moved is read afresh |
+| `SourceMemoryTests` | The same question for the other two sources and for a whole pass: a payload and a rollout that have not moved are not read again, one walk of a tree answers everything asked of it, and an event that changed no file at all opens none |
 | `WaitingStateTests` | Whether a session is waiting on its agent: the four moments of a turn, the housekeeping written after an answer, and a response arriving as several entries |
 | `CodexRolloutTests` | Reading limits and sessions out of rollout fixtures, including the shapes that mean "no data" and "source changed" |
 | `SetupTests` | Which sources read as connected, what the first run says about the ones that do not, and showing that explanation once |
@@ -65,16 +66,17 @@ config, because a test that repeats the numbers keeps passing after someone edit
 and catching exactly that is why the thresholds live in a file. There is no exception now:
 all four marks are config entries.
 
-**Fixtures are trimmed copies of real lines.** The rollout fixtures in `CodexRolloutTests`
-reproduce shapes found in `~/.codex/sessions` — including the limit pool whose windows are
-both null — rather than shapes that would be convenient to parse. The same holds for the
-transcript fixtures (sidechain lines, `tool_result` user lines) and for the statusLine
-payloads, which follow the documented contract field for field.
+**Fixtures are trimmed copies of real lines.** The rollout fixtures reproduce shapes found in
+`~/.codex/sessions` — including the limit pool whose windows are both null — rather than shapes
+that would be convenient to parse. The same holds for the transcript fixtures (sidechain lines,
+`tool_result` user lines) and for the statusLine payloads, which follow the documented contract
+field for field.
 
-The transcript fixtures are in `ClaudeFixtures.swift`, shared by the session cases and the
-subagent ones. Deliberately one copy: a subagent's file holds the same lines as a session's,
-and two sets of builders would let the two halves of one reader be tested against two
-different ideas of what a transcript looks like.
+They live in two files: `ClaudeFixtures.swift` for what Claude Code writes — transcript lines
+and status line payloads — and `CodexFixtures.swift` for what Codex writes. Deliberately one
+copy of each: a subagent's file holds the same lines as a session's, the limits and the session
+of a rollout are read out of the same file, and a second set of builders would let the halves of
+one reader be tested against two different ideas of what its files look like.
 
 **A case that waits for something waits for the real thing.** The watcher cases block on a
 semaphore with a generous timeout instead of sleeping for a fixed while: a loaded machine does

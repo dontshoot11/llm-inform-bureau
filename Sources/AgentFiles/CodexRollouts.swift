@@ -1,6 +1,16 @@
 import Foundation
 import SessionHealthCore
 
+/// Everything one walk of the rollout tree has to say.
+///
+/// Both questions the app asks of Codex — the subscription limits and the sessions being
+/// worked on — are answered by the same files, and used to be asked one after the other: two
+/// walks of the tree per pass, and the newest rollout read twice.
+public struct CodexRolloutReading: Sendable {
+    public let limits: LimitsReading
+    public let sessions: SessionsReading
+}
+
 /// Reads the Codex subscription limits out of `~/.codex/sessions`.
 ///
 /// Codex writes its rollout as it goes, and every API response appends a `token_count` event
@@ -37,25 +47,71 @@ public struct CodexRolloutStore: Sendable {
     /// abandoned before its first API response.
     public let filesToScan: Int
 
+    /// What the end of each rollout last said about the limits — see `FileMemory` for what a
+    /// hit is allowed to mean and what bounds the memory. A rollout is appended to all through
+    /// a turn, so between turns this is the same half-megabyte tail scanned for the same
+    /// answer.
+    private let limitsReadings = FileMemory<LimitsInFile>()
+
+    /// What the end of each rollout last said about its session.
+    private let sessionReadings = FileMemory<SourceReading<Reading>>()
+
+    /// What the head of each rollout says the session is, remembered by file identity alone:
+    /// `session_meta` is the first line written and appending cannot move it. Worth its own
+    /// memory because that line carries the whole system prompt — half a megabyte read and
+    /// parsed, on every pass, for an answer that never changes.
+    private let metas = FileMemory<RolloutMeta>()
+
+    /// Kept for the life of the app rather than made per pass: what the memories above are
+    /// worth depends on outliving a pass. `sessionsDirectory` is the tests' way in, and the
+    /// measuring rig's.
     public init(sessionsDirectory: URL = CodexRolloutStore.defaultSessionsDirectory, filesToScan: Int = 5) {
         self.sessionsDirectory = sessionsDirectory
         self.filesToScan = filesToScan
     }
 
+    /// One walk of the tree, and everything that walk can answer.
+    ///
+    /// The walk is the sessions half's: it wants every rollout that might still be running,
+    /// where the limits half only needs the newest few, and the newest few are the beginning of
+    /// the same list.
+    public func read(activity: SessionActivity, now: Date = Date()) -> CodexRolloutReading {
+        let rollouts = newestRollouts(limit: rolloutsToWalk)
+        return CodexRolloutReading(
+            limits: limits(in: Array(rollouts.prefix(filesToScan))),
+            sessions: sessions(in: rollouts, activity: activity, now: now)
+        )
+    }
+
     public func latestLimits() -> LimitsReading {
-        let rollouts = newestRollouts(limit: filesToScan)
+        limits(in: newestRollouts(limit: filesToScan))
+    }
+
+    /// How many rollouts one walk looks at.
+    private var rolloutsToWalk: Int { max(filesToScan, 20) }
+
+    // MARK: The limits, across the newest files
+
+    private func limits(in rollouts: [SessionFiles.Found]) -> LimitsReading {
+        // Every exit from here ends this half of a pass, and the end of a pass is what bounds
+        // the memory: whatever was not asked about is not in the walk any more.
+        defer { limitsReadings.forgetUnasked() }
+
         guard !rollouts.isEmpty else {
             return .noData("No Codex sessions yet — one appears the first time Codex answers.")
         }
 
+        // A file is only reached once the ones newer than it had nothing to say, which is why
+        // the unreadable ones are counted as they are passed rather than looked for afterwards.
+        var sawUnreadableLine = false
         for rollout in rollouts {
-            if let snapshot = limits(in: rollout.url, modified: rollout.modified) {
-                return .value(snapshot)
-            }
+            let reading = limits(of: rollout)
+            if let snapshot = reading.snapshot { return .value(snapshot) }
+            sawUnreadableLine = sawUnreadableLine || reading.sawUnreadableLine
         }
         // Asked only once nothing could be read at all: a broken line in a file that still
         // answered is not a broken source.
-        if rollouts.contains(where: { hasUnreadableLine($0.url) }) {
+        if sawUnreadableLine {
             return .unavailable("Codex rollouts no longer look the way this app reads them.")
         }
         return .noData("Codex has not reported any limits yet — they arrive with its next answer.")
@@ -63,28 +119,43 @@ public struct CodexRolloutStore: Sendable {
 
     // MARK: One file
 
-    /// The last usable limits reading in one rollout, read from its end.
-    private func limits(in url: URL, modified: Date) -> LimitsSnapshot? {
-        let size = FileTail.size(of: url)
-        for (index, tail) in Self.tailSizes.enumerated() {
-            // Widening past the size of the file would only re-read the same lines.
-            if index > 0, size <= UInt64(Self.tailSizes[index - 1]) { break }
-            guard let lines = FileTail.lines(of: url, maxBytes: tail) else { return nil }
-            for line in lines.reversed() where line.contains("\"rate_limits\"") {
-                if let snapshot = Self.snapshot(fromLine: line, fileModified: modified) { return snapshot }
-            }
-        }
-        return nil
+    /// What one rollout says about the limits.
+    fileprivate struct LimitsInFile: Equatable, Sendable {
+        /// The last usable limits reading in the file, or `nil` when it carries none.
+        let snapshot: LimitsSnapshot?
+
+        /// Whether a line claiming to carry limits is not JSON at all — the shape a changed
+        /// format takes on disk. A line that parses and describes another limit pool is not
+        /// that, which is why the two are told apart here.
+        let sawUnreadableLine: Bool
     }
 
-    /// Whether the file ends in lines that mention limits and are not JSON at all — the shape
-    /// a changed format takes on disk.
-    private func hasUnreadableLine(_ url: URL) -> Bool {
-        guard let lines = FileTail.lines(of: url, maxBytes: Self.tailSizes[0]) else { return false }
-        return lines.contains { line in
-            line.contains("\"rate_limits\"")
-                && (try? JSONSerialization.jsonObject(with: Data(line.utf8))) == nil
+    private func limits(of rollout: SessionFiles.Found) -> LimitsInFile {
+        if let remembered = limitsReadings.value(of: rollout.url, unchangedSince: rollout.stamp) {
+            return remembered
         }
+        let reading = parseLimits(rollout)
+        limitsReadings.remember(reading, of: rollout.url, as: rollout.stamp)
+        return reading
+    }
+
+    /// The last usable limits reading in one rollout, read from its end.
+    private func parseLimits(_ rollout: SessionFiles.Found) -> LimitsInFile {
+        var sawUnreadableLine = false
+        for (index, tail) in Self.tailSizes.enumerated() {
+            // Widening past the size of the file would only re-read the same lines.
+            if index > 0, rollout.stamp.size <= Self.tailSizes[index - 1] { break }
+            guard let lines = FileTail.lines(of: rollout.url, maxBytes: tail) else { break }
+            for line in lines.reversed() where line.contains("\"rate_limits\"") {
+                if let snapshot = Self.snapshot(fromLine: line, fileModified: rollout.modified) {
+                    return LimitsInFile(snapshot: snapshot, sawUnreadableLine: sawUnreadableLine)
+                }
+                if index == 0, (try? JSONSerialization.jsonObject(with: Data(line.utf8))) == nil {
+                    sawUnreadableLine = true
+                }
+            }
+        }
+        return LimitsInFile(snapshot: nil, sawUnreadableLine: sawUnreadableLine)
     }
 
     // MARK: One line
@@ -136,6 +207,28 @@ extension CodexRolloutStore {
     /// carries the whole system prompt, so it runs to tens of kilobytes on its own.
     static let headSize = 512 * 1024
 
+    /// What one rollout said about its session, before it is anybody's snapshot.
+    ///
+    /// Nothing in here is measured against a clock: how long a session has been waiting moves
+    /// while the file stands still, so what is remembered is what the file said — a moment —
+    /// and the rule is applied to it afresh on every pass.
+    fileprivate struct Reading: Equatable, Sendable {
+        let contextTokens: Int
+        let contextWindowTokens: Int?
+        let turnGrowthTokens: Int?
+        /// The model the last turn opened on.
+        let model: String?
+        /// When the turn that still owes an answer was last written to, or `nil` when nothing
+        /// is owed.
+        let awaitingSince: Date?
+    }
+
+    /// What the head of a rollout says the session is.
+    fileprivate struct RolloutMeta: Equatable, Sendable {
+        let sessionID: String?
+        let workingDirectory: String?
+    }
+
     /// The Codex sessions being worked on right now, with their context budget.
     ///
     /// Codex is the easier half of the two: the `token_count` event carries both the tokens
@@ -151,7 +244,20 @@ extension CodexRolloutStore {
     /// }
     /// ```
     public func activeSessions(activity: SessionActivity, now: Date = Date()) -> SessionsReading {
-        let rollouts = newestRollouts(limit: max(filesToScan, 20))
+        sessions(in: newestRollouts(limit: rolloutsToWalk), activity: activity, now: now)
+    }
+
+    private func sessions(
+        in rollouts: [SessionFiles.Found],
+        activity: SessionActivity,
+        now: Date
+    ) -> SessionsReading {
+        // Every exit from here ends this half of a pass; see `limits(in:)` for what that does.
+        defer {
+            sessionReadings.forgetUnasked()
+            metas.forgetUnasked()
+        }
+
         guard !rollouts.isEmpty else {
             return .noData("No Codex sessions yet — one appears the first time Codex answers.")
         }
@@ -164,8 +270,9 @@ extension CodexRolloutStore {
         var snapshots: [SessionSnapshot] = []
         var unreadable = false
         for rollout in active {
-            switch session(in: rollout, activity: activity, now: now) {
-            case .value(let snapshot): snapshots.append(snapshot)
+            switch read(rollout) {
+            case .value(let reading):
+                snapshots.append(snapshot(of: rollout, reading: reading, activity: activity, now: now))
             case .noData: continue
             case .unavailable: unreadable = true
             }
@@ -176,11 +283,38 @@ extension CodexRolloutStore {
         return .value(activity.active(snapshots, now: now))
     }
 
-    private func session(
-        in rollout: SessionFiles.Found,
+    /// What the panel shows for one rollout: what the file said, told what time it is.
+    private func snapshot(
+        of rollout: SessionFiles.Found,
+        reading: Reading,
         activity: SessionActivity,
         now: Date
-    ) -> SourceReading<SessionSnapshot> {
+    ) -> SessionSnapshot {
+        let meta = meta(of: rollout)
+        return SessionSnapshot(
+            sessionID: meta?.sessionID ?? rollout.url.deletingPathExtension().lastPathComponent,
+            service: .codex,
+            contextTokens: reading.contextTokens,
+            contextWindowTokens: reading.contextWindowTokens,
+            turnGrowthTokens: reading.turnGrowthTokens,
+            model: reading.model,
+            project: SessionFiles.projectName(fromWorkingDirectory: meta?.workingDirectory),
+            lastActivityAt: rollout.modified,
+            replyWait: activity.replyWait(since: reading.awaitingSince, now: now)
+        )
+    }
+
+    private func read(_ rollout: SessionFiles.Found) -> SourceReading<Reading> {
+        if let remembered = sessionReadings.value(of: rollout.url, unchangedSince: rollout.stamp) {
+            return remembered
+        }
+        let reading = parse(rollout)
+        sessionReadings.remember(reading, of: rollout.url, as: rollout.stamp)
+        return reading
+    }
+
+    /// What the file itself says, with nothing remembered.
+    private func parse(_ rollout: SessionFiles.Found) -> SourceReading<Reading> {
         guard let lines = FileTail.lines(of: rollout.url, maxBytes: Self.tailSizes[0]) else {
             return .noData("unreadable file")
         }
@@ -198,21 +332,14 @@ extension CodexRolloutStore {
             .map { max(0, held - $0) }
 
         return .value(
-            SessionSnapshot(
-                sessionID: meta(of: rollout.url)?.sessionID ?? rollout.url.deletingPathExtension().lastPathComponent,
-                service: .codex,
+            Reading(
                 contextTokens: held,
                 contextWindowTokens: last.element.contextWindow,
                 turnGrowthTokens: growth,
                 // The last turn's, not the session's: Codex lets the model be changed mid
                 // session, and every turn says which one it opened on.
                 model: events.last { $0.isTurnContext }?.model,
-                project: SessionFiles.projectName(fromWorkingDirectory: meta(of: rollout.url)?.workingDirectory),
-                lastActivityAt: rollout.modified,
-                replyWait: activity.replyWait(
-                    since: Self.awaitingSince(events, writtenBy: rollout.modified),
-                    now: now
-                )
+                awaitingSince: Self.awaitingSince(events, writtenBy: rollout.modified)
             )
         )
     }
@@ -256,15 +383,30 @@ extension CodexRolloutStore {
         return events.last?.writtenAt ?? modified
     }
 
-    /// What the head of the rollout says the session is.
-    private func meta(of url: URL) -> (sessionID: String?, workingDirectory: String?)? {
+    /// What the head of the rollout says the session is, read once per file rather than once
+    /// per pass — see `metas`.
+    private func meta(of rollout: SessionFiles.Found) -> RolloutMeta? {
+        if let remembered = metas.value(of: rollout.url, stillTheSameFileAs: rollout.stamp) {
+            return remembered
+        }
+        guard let meta = Self.sessionMeta(in: rollout.url) else { return nil }
+        // Only an answer is remembered. A rollout whose head has no `session_meta` in it yet
+        // would otherwise be remembered as having none for as long as it lives.
+        metas.remember(meta, of: rollout.url, as: rollout.stamp)
+        return meta
+    }
+
+    private static func sessionMeta(in url: URL) -> RolloutMeta? {
         guard let lines = FileTail.headLines(of: url, maxBytes: Self.headSize) else { return nil }
         for line in lines where line.contains("session_meta") {
             guard
                 let root = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any],
                 let payload = root["payload"] as? [String: Any]
             else { continue }
-            return (payload["session_id"] as? String, payload["cwd"] as? String)
+            return RolloutMeta(
+                sessionID: payload["session_id"] as? String,
+                workingDirectory: payload["cwd"] as? String
+            )
         }
         return nil
     }

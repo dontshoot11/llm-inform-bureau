@@ -9,12 +9,8 @@ import SessionHealthCore
 /// nothing new to say is not opened, and a file that does have something new is read whichever
 /// way it changed.
 ///
-/// **How "not opened" is checked rather than assumed.** The file is left byte for byte as it
-/// was and its permissions are taken away, which moves neither its size, its modification date
-/// nor its identifier. A reader that opens it gets nothing; a reader that remembers it answers
-/// as before. Every such case is followed by the same file read through a reader with no
-/// memory, so that a run where the permissions did not bite — as root, say — fails instead of
-/// passing for the wrong reason.
+/// How "not opened" is checked rather than assumed — the permissions trick and the control that
+/// keeps it honest — is with `withoutPermissions`.
 func runTranscriptMemoryTests(_ suite: TestSuite, config: ThresholdConfig) {
     let activity = SessionActivity(config: config)
     let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -157,24 +153,4 @@ private func size(of url: URL, _ suite: TestSuite) -> Int {
         return -1
     }
     return size
-}
-
-/// Runs `body` with the file unopenable, and hands its permissions back afterwards.
-///
-/// Changing the mode touches neither the size, the modification date nor the identifier of the
-/// file — the three things the memory is keyed by — so a reader that remembers the file cannot
-/// tell the difference, and one that opens it comes back empty-handed.
-private func withoutPermissions(_ url: URL, _ suite: TestSuite, _ body: () -> Void) {
-    let manager = FileManager.default
-    let original = (try? manager.attributesOfItem(atPath: url.path)[.posixPermissions]) as? NSNumber
-    do {
-        try manager.setAttributes([.posixPermissions: 0o000], ofItemAtPath: url.path)
-    } catch {
-        suite.expect(false, "could not take the permissions off \(url.lastPathComponent): \(error)")
-        return
-    }
-    defer {
-        try? manager.setAttributes([.posixPermissions: original ?? 0o644], ofItemAtPath: url.path)
-    }
-    body()
 }

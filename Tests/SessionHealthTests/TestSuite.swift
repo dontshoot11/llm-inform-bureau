@@ -99,3 +99,47 @@ func makeDirectory(_ root: URL, _ name: String, _ suite: TestSuite) -> URL {
     }
     return directory
 }
+
+/// Runs `body` with these files unopenable, and hands their permissions back afterwards.
+///
+/// How "the reader did not open it" is checked rather than assumed. Changing the mode touches
+/// neither the size, the modification date nor the identifier of a file — the three things
+/// `FileMemory` is keyed by — so a reader that remembers the file cannot tell the difference,
+/// and one that opens it comes back empty-handed. Every such case is followed by the same
+/// files read through a reader with no memory, so that a run where the permissions did not
+/// bite — as root, say — fails instead of passing for the wrong reason.
+func withoutPermissions(_ urls: [URL], _ suite: TestSuite, _ body: () -> Void) {
+    let manager = FileManager.default
+    var restore: [URL: NSNumber] = [:]
+    for url in urls {
+        restore[url] = (try? manager.attributesOfItem(atPath: url.path)[.posixPermissions]) as? NSNumber
+        do {
+            try manager.setAttributes([.posixPermissions: 0o000], ofItemAtPath: url.path)
+        } catch {
+            suite.expect(false, "could not take the permissions off \(url.lastPathComponent): \(error)")
+        }
+    }
+    defer {
+        for url in urls {
+            try? manager.setAttributes(
+                [.posixPermissions: restore[url] ?? 0o644], ofItemAtPath: url.path
+            )
+        }
+    }
+    body()
+}
+
+func withoutPermissions(_ url: URL, _ suite: TestSuite, _ body: () -> Void) {
+    withoutPermissions([url], suite, body)
+}
+
+/// Every regular file under a directory, however deeply nested. What a pass is allowed to open.
+func everyFile(under directory: URL) -> [URL] {
+    guard let walker = FileManager.default.enumerator(
+        at: directory,
+        includingPropertiesForKeys: [.isRegularFileKey]
+    ) else { return [] }
+    return walker.compactMap { $0 as? URL }.filter {
+        (try? $0.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true
+    }
+}

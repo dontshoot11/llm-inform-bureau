@@ -146,51 +146,6 @@ func runClaudeStatusTests(_ suite: TestSuite, config: ThresholdConfig) {
     }
 }
 
-// MARK: Fixtures
-
-/// A statusLine payload, trimmed to the fields this app reads.
-private func payload(
-    session: String,
-    fiveHour: Double?,
-    sevenDay: Double?,
-    contextTokens: Int? = 15_500,
-    windowSize: Int? = 200_000
-) -> String {
-    var parts: [String] = [
-        "\"session_id\": \"\(session)\"",
-        "\"cwd\": \"/Users/nobody/petProjects/llm-inform-bureau\"",
-        "\"model\": {\"id\": \"claude-opus-5\", \"display_name\": \"Opus\"}"
-    ]
-    var context: [String] = []
-    if let contextTokens { context.append("\"total_input_tokens\": \(contextTokens)") }
-    if let windowSize { context.append("\"context_window_size\": \(windowSize)") }
-    parts.append("\"context_window\": {\(context.joined(separator: ", "))}")
-    if let fiveHour, let sevenDay {
-        parts.append("""
-            "rate_limits": {\
-            "five_hour": {"used_percentage": \(fiveHour), "resets_at": 1738425600}, \
-            "seven_day": {"used_percentage": \(sevenDay), "resets_at": 1738857600}}
-            """)
-    }
-    return "{\(parts.joined(separator: ", "))}"
-}
-
-private func writeStatus(
-    _ contents: String,
-    to directory: URL,
-    named name: String,
-    modified: Date,
-    _ suite: TestSuite
-) {
-    let url = directory.appendingPathComponent(name)
-    do {
-        try Data(contents.utf8).write(to: url)
-        try FileManager.default.setAttributes([.modificationDate: modified], ofItemAtPath: url.path)
-    } catch {
-        suite.expect(false, "could not write \(name): \(error)")
-    }
-}
-
 /// The join between the two Claude sources.
 ///
 /// A transcript always knows the tokens held and never the size of the window; the status
