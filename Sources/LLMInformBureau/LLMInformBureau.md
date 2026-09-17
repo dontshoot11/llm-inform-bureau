@@ -260,6 +260,14 @@ go round once more instead of starting a second one. The thresholds are re-read 
 so editing the config file changes behaviour without a restart, and so is the activity window
 that decides which sessions the list holds.
 
+The reader itself is kept for the life of the app rather than made per refresh, and that is
+what makes the frequency above affordable. A turn is dozens of events about one file, and a
+reader made afresh each time re-read every active session from the beginning for each of them;
+one that outlives a pass remembers what a file said while the file still looks that way, so a
+refresh costs what changed. The memory and its rules are `FileMemory`, in `AgentFiles` — the
+directing of a copy of the app at a controlled set of files, for measuring, is the same
+argument.
+
 ## Notifications
 
 A mark crossed while the app is watching is said once, silently, and the last line of the
@@ -340,7 +348,7 @@ the drag first and the first launch after it.
 | --- | --- |
 | `Entry.swift` | Where the process starts: the menu bar app, or Claude Code's status line command |
 | `LLMInformBureauApp.swift` | The `MenuBarExtra` scene |
-| `UsageModel.swift` | What is on screen, and what keeps it current: file events, the heartbeat, the alerts that come out of a refresh, and the change to `settings.json` waiting for a yes or a no |
+| `UsageModel.swift` | What is on screen, and what keeps it current: file events, the heartbeat, the one reader kept across passes, the alerts that come out of a refresh, and the change to `settings.json` waiting for a yes or a no |
 | `MenuContent.swift` | The panel, the one light a section shows, and the button that takes Claude Code's status line slot |
 | `Notifier.swift` | Putting a notification on screen, silently, over whichever channel works |
 | `WelcomeWindow.swift` | The first-run explanation, and the only window this app has |

@@ -155,6 +155,19 @@ final class UsageModel: ObservableObject {
     @Published private(set) var stalledServices: Set<AgentService> = []
     @Published private(set) var stalledSessions: Set<String> = []
 
+    /// One reader for the life of the app, not one per pass.
+    ///
+    /// It is what remembers which files have already been read, and that memory is the whole
+    /// of why a burst of events from one transcript no longer costs a full re-read of every
+    /// other one. A reader made afresh inside `refresh` — which is how this used to work —
+    /// starts every pass knowing nothing.
+    ///
+    /// Injectable for the same reason `paths` is: a copy of the app can then be pointed at a
+    /// controlled set of files instead of at the real home, which is what the measuring rig in
+    /// `TODO/refresh-cost/measure/` needs. `nonisolated` because the read itself runs off the
+    /// main actor.
+    private nonisolated let reader: UsageReader
+
     private let notifier: Notifier
     private let statusLine: StatusLineSlot
     private var dispatch = AlertDispatch()
@@ -185,9 +198,11 @@ final class UsageModel: ObservableObject {
 
     init(
         paths: [URL] = SourceWatcher.defaultPaths,
+        reader: UsageReader = UsageReader(),
         notifier: Notifier = Notifier(),
         statusLine: StatusLineSlot = StatusLineSlot()
     ) {
+        self.reader = reader
         self.notifier = notifier
         self.statusLine = statusLine
 
@@ -272,7 +287,7 @@ final class UsageModel: ObservableObject {
         // Re-read on every pass, so editing the config file changes behaviour without a restart.
         let load = ThresholdConfigLoader.load()
         let rules = BudgetRules(config: load.config)
-        let reading = await Self.read(config: load.config)
+        let reading = await Self.read(with: reader, config: load.config)
         let slot = await Self.readSlot(statusLine)
 
         var limits: [AgentService: LimitsAssessment] = [:]
@@ -521,8 +536,11 @@ final class UsageModel: ObservableObject {
 
     /// `nonisolated async` on purpose: it runs off the main actor, so a slow disk cannot make
     /// the panel stutter.
-    private nonisolated static func read(config: ThresholdConfig) async -> UsageReading {
-        UsageReader().read(config: config)
+    private nonisolated static func read(
+        with reader: UsageReader,
+        config: ThresholdConfig
+    ) async -> UsageReading {
+        reader.read(config: config)
     }
 
     /// Off the main actor for the same reason, and re-read on every pass rather than once at

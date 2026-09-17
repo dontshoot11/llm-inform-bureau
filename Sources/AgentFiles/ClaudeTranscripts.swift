@@ -54,6 +54,20 @@ public struct ClaudeTranscriptStore: Sendable {
     /// one and six of them, and this is the panel's patience rather than a limit on the CLI.
     public let subagentsToScan: Int
 
+    /// What each transcript said last time it was read. A turn is dozens of file system
+    /// events, and almost every one of them is about a file this already has the answer for —
+    /// see `FileMemory` for what a hit is allowed to mean and what bounds the memory.
+    private let readings = FileMemory<SourceReading<Reading>>()
+
+    /// The directory each transcript's session started in, remembered by file identity alone:
+    /// it comes from the *first* `cwd` in the file, and appending cannot move it. Worth its own
+    /// memory because finding it costs a quarter of a megabyte and a JSON parse per line, on
+    /// every pass, for an answer that never changes.
+    private let homes = FileMemory<String>()
+
+    /// Kept for the life of the app rather than made per pass: what the memories above are
+    /// worth depends on outliving a pass. `projectsDirectory` is the tests' way in, and the
+    /// measuring rig's.
     public init(
         projectsDirectory: URL = ClaudeTranscriptStore.defaultProjectsDirectory,
         filesToScan: Int = 20,
@@ -65,6 +79,13 @@ public struct ClaudeTranscriptStore: Sendable {
     }
 
     public func activeSessions(activity: SessionActivity, now: Date = Date()) -> SessionsReading {
+        // Every exit from here ends a pass, and the end of a pass is what bounds the memory:
+        // whatever was not asked about is not in the walk any more.
+        defer {
+            readings.forgetUnasked()
+            homes.forgetUnasked()
+        }
+
         // Subagent files are left out of the walk on purpose: they are newer than the session
         // they belong to, so counting them here would spend the budget of files to look at on
         // one busy session and drop other projects off the list. They are found through their
@@ -95,7 +116,7 @@ public struct ClaudeTranscriptStore: Sendable {
                     turnGrowthTokens: reading.turnGrowthTokens,
                     model: reading.model,
                     project: SessionFiles.projectName(
-                        fromWorkingDirectory: Self.home(of: file.url) ?? reading.workingDirectory
+                        fromWorkingDirectory: home(of: file) ?? reading.workingDirectory
                     ),
                     lastActivityAt: file.modified,
                     replyWait: activity.replyWait(since: reading.awaitingSince, now: now)
@@ -203,10 +224,21 @@ public struct ClaudeTranscriptStore: Sendable {
     }
 
     private func read(_ file: SessionFiles.Found, as role: Role) -> SourceReading<Reading> {
+        if let remembered = readings.value(of: file.url, unchangedSince: file.stamp) {
+            return remembered
+        }
+        let reading = parse(file, as: role)
+        readings.remember(reading, of: file.url, as: file.stamp)
+        return reading
+    }
+
+    /// What the file itself says, with nothing remembered — the whole of the cost a pass used
+    /// to pay for every active file whether or not it had changed.
+    private func parse(_ file: SessionFiles.Found, as role: Role) -> SourceReading<Reading> {
         var sawUnreadableLine = false
         var result: SourceReading<Reading> = .noData("nothing answered yet")
 
-        for tail in Self.readableTailSizes(of: file.url) {
+        for tail in Self.readableTailSizes(ofSize: file.stamp.size) {
             guard let lines = FileTail.lines(of: file.url, maxBytes: tail) else { break }
 
             let entries = lines.map { TranscriptLine(raw: $0) }
@@ -245,12 +277,11 @@ public struct ClaudeTranscriptStore: Sendable {
 
     /// The tail sizes worth reading for this file: the ones smaller than it, plus the first
     /// one that covers it whole. Widening past the file only re-reads the same lines.
-    private static func readableTailSizes(of url: URL) -> [Int] {
-        let size = FileTail.size(of: url)
+    private static func readableTailSizes(ofSize size: Int) -> [Int] {
         var sizes: [Int] = []
         for tail in tailSizes {
             sizes.append(tail)
-            if size <= UInt64(tail) { break }
+            if size <= tail { break }
         }
         return sizes
     }
@@ -262,7 +293,19 @@ public struct ClaudeTranscriptStore: Sendable {
     /// two in a list where each session gets one line. The first `cwd` written is the one the
     /// session belongs to — Claude Code names the transcript's own directory after it — and
     /// the first lines of the file are where it is.
-    private static func home(of url: URL) -> String? {
+    private func home(of file: SessionFiles.Found) -> String? {
+        if let remembered = homes.value(of: file.url, stillTheSameFileAs: file.stamp) {
+            return remembered
+        }
+        guard let home = Self.firstWorkingDirectory(in: file.url) else { return nil }
+        // Only an answer is remembered. A file whose head has no `cwd` in it yet — a transcript
+        // one line long — would otherwise be remembered as having none for as long as it lives,
+        // and the session would keep the fallback name after the real one had been written.
+        homes.remember(home, of: file.url, as: file.stamp)
+        return home
+    }
+
+    private static func firstWorkingDirectory(in url: URL) -> String? {
         guard let lines = FileTail.headLines(of: url, maxBytes: headSize) else { return nil }
         for line in lines {
             guard let json = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any],

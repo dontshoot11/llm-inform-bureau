@@ -268,6 +268,51 @@ Which files are opened at all is the activity rule's decision, applied to the mo
 before anything is read. A refresh therefore costs what is running, not what the machine has
 stored.
 
+## Reading only what changed
+
+The activity rule decides which files are worth opening. `FileMemory` decides which of those
+have anything new to say, and that is a second question with an answer of its own: a turn is
+dozens of file system events, every one of them a line appended to *one* file, and a pass used
+to re-read every active file from the beginning whichever one had moved. Measured on a set of
+six sessions: one pass cost 1.2–1.4 s of CPU, and a working agent held the app at a third of a
+core with nothing on screen changing. Measured again on twenty real transcripts: a pass that
+finds nothing changed now costs 0.005 s against 1.27 s, and a pass where one file grew costs
+0.08 s — the price of what moved, which is the whole point.
+
+**A file is the same file when its identifier, its size and its modification date all are.**
+The date carries nanoseconds on APFS (`1787242588.223001172`), so appending always moves it;
+the identifier (`fileResourceIdentifier`, the volume id and the inode) is what catches a file
+deleted and written again under the same name, which keeps neither. Any one of the three
+differing means the file is read again from scratch — grown, shortened or replaced alike.
+
+**A hit is never a way of being out of date.** The bytes behind a matching stamp are the bytes
+that were read, so a remembered answer is what a re-read would have said — including
+`.unavailable`, which is a verdict on a file and not a failure to reach one. Nothing here ever
+holds a stale reading back as better than none.
+
+**What a later line cannot change is remembered by identity alone.** The directory a session
+started in comes from the *first* `cwd` in the transcript, so appending cannot move it — and
+finding it costs a quarter of a megabyte and a JSON parse per line, on every pass, for the same
+answer. It is kept until the file is not that file any more. A head with no `cwd` in it yet is
+not remembered at all: a transcript one line long would otherwise keep its fallback name for
+as long as it lives.
+
+**Nothing bounds it but the walk.** Entries are made only for files a walk found, and the walk
+is bounded — the newest `filesToScan`, plus the subagents of each active session. At the end of
+a pass, everything that pass did not ask about is dropped, so a session that ended or fell off
+the list leaves no record. There is no size to tune, no expiry to get wrong, and nothing is
+written to disk: the memory lives in the process and dies with it.
+
+**The trap underneath all of this: a `URL` caches the resource values it is asked for.** One
+kept from an earlier pass answers with the size the file had when it was first asked —
+measured, `size=2` for a file that had grown to 200 bytes. A memory built on such a `URL` would
+never see a change at all. So the stamp is taken during the walk, off the `URL` the enumerator
+has just made, and the walk asks for date, size and identifier together so that one `stat`
+answers the whole of it.
+
+The reader has to outlive a pass for any of this to be worth anything, which is why `UsageModel`
+owns one `UsageReader` for the life of the app instead of making one per refresh.
+
 ## Noticing that something changed
 
 Both CLIs append to a file as a turn ends, so the end of a turn is a file system event and
@@ -404,7 +449,8 @@ machine rather than about a reading: whether that explanation has already been s
 ## Using it
 
 ```swift
-let reading = UsageReader().read(config: load.config)
+let reader = UsageReader()                              // kept, not made per pass — see above
+let reading = reader.read(config: load.config)
 
 switch reading.claudeLimits {
 case .value(let snapshot):     show(snapshot)           // snapshot.observedAt is its age
@@ -433,6 +479,7 @@ run against fixtures instead of against whatever the machine happens to have.
 | `JSONText.swift` | Setting one key of a JSON file without rewriting the rest of it |
 | `SessionFiles.swift` | Finding the files a service has most recently written, and telling a session's transcript from a subagent's |
 | `FileTail.swift` | Reading the ends of a large file without loading it |
+| `FileMemory.swift` | What a file said while it still looks the way it did when it said it |
 | `Timestamps.swift` | The one way a written moment is read, shared by both readers |
 | `SourceWatcher.swift` | Noticing that one of the trees changed, which is how a finished turn is noticed |
 | `Setup.swift` | Which sources have written anything at all, and whether the first run has been explained |

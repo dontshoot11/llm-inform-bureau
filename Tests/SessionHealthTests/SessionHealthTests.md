@@ -37,6 +37,7 @@ the cases are plain functions and would port to swift-testing mechanically.
 | `SessionActivityTests` | Which sessions count as being worked on right now, and both sides of the edge |
 | `ClaudeStatusTests` | Reading the payloads the status line command leaves, and the join between the two Claude sources |
 | `ClaudeTranscriptTests` | Reading a session out of a transcript: tokens held, turn growth, sidechains, `/clear` |
+| `TranscriptMemoryTests` | What the reader remembers between passes: a file whose stamp has not moved is not opened again — checked by taking its permissions away rather than by counting — and one that grew, got shorter or had its date moved is read afresh |
 | `WaitingStateTests` | Whether a session is waiting on its agent: the four moments of a turn, the housekeeping written after an answer, and a response arriving as several entries |
 | `CodexRolloutTests` | Reading limits and sessions out of rollout fixtures, including the shapes that mean "no data" and "source changed" |
 | `SetupTests` | Which sources read as connected, what the first run says about the ones that do not, and showing that explanation once |
