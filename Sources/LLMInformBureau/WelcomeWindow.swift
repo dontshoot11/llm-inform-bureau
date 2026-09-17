@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 import AgentFiles
 import Phrasing
@@ -23,6 +24,10 @@ enum Welcome {
 
     /// Held because a window's delegate is a weak reference and this one has no other owner.
     private static var watcher: WindowWatcher?
+
+    /// Kept while the window is open: the window's own title is drawn by AppKit and not by
+    /// SwiftUI, so it is the one word in here that a language change does not redraw by itself.
+    private static var titleWatcher: AnyCancellable?
 
     /// The checkup this window is showing, kept so it can be read again while the window is
     /// open. Held here rather than by the view for the same reason the window is: a SwiftUI
@@ -102,8 +107,14 @@ enum Welcome {
             backing: .buffered,
             defer: false
         )
-        window.title = Briefing.windowTitle
-        let content = NSHostingView(rootView: WelcomeView(live: live, marks: marks, close: close))
+        window.title = InterfaceLanguage.shared.say(Briefing.windowTitle)
+        titleWatcher = InterfaceLanguage.shared.$current.sink { [weak window] language in
+            window?.title = Briefing.windowTitle[language]
+        }
+        let content = NSHostingView(
+            rootView: WelcomeView(live: live, marks: marks, close: close)
+                .environmentObject(InterfaceLanguage.shared)
+        )
         window.contentView = content
         // Sized to what it actually holds — the marks come from the config and the list can
         // grow — but never taller than the screen it opens on.
@@ -330,6 +341,10 @@ private struct FoldingSection<Content: View>: View {
 /// background they rest on, then the checkup — everything the app runs on that this Mac had to
 /// give it, folded away unless something in it is missing.
 private struct WelcomeView: View {
+    /// Which language every word in this window is being said in. Handed down from the app so
+    /// that the panel behind the menu bar cannot be speaking another one.
+    @EnvironmentObject private var interface: InterfaceLanguage
+
     /// Everything this Mac has given the app, and what it has not — watched rather than held,
     /// because it changes under the open window: the person is out giving a permission.
     @ObservedObject var live: LiveCheckup
@@ -453,11 +468,18 @@ private struct WelcomeView: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 14) {
+            // Above everything, because it decides what everything below it is written in —
+            // and because somebody who came here to change the language is looking for it in
+            // a window they cannot yet read.
+            LanguagePicker()
+
+            Divider()
+
             // The marks come first: they are the part of this window somebody came here to
             // work, and everything under them is an explanation they can open when they want
             // one.
             // Read out of the config, so this list cannot claim a number the app does not use.
-            Text(Briefing.marksTitle)
+            Text(interface.say(Briefing.marksTitle))
                 .font(WindowType.section)
             // What the colours are like to be in, above the marks that say where each of them
             // begins. The marks are numbers on a scale; this is the scale's other half, and
@@ -490,7 +512,7 @@ private struct WelcomeView: View {
             // Folded away, and opened by whoever wants it. It is the longest thing in this
             // window and the only part nobody has to read to use the app: it is here so the
             // premise behind the marks can be checked, which is a thing somebody does once.
-            FoldingSection(title: Briefing.furtherReadingTitle, isOpen: $readingOpen) {
+            FoldingSection(title: interface.say(Briefing.furtherReadingTitle), isOpen: $readingOpen) {
                 Text(Briefing.furtherReadingNote)
                     .font(WindowType.detail)
                     .foregroundStyle(.secondary)
@@ -524,7 +546,7 @@ private struct WelcomeView: View {
 
             HStack(alignment: .firstTextBaseline) {
                 Spacer()
-                Button("Done", action: close)
+                Button(interface.say(Briefing.done), action: close)
                     .keyboardShortcut(.defaultAction)
             }
         }
@@ -564,7 +586,7 @@ private struct WelcomeView: View {
                 // Only on a mark that was actually moved: a button with nothing to undo is one
                 // more control to read past, and this window is already a list of them.
                 if isChosen {
-                    Button(Briefing.resetMark) { reset(mark.mark) }
+                    Button(interface.say(Briefing.resetMark)) { reset(mark.mark) }
                         .buttonStyle(.link)
                         .font(WindowType.detail)
                 }
@@ -608,7 +630,7 @@ private struct WelcomeView: View {
             // Under the bar alone: dragging is discoverable and the arrow keys are not, while
             // a field with a stepper beside it says how it is worked by being one.
             if scale != nil {
-                Text(Briefing.markEditHint)
+                Text(interface.say(Briefing.markEditHint))
                     .font(WindowType.detail)
                     .foregroundStyle(.tertiary)
             }

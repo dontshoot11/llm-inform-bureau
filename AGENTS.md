@@ -4,7 +4,11 @@ Instructions for AI agents working in this repository.
 
 ## Language
 
-- README, in-app strings, issue and PR text: **English**.
+- The interface speaks **two languages**: every string a person reads in the app is a `Phrase`
+  with an English side and a Russian one, and a new one does not compile until both are
+  written. English is the side written first — it is what this project reviews in.
+- README, `INSTALL.txt`, issue and PR text: **English**. The public documents of the project
+  are not translated; the app is.
 - Planning documents under `TODO/` (git-ignored): Russian.
 
 ## Updating the thresholds

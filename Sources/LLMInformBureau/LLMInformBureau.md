@@ -575,5 +575,6 @@ the drag first and the first launch after it.
 | `MarkScaleBar.swift` | A scale as something to move: the bar in the colours of its own lights, a handle on each mark and the number under it |
 | `MinuteMarkField.swift` | A mark that is one number as something to set: the field, the stepper beside it and the unit after them |
 | `LoginItem.swift` | Starting with the Mac, and the checkbox both views share |
+| `InterfaceLanguage.swift` | Which language the app is speaking right now, handed to both roots so they cannot differ — and the picker at the top of the settings window that changes it without a restart |
 
 The English it speaks is its own target: see `Sources/Phrasing/Phrasing.md`.

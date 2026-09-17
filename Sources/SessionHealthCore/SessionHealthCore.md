@@ -110,6 +110,25 @@ recording what it has accounted for. A silence higher up would leave a backlog b
 ticking the box again would empty that backlog onto the person who had just asked to be
 interrupted again.
 
+## Which language it speaks
+
+The other answer that is the person's and not the machine's. `LanguageChoice` keeps it the
+same way the silence is kept — a file in the app's own directory, `chosen-language`, written
+when somebody picks a language in the settings window and removed when they put it back to
+following the Mac. The code is its first line and the rest is a note for whoever opens it.
+
+**Not having chosen is not the same as having chosen English.** No file means the app follows
+the Mac, so somebody who never opened that window and later switches their system to Russian
+gets a Russian app; a file means they said which one, and the system has no vote from then on.
+The difference is the file being there rather than a value inside it, which is why an
+unreadable file, an empty one or a code from some later release all come to the same thing:
+nobody chose, and the Mac is asked.
+
+This module names the two languages (`Language`) and never speaks either. What is said in them
+is `Phrasing`'s, where every string is a pair and an untranslated one does not compile; which
+side of the pair is showing is the app's (`InterfaceLanguage`). The rule that a rule never
+reads English is untouched by any of it.
+
 ## What this Mac has given the app
 
 The app depends on things it did not bring with it: a status line slot, a permission, a source
@@ -279,6 +298,7 @@ Nothing in the loader throws: a broken config file degrades to the values below 
 | `StatusLineSlotState.swift` | Whose Claude Code's one status line slot is, and what taking it or giving it back would change |
 | `TerminalRaise.swift` | How far a click on a session's row can get — the tab, the window titled after the project, or the application — the AppleScript that asks for a tab, and which permission each answer costs |
 | `NotificationChoice.swift` | Whether the app may say anything out loud — the one thing about notifications the person decides, and where that answer is kept |
+| `LanguageChoice.swift` | The two languages the interface is written in, and the file that records which one somebody picked — the absence of which means following the Mac |
 | `SupportDirectory.swift` | The directory this app keeps its own files in |
 | `Resources/thresholds.json` | The marks themselves — see `Thresholds.md` |
 

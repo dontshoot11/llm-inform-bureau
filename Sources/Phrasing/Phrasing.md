@@ -1,6 +1,12 @@
 # Phrasing
 
-Every English string the widget says about a number, and the rules about what it may claim.
+Every string the widget says about a number, in both of the languages it speaks, and the rules
+about what either of them may claim.
+
+A string here is a `Phrase`: one value with an English side and a Russian one, so an
+untranslated line does not compile rather than reaching a reader as English in the middle of a
+Russian window. Which side is showing is the app's to decide (`InterfaceLanguage`) and is
+decided where the text is drawn, which is why the language can change while a window is open.
 
 ## Why this is its own target
 
@@ -66,6 +72,8 @@ look up a number instead.
 
 | File | Holds |
 | --- | --- |
+| `Phrase.swift` | Something the app says, in both languages at once: one value with two sides, and no way to build one without writing both |
+| `LanguageInUse.swift` | Which language the app opens in — the choice on disk, and failing that the Mac's own list |
 | `AlertPhrasing.swift` | A crossed mark — or an agent waiting on the person — as a notification: title, body, command |
 | `Wording.swift` | What a mark is called, what a subagent's row is called, which command shows more of it, what a folded row with no reading yet says, what a service is called — `service` where there is room to say it, `serviceInBar` where the budget is pixels — and what a clickable session row promises, what the panel's dead ends promise instead — a reading with no numbers, a session that cannot be brought up, a click that got partway — plus the line and button shown when the permission for something closer than the application is missing, the name of the button that opens any pane of System Settings, and the sentence an ad-hoc-signed copy adds about a tick that belongs to the version before this one — said in one place because both the panel and the checkup say it |
 | `Briefing.swift` | What the settings window says about its marks: what each colour is like to be in, how a scale is worked, what each mark decides, said under every one of them whether the app placed it or the reader did — because that describes the mark and not the number standing on it — and, under that, where the number itself came from: a published date, an admission that nobody measured it, or, for a mark somebody moved, that they chose it, since the reasoning that shipped was about another number — plus each source of readings, as the checkup lists it |
@@ -76,4 +84,5 @@ look up a number instead.
 | `SlotPhrasing.swift` | The button that takes that slot, in the panel, and the one that gives it back, on the checkup line about the slot in the settings window — and what the change to `~/.claude/settings.json` is shown as before either of them is made |
 
 Tests: `Tests/SessionHealthTests/NotificationTextTests.swift`, `SetupTests.swift`,
-`CheckupTests.swift`, `NotificationChoiceTests.swift` and `StatusLineModeTests.swift`.
+`CheckupTests.swift`, `NotificationChoiceTests.swift`, `LanguageChoiceTests.swift` and
+`StatusLineModeTests.swift`.

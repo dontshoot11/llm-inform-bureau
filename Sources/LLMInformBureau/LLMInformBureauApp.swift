@@ -16,7 +16,10 @@ struct LLMInformBureauApp: App {
 
     var body: some Scene {
         MenuBarExtra {
+            // The same object the settings window is given: one language for the whole app,
+            // and a change to it redraws both roots rather than only the one that was open.
             MenuContent(model: model)
+                .environmentObject(InterfaceLanguage.shared)
         } label: {
             // One image for the whole bar, names included. Measured: a label of several views
             // renders only the first — the status item takes one image and one title, and

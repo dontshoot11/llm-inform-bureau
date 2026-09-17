@@ -148,7 +148,51 @@ public struct Reading: Equatable, Sendable {
 public enum Briefing {
     /// The window's own name. It is a settings window now — the marks are moved in it — and
     /// the explanation of where the readings come from is one of the things folded up inside.
-    public static let windowTitle = "Settings"
+    public static let windowTitle = Phrase("Settings", "Настройки")
+
+    /// The button that closes the window. Nothing is applied by it that was not applied
+    /// already — every control in here writes when it is touched — so it says "done" rather
+    /// than "save", which would promise a step that does not exist.
+    public static let done = Phrase("Done", "Готово")
+
+    /// The row that picks the language of the interface.
+    ///
+    /// A setting rather than a reading, and the first line of the window because it governs
+    /// every word under it: a person who opened this window to change the language should not
+    /// have to read a screenful of the wrong one to find the control.
+    public static let languageTitle = Phrase("Language", "Язык")
+
+    /// What each language is called, in itself.
+    ///
+    /// One string and not a phrase, deliberately: a language names itself the same way whatever
+    /// the app is currently speaking, and "Russian"/"Русский" side by side in one picker would
+    /// be the app answering in a language the reader may not have.
+    public static func languageName(_ language: Language) -> String {
+        switch language {
+        case .english: "English"
+        case .russian: "Русский"
+        }
+    }
+
+    /// Said under the picker while nobody has touched it. It is the whole difference between
+    /// not having chosen and having chosen English, and it is worth a line: the app is
+    /// following something, and the reader is entitled to know what.
+    public static let languageFollowsMac = Phrase(
+        "Following the language of this Mac.",
+        "Как язык этого Мака."
+    )
+
+    /// Said under the picker once somebody has picked. The counterpart of the line above, and
+    /// read off the same state the picker is: a choice outranks the system from here on, which
+    /// is the thing a reader cannot see and has to be told.
+    public static let languageChosen = Phrase(
+        "Chosen by you. Changing the language of this Mac will not change it back.",
+        "Выбран вами. Смена языка этого Мака его уже не поменяет."
+    )
+
+    /// Puts the language back to following the Mac, and takes the choice off the disk. Shown
+    /// only once there is a choice to undo, the same as the button under a mark somebody moved.
+    public static let languageFollowMac = Phrase("Follow this Mac", "Следовать за Маком")
 
     /// How the one source that has to be connected is connected, named in one place so the
     /// window, the panel and the README cannot drift apart. The button itself is
@@ -156,7 +200,7 @@ public enum Briefing {
     /// to disagree.
     public static let connectAction = "the \"\(SlotPhrasing.connect)\" button in the panel"
 
-    public static let marksTitle = "The marks it watches"
+    public static let marksTitle = Phrase("The marks it watches", "Отметки, за которыми оно следит")
 
     /// What each colour is like to be in, above the marks that say where it starts. Every
     /// colour the widget can draw is here, green included: a dot that never gets explained is
@@ -177,11 +221,14 @@ public enum Briefing {
 
     /// Puts a mark back where the app had it. Shown only on a mark that was moved: a button
     /// that undoes nothing is a control a reader learns to skip over.
-    public static let resetMark = "Reset to default"
+    public static let resetMark = Phrase("Reset to default", "Вернуть как было")
 
     /// How the bar is worked, said once under it. Dragging is discoverable; the arrow keys are
     /// not, and they are the only way to land on an exact number.
-    public static let markEditHint = "Drag a mark to move it, or click one and use the arrow keys."
+    public static let markEditHint = Phrase(
+        "Drag a mark to move it, or click one and use the arrow keys.",
+        "Отметку можно перетащить, а можно щёлкнуть по ней и двигать стрелками."
+    )
 
     /// The unit of the marks that are one number. Beside the field rather than in the title,
     /// because the number is what changes and the unit is what it is measured in.
@@ -290,7 +337,10 @@ public enum Briefing {
         ]
     }
 
-    public static let furtherReadingTitle = "Why a full window is worth watching at all"
+    public static let furtherReadingTitle = Phrase(
+        "Why a full window is worth watching at all",
+        "Зачем вообще следить за наполнением окна"
+    )
 
     public static let furtherReadingNote = """
         None of these set a mark. They are the published work the premise rests on, so it can \

@@ -122,7 +122,7 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
     suite.test("nothing in the briefing claims to have measured quality") {
         var lines: [String] = [
             CheckupPhrasing.title, CheckupPhrasing.intro, CheckupPhrasing.closing,
-            Briefing.marksTitle, Briefing.scaleHelp(config)
+            Briefing.marksTitle.english, Briefing.marksTitle.russian, Briefing.scaleHelp(config)
         ]
         lines += Briefing.levelKey.map(\.meaning)
         lines += Briefing.marks(of: config).flatMap { [$0.title, $0.what, $0.origin] }
