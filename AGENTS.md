@@ -62,7 +62,7 @@ Threshold updates land in the repository as commits.
    in Application Support, left over from the release that had an installer, is not read at
    all, and the panel says nothing about any of it — a reader who never chose a number has
    nothing to do about one. Choosing them from the app's own settings is a task of its own
-   (`TODO/thresholds-in-settings/`).
+   (`TODO/settings-and-checkup/`).
 
    To run against marks other than the shipped ones, name a file:
    `LLM_INFORM_BUREAU_THRESHOLDS=/path/to/thresholds.json`. That override is the only way

@@ -68,7 +68,7 @@ In order:
 **There is no copy in Application Support**, nothing is created on a first launch, and one
 left behind by the release that had an installer is not read. The marks are the app's own:
 nobody was going to hand-edit JSON to move a percentage, and the way to choose these numbers
-will be the app's own settings (`TODO/thresholds-in-settings/`). Installing this app is a drag
+will be the app's own settings (`TODO/settings-and-checkup/`). Installing this app is a drag
 and one command, and a file the reader is expected to find and edit is exactly the kind of
 step that path is meant to be free of.
 

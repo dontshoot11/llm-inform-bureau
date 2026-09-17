@@ -16,7 +16,7 @@ than fixtures.
 
 Four marks, all of them in `Resources/thresholds.json`, none of them in the code — and none of
 them the reader's to set: the file ships inside the app, and choosing these numbers from its own
-settings is a task of its own (`TODO/thresholds-in-settings/`).
+settings is a task of its own (`TODO/settings-and-checkup/`).
 
 | Mark | Applies to | What it means | What the user can do |
 | --- | --- | --- | --- |
