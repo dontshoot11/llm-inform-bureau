@@ -86,6 +86,15 @@ final class UsageModel: ObservableObject {
     /// attempt — a complaint about a file somebody has since fixed is worse than none.
     @Published private(set) var slotProblem: String?
 
+    /// Which permission the last click on a session turned out to need, and `nil` while none
+    /// has.
+    ///
+    /// One value for the panel and not one per row: the answer it is about belongs to the
+    /// machine, not to a session — a system that has not been told this app may look through
+    /// windows will say so about every session alike. Set only by a click, so nothing is ever
+    /// said about a permission until somebody has actually wanted it.
+    @Published private(set) var missingPermission: TerminalRaise.Permission?
+
     /// Whether the panel's limits half is opened out.
     ///
     /// Folded by default, and kept here rather than in the view so that it survives the panel
@@ -177,6 +186,7 @@ final class UsageModel: ObservableObject {
 
     private let notifier: Notifier
     private let statusLine: StatusLineSlot
+    private let raiser = TerminalRaiser()
     private var dispatch = AlertDispatch()
     private var watcher: SourceWatcher?
     private var heartbeat: Task<Void, Never>?
@@ -627,6 +637,47 @@ final class UsageModel: ObservableObject {
         case .unreadable(let path): SlotPhrasing.unreadable(path)
         case .notWritten(let reason): SlotPhrasing.failed(reason)
         }
+    }
+
+    // MARK: Going to the session
+
+    /// Brings up the window a session is running in — the end of the road every reading in
+    /// this panel is on.
+    ///
+    /// Nothing happens for a session with no live process behind it: `processID` is `nil`
+    /// exactly then, the row offers no click in the first place, and this is the second half
+    /// of that promise rather than a repetition of it.
+    func raise(_ snapshot: SessionSnapshot) {
+        guard let pid = snapshot.processID else { return }
+        Task { [weak self] in
+            guard let outcome = await self?.raiser.raise(
+                processID: pid,
+                project: snapshot.project
+            ) else { return }
+            // Only a missing permission leaves anything on screen. Every other outcome says
+            // nothing: what the person asked for is now in front of them, and a panel
+            // commenting on that would be talking about itself.
+            if case .appWithout(let permission) = outcome {
+                self?.missingPermission = permission
+            } else {
+                self?.missingPermission = nil
+            }
+        }
+    }
+
+    /// Opens the settings where that permission is kept, and stops saying anything about it.
+    ///
+    /// Cleared on the way out because the answer is no longer this app's to know: whatever the
+    /// person does in that pane, the next click is what finds out.
+    func openSettings(for permission: TerminalRaise.Permission) {
+        missingPermission = nil
+        TerminalRaiser.openSettings(for: permission)
+    }
+
+    /// Forgets the offer above. The panel closing is what calls this — a question left hanging
+    /// expires with the panel, like the others.
+    func forgetPermissionOffer() {
+        missingPermission = nil
     }
 }
 

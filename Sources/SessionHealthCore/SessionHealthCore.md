@@ -178,7 +178,7 @@ Nothing in the loader throws: a broken config file degrades to the values below 
 | --- | --- |
 | `AgentService.swift` | The two services, and why they are not symmetric |
 | `SessionActivity.swift` | Which sessions count as the ones being worked on right now |
-| `SessionSnapshot.swift` | The input: a session's tokens, window, last turn and the model that answered it, who it is waiting on (nobody, its agent, its agent for a long time, or the person it has asked something) — and, for a subagent, where it came from |
+| `SessionSnapshot.swift` | The input: a session's tokens, window, last turn and the model that answered it, who it is waiting on (nobody, its agent, its agent for a long time, or the person it has asked something), the live process it runs in — and, for a subagent, where it came from |
 | `LimitsSnapshot.swift` | The input: one service's limit windows and when they were reported |
 | `BudgetAlert.swift` | What a crossed mark is — and a request to the person, which is not one — plus the identity the memory remembers |
 | `AlertMemory.swift` | One mark, one notification — scopes (a session, a limit window, one wait) and what ends them |
@@ -188,6 +188,7 @@ Nothing in the loader throws: a broken config file degrades to the values below 
 | `ThresholdConfigLoader.swift` | Reading the marks the app ships with, and the built-in values under them |
 | `SetupState.swift` | Which sources have written anything on this machine |
 | `StatusLineSlotState.swift` | Whose Claude Code's one status line slot is, and what taking it or giving it back would change |
+| `TerminalRaise.swift` | How far a click on a session's row can get — the tab, the window titled after the project, or the application — the AppleScript that asks for a tab, and which permission each answer costs |
 | `SupportDirectory.swift` | The directory this app keeps its own files in |
 | `Resources/thresholds.json` | The marks themselves — see `Thresholds.md` |
 

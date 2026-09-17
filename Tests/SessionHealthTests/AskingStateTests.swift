@@ -269,6 +269,20 @@ func runAskingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
             suite.expectEqual(snapshot.replyWait, .waiting, "a request that cannot be dated cannot be aged out")
         }
 
+        // A record is named after a pid and carries it inside as well, so one without it is a
+        // record of a shape this app has never seen. Nothing in it is trusted then: neither
+        // half of what it is read for — who is waiting, and which window to go to — survives
+        // a file that is not the file this reader knows.
+        suite.test("a record with no process in it is not read at all") {
+            guard let snapshot = pass(
+                root, "pidless-record",
+                transcript: askedTurn,
+                records: [#"{"sessionId":"abc","status":"waiting","statusUpdatedAt":1789643551611}"#]
+            ) else { return }
+            suite.expectEqual(snapshot.replyWait, .waiting, "no sign from a record with no process")
+            suite.expect(snapshot.processID == nil, "and no window to promise")
+        }
+
         // MARK: The fuse, the blink and the subagents, as they were
 
         // The fuse is about an answer that is not coming. A request is not owed an answer by

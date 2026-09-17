@@ -88,7 +88,7 @@ public struct UsageReader: Sendable {
         return UsageReading(
             claudeLimits: status.limits,
             codexLimits: codex.limits,
-            claudeSessions: Self.withAsking(
+            claudeSessions: Self.withRecords(
                 Self.withWindowSizes(transcripts, from: status.payloads),
                 from: records,
                 activity: activity,
@@ -150,9 +150,10 @@ public struct UsageReader: Sendable {
         )
     }
 
-    /// Marks the sessions whose agent has stopped and is waiting on the person.
+    /// Adds to each session what only the record of its running process knows: that the agent
+    /// has stopped and is waiting on the person, and which process to find its window by.
     ///
-    /// This overrides whatever the transcript concluded, and has to: a question is written
+    /// The first overrides whatever the transcript concluded, and has to: a question is written
     /// there as a tool call with no result yet, which the waiting rule reads — correctly, for
     /// everything it can see — as an agent still at work. The record is the only source that
     /// knows better, so where it speaks it decides.
@@ -171,13 +172,24 @@ public struct UsageReader: Sendable {
     ///   sign standing. Nothing rewrites a record while the person is away, so this is the
     ///   same half hour after which the row itself would go — the sign never outlives the row.
     ///
-    /// Subagents are left out: they have no record of their own, and a request is something a
-    /// session makes of the person, never an agent running inside one.
-    public static func withAsking(
+    /// The process is bound by one rule of its own, and it is not the freshness of the record
+    /// but the process itself: the pid is carried across only if the process behind it is
+    /// still the one the record was written about (`SessionProcess.isTheOne`). A record left
+    /// behind by a killed session names a pid the system is free to hand out again, and a row
+    /// offering to take a person to a stranger's window is worse than a row offering nothing.
+    /// That check is the reason a live process is asked about on every pass rather than read
+    /// once — and it is why the pid does not ride on the freshness rule above: a row with an
+    /// old record and a live process still leads to the right window.
+    ///
+    /// Subagents are left out of both: they have no record of their own, a request is
+    /// something a session makes of the person, never an agent running inside one, and an
+    /// agent has no window — it lives inside its session's.
+    public static func withRecords(
         _ sessions: SessionsReading,
         from records: [ClaudeSessionRecord],
         activity: SessionActivity,
-        now: Date = Date()
+        now: Date = Date(),
+        isTheOne: (Int32, Date) -> Bool = SessionProcess.isTheOne
     ) -> SessionsReading {
         guard case .value(let snapshots) = sessions else { return sessions }
         var newest: [String: ClaudeSessionRecord] = [:]
@@ -190,12 +202,17 @@ public struct UsageReader: Sendable {
         }
         return .value(
             snapshots.map { snapshot in
-                guard !snapshot.isSubagent,
-                      let record = newest[snapshot.sessionID],
-                      record.isAsking,
-                      activity.isActive(lastActivityAt: record.statusUpdatedAt, now: now)
-                else { return snapshot }
-                return snapshot.asking(since: record.statusUpdatedAt)
+                guard !snapshot.isSubagent, let record = newest[snapshot.sessionID] else {
+                    return snapshot
+                }
+                let asking = record.isAsking
+                    && activity.isActive(lastActivityAt: record.statusUpdatedAt, now: now)
+                let process = isTheOne(record.pid, record.startedAt) ? record.pid : nil
+                guard asking || process != nil else { return snapshot }
+                return snapshot.withRecord(
+                    asking: asking ? record.statusUpdatedAt : nil,
+                    process: process
+                )
             }
         )
     }

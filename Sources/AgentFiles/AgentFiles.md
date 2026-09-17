@@ -38,7 +38,7 @@ empty list of sessions is a `.value`, not an absence — "nothing is running" is
 | Codex rollouts | Codex limits **and** Codex sessions, window size included | no |
 | Claude transcripts | Claude sessions: tokens held, project, turn growth — and the subagents running inside them | no |
 | the status line slot | Claude limits, and the size of a Claude context window | **yes** |
-| Claude session records | which Claude sessions have stopped and are waiting on the person | no |
+| Claude session records | which Claude sessions have stopped and are waiting on the person, and the process each one runs in | no |
 
 Four readers, because Codex says everything in one file and Claude says it in three places —
 none of which is complete on its own. The join between the three Claude ones is
@@ -225,7 +225,7 @@ data. The name of the tool is the whole of that rule and the vendor's to change 
 one costs the wording of a notification and nothing else, because whether anybody is waiting is
 the record's answer and not this one's.
 
-Four things bound what this source is allowed to do, and all four are about a file written by a
+Five things bound what this source is allowed to do, and all five are about a file written by a
 process that may no longer exist:
 
 - **Missing is the normal case.** There is no record for a non-interactive run (`claude -p`),
@@ -242,6 +242,8 @@ process that may no longer exist:
   and a stuck `waiting` would otherwise draw a pause sign with no end. A record whose status has
   not moved inside the activity window is ignored, and of two records naming the same session —
   which is what `claude --resume` leaves behind — only the newest is read.
+- **A pid is believed only while the process behind it answers for itself.** See below: the
+  number outlives the process and the kernel hands it out again.
 
 The fuse never applies here. `sessions.abandoned_wait_after_minutes` asks whether an answer is
 still coming from the agent; a person who has not come back in an hour has not stalled, they
@@ -277,6 +279,38 @@ Everything else about the wait is the same rule as Claude's, for the same reason
 - **A turn whose opening is further back than the half megabyte read from the end of the file
   is not claimed as a wait.** That takes a tool output running to megabytes; on a guess the
   light stays steady rather than blinking.
+
+### From a pid to the window a person is sitting in front of
+
+The same record carries the one thing no file in `~/.claude` mentions: `pid`, the process
+running the session, plus `startedAt`, the moment it began. That pair is the whole of what the
+panel needs to take a person to their session instead of telling them about it — and it is
+also the one reading here that is not about a file at all. `SessionProcess` asks the kernel
+(`proc_pidinfo`, one call, no subprocess and no `ps` output to parse):
+
+| Question | Answer | Measured |
+| --- | --- | --- |
+| when did this process start | `pbi_start_tvsec` | 0.43 s and 0.64 s before the record's own `startedAt` on two live sessions |
+| which terminal is it attached to | `e_tdev` → `devname` | `ttys001`, `ttys005` |
+| what started it | the chain of `pbi_ppid` | a session in the terminal of VS Code: `claude` → `zsh` → `Code Helper` → `Code` |
+
+Two of those answers shape everything above them. **A pid is not an identity:** the kernel
+hands the number out again, so a record left behind by a killed session names a pid that may
+now belong to anything. The join carries a pid across only when the process behind it started
+when the record says the session did (`SessionProcess.isTheOne`, five seconds of room for the
+lag measured above), which is why a live process is asked about on every pass rather than read
+once. And **the chain has to be walked to the end**: the process above a session in an editor's
+terminal is a helper the system does not consider an application at all, so stopping at the
+first parent finds nothing to raise.
+
+Note what this does *not* ride on. A record too old to raise a pause sign still leads to a
+window: the freshness rule is about nobody rewriting a record while a person is away, and a
+process either answers for itself or does not. The two rules are separate on purpose.
+
+What is done with the answer — a tab where a terminal can name its tabs, otherwise the window
+titled after the project, and the application under both — is not this module's business: see
+`TerminalRaise` in `SessionHealthCore` for the rule and `TerminalRaiser` in the app for the
+border with the system.
 
 ### Claude: the subagents of a session
 

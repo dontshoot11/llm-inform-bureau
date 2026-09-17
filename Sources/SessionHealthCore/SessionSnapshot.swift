@@ -148,6 +148,20 @@ public struct SessionSnapshot: Equatable, Sendable {
     /// the notification is the only thing that has to.
     public let request: String?
 
+    /// The process this session is running in, when one was found alive this pass, and `nil`
+    /// otherwise.
+    ///
+    /// The whole of what the panel needs to take a person to their session: from a pid the
+    /// system knows the terminal it sits in and the application that started it. A reading
+    /// with none — a session whose CLI writes no record, a Codex session, a subagent, a
+    /// process that has since exited — is a row that promises nothing, and that is the point
+    /// of it being optional rather than a number that might be stale.
+    ///
+    /// Checked, not copied: whoever sets this has confirmed against the running process that
+    /// the pid is still the one the record was written about (`SessionProcess.isTheOne`),
+    /// because a pid is a number the system hands out again.
+    public let processID: Int32?
+
     /// Set when this reading is a subagent's rather than a session's. Everything above means
     /// the same thing either way — the difference is what it is allowed to do, which is why
     /// the rules and the panel ask this question and the reader does not answer it twice.
@@ -166,6 +180,7 @@ public struct SessionSnapshot: Equatable, Sendable {
         lastActivityAt: Date = Date(),
         replyWait: ReplyWait = .none,
         request: String? = nil,
+        processID: Int32? = nil,
         subagent: SubagentOrigin? = nil
     ) {
         self.sessionID = sessionID
@@ -178,6 +193,7 @@ public struct SessionSnapshot: Equatable, Sendable {
         self.lastActivityAt = lastActivityAt
         self.replyWait = replyWait
         self.request = request
+        self.processID = processID
         self.subagent = subagent
     }
 
@@ -197,18 +213,26 @@ public struct SessionSnapshot: Equatable, Sendable {
             lastActivityAt: lastActivityAt,
             replyWait: replyWait,
             request: request,
+            processID: processID,
             subagent: subagent
         )
     }
 
-    /// The same reading, told that its agent is asking the person for something.
+    /// The same reading, told what the record of its running process knows: since when the
+    /// agent has been asking the person for something, and which process it is running in.
     ///
-    /// Told rather than read, because the two halves of this come from two files. The
-    /// transcript says what the session holds and whether the agent owes it an answer; only
-    /// the session record says the agent has stopped and is waiting on the person, and that
+    /// Told rather than read, because these come from a different file than everything above.
+    /// The transcript says what the session holds and whether the agent owes it an answer;
+    /// only the record says the agent has stopped and is waiting on the person, and that
     /// answer overrides the transcript's — a question is written there as a tool call like any
-    /// other, which is exactly what "the agent is working" looks like.
-    public func asking(since: Date) -> SessionSnapshot {
+    /// other, which is exactly what "the agent is working" looks like. The process is the same
+    /// story: nothing a transcript contains leads to the window a person is sitting in front
+    /// of.
+    ///
+    /// Both arguments are optional and independent. A record may say a session is asking while
+    /// its process has already been checked and found gone, and a live process says nothing
+    /// about anybody waiting.
+    public func withRecord(asking since: Date?, process: Int32?) -> SessionSnapshot {
         SessionSnapshot(
             sessionID: sessionID,
             service: service,
@@ -218,8 +242,9 @@ public struct SessionSnapshot: Equatable, Sendable {
             model: model,
             project: project,
             lastActivityAt: lastActivityAt,
-            replyWait: .asking(since: since),
+            replyWait: since.map { .asking(since: $0) } ?? replyWait,
             request: request,
+            processID: process,
             subagent: subagent
         )
     }

@@ -4,12 +4,12 @@ import SessionHealthCore
 /// What one record in `~/.claude/sessions` says: which session a running Claude Code process
 /// is on, and whether that process has stopped and is waiting on the person.
 ///
-/// Only the three fields this app reads. The file holds a dozen more — the pid, the socket it
-/// listens on, the name the CLI gave itself — and none of them answers a question the widget
-/// asks.
+/// Only the fields this app reads. The file holds a dozen more — the socket it listens on,
+/// the name the CLI gave itself, the protocol it speaks — and none of them answers a question
+/// the widget asks.
 public struct ClaudeSessionRecord: Equatable, Sendable {
-    /// The session this process is running. What ties the record to a row in the panel: the
-    /// record is named after the pid, and the pid means nothing to anything else here.
+    /// The session this process is running. What ties the record to a row in the panel — the
+    /// file is named after the pid, and no other reading in this app knows a pid.
     public let sessionID: String
 
     /// Whether the CLI is waiting on the person rather than working.
@@ -24,10 +24,32 @@ public struct ClaudeSessionRecord: Equatable, Sendable {
     /// nothing rewrites the record while the person is away.
     public let statusUpdatedAt: Date
 
-    public init(sessionID: String, isAsking: Bool, statusUpdatedAt: Date) {
+    /// The process running this session — the one thing in the record that leads to the window
+    /// the person has to be taken to.
+    ///
+    /// A number is all it is, and a number is reused: the kernel hands pids out again. So it
+    /// travels with the moment below, and the two are only worth anything together.
+    public let pid: Int32
+
+    /// When the session started, as the CLI wrote it down.
+    ///
+    /// Here for one job: telling this process from whatever else may be wearing its pid later.
+    /// It is not the process's own start — the CLI boots first and writes the record after —
+    /// and the gap between them is what `SessionProcess.isTheOne` is given room for.
+    public let startedAt: Date
+
+    public init(
+        sessionID: String,
+        isAsking: Bool,
+        statusUpdatedAt: Date,
+        pid: Int32,
+        startedAt: Date
+    ) {
         self.sessionID = sessionID
         self.isAsking = isAsking
         self.statusUpdatedAt = statusUpdatedAt
+        self.pid = pid
+        self.startedAt = startedAt
     }
 }
 
@@ -49,10 +71,12 @@ public struct ClaudeSessionRecord: Equatable, Sendable {
 /// fault, and nothing in the interface mentions the file.
 ///
 /// **A record outlives nothing for long.** It is written by a live process, and a killed one
-/// leaves its last state behind — a stuck `waiting` would otherwise draw a pause sign forever.
-/// Two rules bound that, and both live in the join (`UsageReader.withAsking`): a record is
-/// read only for a session the panel is already showing on its own activity, and a record
-/// whose status has not moved inside the activity window is not read at all.
+/// leaves its last state behind — a stuck `waiting` would otherwise draw a pause sign forever,
+/// and a stale pid would send a click to a window belonging to somebody else. Three rules
+/// bound that, and all three live in the join (`UsageReader.withRecords`): a record is read
+/// only for a session the panel is already showing on its own activity, a record whose status
+/// has not moved inside the activity window is not read at all, and a pid is carried across
+/// only while the process behind it is still the one the record was written about.
 ///
 /// Usage:
 /// ```swift
@@ -124,14 +148,18 @@ public struct ClaudeSessionRecordStore: Sendable {
 
     /// What the bytes of one record say, with nothing remembered.
     ///
-    /// `nil` for anything this app cannot use: no session named, or no moment to date the
-    /// status by. Neither is worth guessing at — a record with no `sessionId` matches no row,
-    /// and a status with no moment could not be told from one left behind by a dead process.
+    /// `nil` for anything this app cannot use: no session named, no moment to date the status
+    /// by, or no process behind it. The first two are not worth guessing at — a record with no
+    /// `sessionId` matches no row, and a status with no moment could not be told from one left
+    /// behind by a dead process. The third is the same kind of nothing: a record that does not
+    /// say which process wrote it can neither be checked for life nor followed to a window.
     static func parse(_ data: Data) -> ClaudeSessionRecord? {
         guard
             let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
             let sessionID = root["sessionId"] as? String,
-            let updated = root["statusUpdatedAt"] as? NSNumber
+            let updated = root["statusUpdatedAt"] as? NSNumber,
+            let pid = root["pid"] as? NSNumber,
+            let started = root["startedAt"] as? NSNumber
         else { return nil }
         return ClaudeSessionRecord(
             sessionID: sessionID,
@@ -141,7 +169,9 @@ public struct ClaudeSessionRecordStore: Sendable {
             // a sign nobody can explain.
             isAsking: (root["status"] as? String) == "waiting",
             // Milliseconds since the epoch, as the CLI writes every moment in this file.
-            statusUpdatedAt: Date(timeIntervalSince1970: updated.doubleValue / 1000)
+            statusUpdatedAt: Date(timeIntervalSince1970: updated.doubleValue / 1000),
+            pid: pid.int32Value,
+            startedAt: Date(timeIntervalSince1970: started.doubleValue / 1000)
         )
     }
 }

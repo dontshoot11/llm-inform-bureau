@@ -257,6 +257,46 @@ Three rules the interface follows everywhere:
   about a line the vendor drew. "Quality: 62%" would be an invention, and there is no signal
   for it in anything this app can read.
 
+### A session's row leads to its window
+
+A row is not only a reading. Where the session behind it is running in a live process, the row
+is a control: the pointer over it raises the plate every other control in this panel wears, and
+a click brings up the window that session is running in. That is the end of the road the rest of
+the app is on — being told an agent is waiting and then hunting for the right window among a
+dozen was the part that stayed manual.
+
+How far a click gets depends on the terminal, and the panel promises the smaller of the two
+outcomes — "the window this session is running in" — and quietly does better where it can:
+
+| Terminal | What a click does |
+| --- | --- |
+| Terminal.app | selects the tab whose terminal device is the session's, then raises it |
+| iTerm2 | the same, through its own dictionary — written from it, not measured |
+| everything else — Ghostty, kitty, Alacritty, the terminal inside VS Code or Cursor | looks through the application's windows for the one titled after the session's project and raises that one |
+
+Raising the application is the floor under both, and it needs no permission from anybody: the
+process table and `NSRunningApplication` are not private data. The two closer answers each cost
+one, and neither is asked for in advance — the click is what asks:
+
+| Answer | Permission | How it is given |
+| --- | --- | --- |
+| the tab, in Terminal.app and iTerm2 | Automation | the system's own dialog, on the first click |
+| the window, everywhere else | Accessibility | by hand in Privacy & Security → Accessibility; a dialog can only offer to open it |
+
+Refuse either and nothing breaks: the application comes up anyway, and the panel shows one line
+naming what was missing, with a button that opens that pane. The app opens it itself, the way
+the limits button takes the status line slot itself.
+
+Why a window is found by its title: a terminal device belongs to a tab, and the applications
+that get this far have no notion of a tab to be asked about. What they do have is a window
+titled after the folder open in it, and the panel already knows that folder — it is the project
+on the session's row. A match is not proof and does not have to be: the worst a wrong one can do
+is raise another window of the same project. No match means the application, same as before.
+
+Rows that lead nowhere say so by staying plain: no plate under the pointer, no click. That is
+every session with no record of a live process — a Codex session, a non-interactive run, a
+process that has since exited — and every subagent, which has no window of its own.
+
 ## How it stays current
 
 A source file changing is what triggers a refresh, and both CLIs append to a file as a turn
@@ -378,6 +418,7 @@ the drag first and the first launch after it.
 | `UsageModel.swift` | What is on screen, and what keeps it current: file events, the heartbeat, the one reader kept across passes, the alerts that come out of a refresh, and the change to `settings.json` waiting for a yes or a no |
 | `MenuContent.swift` | The panel, the one light a section shows, and the button that takes Claude Code's status line slot |
 | `Notifier.swift` | Putting a notification on screen, silently, over whichever channel works |
+| `TerminalRaiser.swift` | Taking a person to the window their session runs in: the tab where the terminal can name one, the application otherwise, and the settings pane after a refusal |
 | `WelcomeWindow.swift` | The first-run explanation, and the only window this app has |
 | `LoginItem.swift` | Starting with the Mac, and the checkbox both views share |
 

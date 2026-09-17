@@ -413,7 +413,7 @@ public struct ClaudeTranscriptStore: Sendable {
     /// person is being waited on — that is the session record's answer (`ClaudeSessionRecord`),
     /// and a transcript cannot tell a question from a tool that is merely slow.
     /// A session's own entries and never a subagent's: an agent asks the person nothing — see
-    /// `UsageReader.withAsking` — so reading one would be answering a question nobody asks.
+    /// `UsageReader.withRecords` — so reading one would be answering a question nobody asks.
     private static func requested(_ entries: [TranscriptLine]) -> String? {
         entries.last(where: { $0.isTurnEntry(sidechain: false) })?.questionAsked
     }

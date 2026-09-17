@@ -121,4 +121,38 @@ public enum Wording {
 
     /// The hint under a reading in the panel: the command, and what it is for.
     public static func moreDetails(_ command: String) -> String { "\(command) for more details" }
+
+    /// What a click on a session's row does, said where the pointer already is.
+    ///
+    /// It promises the window and not the tab, because the tab is what two terminals out of
+    /// several can give (`TerminalRaise`) and the panel has no business guessing which one a
+    /// person is in. Getting the tab when the terminal can name it is better than what was
+    /// promised, which is the only direction this app is allowed to surprise anybody in.
+    public static let raiseSession = "Click to bring up the window this session is running in."
+
+    /// Said after a click got the application but not the tab or window inside it.
+    ///
+    /// Careful about what it claims, because the app cannot tell a refused permission from a
+    /// terminal that turned out not to answer: it says what happened, names the permission as
+    /// the likely reason, and stops there. The application was brought up either way — that
+    /// goes first, so that a person who mostly got what they wanted is not reading an apology.
+    public static func permissionOffer(_ permission: TerminalRaise.Permission) -> String {
+        switch permission {
+        case .automation:
+            "Its application was brought up, but its tab could not be asked for. If you refused "
+                + "the permission to control other apps, that answer is kept in System Settings."
+        case .accessibility:
+            "Its application was brought up, but its windows could not be looked through, so the "
+                + "one in front is whichever you used last. Picking the right window needs this "
+                + "app allowed in Accessibility."
+        }
+    }
+
+    /// The button under the sentence above.
+    public static func permissionSettings(_ permission: TerminalRaise.Permission) -> String {
+        switch permission {
+        case .automation: "Open Automation settings"
+        case .accessibility: "Open Accessibility settings"
+        }
+    }
 }

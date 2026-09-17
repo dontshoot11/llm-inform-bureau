@@ -44,6 +44,9 @@ struct MenuContent: View {
             if model.sessions.isEmpty, silentServices.isEmpty {
                 explanation("No active sessions.")
             }
+            if let permission = model.missingPermission {
+                permissionOffer(permission)
+            }
 
             if let reason = model.levelReason {
                 Divider()
@@ -136,6 +139,7 @@ struct MenuContent: View {
         .onDisappear {
             confirmingTerminate = false
             model.cancelChange()
+            model.forgetPermissionOffer()
         }
     }
 
@@ -378,9 +382,37 @@ struct MenuContent: View {
         }
     }
 
-    /// One running session's context budget, laid out exactly like a limit window: what is
-    /// being spent on the left, how much of it on the right, the detail underneath.
+    /// One running session's context budget — and, when there is a live process behind it, the
+    /// way to the window it is running in.
+    ///
+    /// The plate under the pointer is the only thing that says a row is a control. It is the
+    /// same plate every other control in this panel wears (`Hoverable`), and it appears only
+    /// on rows that lead somewhere: a session with no process behind it is a reading like any
+    /// other, and lighting it under the pointer would promise a window this app cannot find.
+    @ViewBuilder
     private func sessionEntry(_ session: SessionView) -> some View {
+        if session.snapshot.processID != nil {
+            Button {
+                model.raise(session.snapshot)
+            } label: {
+                sessionReadings(session).modifier(Hoverable())
+            }
+            .buttonStyle(.plain)
+            .help(Wording.raiseSession)
+            // The plate needs room around what it sits behind, and that room would move this
+            // row's light out of line with the rows that have no plate. Taken back off the
+            // outside, the column of lights stays a column — the same trick the disclosure
+            // below the limits uses.
+            .padding(.horizontal, -4)
+            .padding(.vertical, -2)
+        } else {
+            sessionReadings(session)
+        }
+    }
+
+    /// The readings themselves, laid out exactly like a limit window: what is being spent on
+    /// the left, how much of it on the right, the detail underneath.
+    private func sessionReadings(_ session: SessionView) -> some View {
         let snapshot = session.snapshot
 
         return entry(
@@ -595,6 +627,22 @@ struct MenuContent: View {
         Text(Wording.moreDetails(command))
             .font(.caption.monospaced())
             .foregroundStyle(.tertiary)
+    }
+
+    /// What is left after a click that got the application and not the tab or window inside
+    /// it: what happened, and the pane where that answer is kept.
+    ///
+    /// Shown only after a click, and gone when the panel closes. A permission nobody has
+    /// wanted yet is not something to bring up — the whole point of asking at the moment of
+    /// the click is that the dialog explains itself — and the app opens that pane itself
+    /// rather than telling a person where to look, the way the limits button takes the status
+    /// line slot itself.
+    private func permissionOffer(_ permission: TerminalRaise.Permission) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            explanation(Wording.permissionOffer(permission))
+            Button(Wording.permissionSettings(permission)) { model.openSettings(for: permission) }
+                .controlSize(.small)
+        }
     }
 
     /// A section's name: quiet, above the section, in the words the bar's dots go by.
