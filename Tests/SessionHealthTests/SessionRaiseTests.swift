@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import AgentFiles
+import Phrasing
 import SessionHealthCore
 
 /// The road from a row in the panel to the window a session is running in.
@@ -263,6 +264,45 @@ func runSessionRaiseTests(_ suite: TestSuite, config: ThresholdConfig) {
             TerminalRaise.plan(owner: nil, tty: "ttys001"),
             .nothing,
             "no application above it means no window to bring up"
+        )
+    }
+
+    // MARK: What the panel says when the click stopped at the application
+    //
+    // The sentence about a tick already given is the one part of this road a person cannot
+    // work out for themselves: the pane shows their tick, and it does nothing. It is said by a
+    // copy signed ad-hoc and by no other, so both halves are worth a case.
+
+    suite.test("an ad-hoc copy warns that a tick may belong to the version before") {
+        let said = Wording.permissionOffer(.accessibility, signedAdHoc: true)
+        suite.expect(
+            said.contains("version before this one"),
+            "the pane's tick is named as the earlier one — \(said)"
+        )
+        suite.expect(
+            said.contains("untick it and tick it again"),
+            "and the person is told what to do about it — \(said)"
+        )
+    }
+
+    suite.test("a copy signed with a certificate keeps that sentence to itself") {
+        let said = Wording.permissionOffer(.accessibility, signedAdHoc: false)
+        suite.expect(
+            said.contains("allowed in Accessibility"),
+            "what is missing is still named — \(said)"
+        )
+        suite.expect(
+            !said.contains("untick"),
+            "and nobody is sent to undo a tick that works — \(said)"
+        )
+    }
+
+    suite.test("the tab's permission is not about ticks of earlier versions") {
+        // Automation is kept per application asked about rather than per copy of this one, and
+        // the sentence would be a guess dressed as an explanation.
+        suite.expect(
+            !Wording.permissionOffer(.automation, signedAdHoc: true).contains("untick"),
+            "the automation answer says nothing about unticking"
         )
     }
 }

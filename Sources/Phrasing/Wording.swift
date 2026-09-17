@@ -136,7 +136,23 @@ public enum Wording {
     /// terminal that turned out not to answer: it says what happened, names the permission as
     /// the likely reason, and stops there. The application was brought up either way — that
     /// goes first, so that a person who mostly got what they wanted is not reading an apology.
-    public static func permissionOffer(_ permission: TerminalRaise.Permission) -> String {
+    ///
+    /// **The sentence about a tick already given** (`signedAdHoc`) is for the one case where
+    /// the pane lies to a person's face. Signed ad-hoc, this app has no name the system can
+    /// keep an answer against beyond the hash of its binary, and a new version has a new hash:
+    /// the tick from the version before is still in the pane, under this same name, granting
+    /// access to a copy that is gone. Nothing in the pane says so, and nothing the app can do
+    /// clears it — the one thing left is to say which tick it is. Measured 2026-09-17: a tick
+    /// given an hour earlier, the system asking again on every click
+    /// (`Scripts/Scripts.md`, "Why a development Mac wants a certificate of its own").
+    ///
+    /// Said only by a copy signed that way, because a copy signed with a certificate keeps its
+    /// permissions across versions, and the sentence would then be sending somebody to undo a
+    /// tick that works.
+    public static func permissionOffer(
+        _ permission: TerminalRaise.Permission,
+        signedAdHoc: Bool = false
+    ) -> String {
         switch permission {
         case .automation:
             "Its application was brought up, but its tab could not be asked for. If you refused "
@@ -145,6 +161,10 @@ public enum Wording {
             "Its application was brought up, but its windows could not be looked through, so the "
                 + "one in front is whichever you used last. Picking the right window needs this "
                 + "app allowed in Accessibility."
+                + (signedAdHoc
+                    ? " If it is ticked there already, that tick was given to the version "
+                        + "before this one — untick it and tick it again."
+                    : "")
         }
     }
 

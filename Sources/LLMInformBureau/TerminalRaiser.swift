@@ -134,6 +134,13 @@ final class TerminalRaiser {
         case notAllowed
     }
 
+    /// Whether the system's dialog about assistive access has been put up in this run.
+    ///
+    /// Per run rather than remembered on disk: a person who gave the access, or took it away,
+    /// did it in a pane this app does not watch, and a launch is the one moment where asking
+    /// again costs nothing and might be the truth.
+    private static var askedForAccessibility = false
+
     /// Raises the window of this application whose title carries `title`.
     ///
     /// **Why a title.** Nothing else about a window says which session is in it. A terminal
@@ -149,15 +156,28 @@ final class TerminalRaiser {
     /// on without it — measured, an attempt without it comes back "not allowed assistive
     /// access" rather than empty, which is why a refusal is told apart from an application
     /// whose windows simply do not match.
+    ///
+    /// **Why the dialog is counted.** The system does not remember that it asked: while access
+    /// is missing, every call that carries the prompt puts the dialog up again, so a person
+    /// who has not given it got one per click — reported, and the reason this counts its own
+    /// asking. Past the first, the panel's own line is what offers the pane, and it survives
+    /// the panel closing no worse than a dialog does.
     private static func raiseWindow(of app: NSRunningApplication, titled title: String) -> WindowResult {
-        // The prompt is part of the click: a person who has just asked to be taken somewhere
-        // is the one person for whom a permission dialog needs no explaining. It is shown by
-        // the system, once, and refusing it is not asked about again.
-        // The key by its own name rather than through `kAXTrustedCheckOptionPrompt`: that
-        // constant is a global `var` in the C header, which Swift 6 will not let a concurrent
-        // program read. Its value is this string, and has been since the option existed.
-        let prompt = "AXTrustedCheckOptionPrompt" as CFString
-        guard AXIsProcessTrustedWithOptions([prompt: true] as CFDictionary) else {
+        // Asked without the prompt first: this is the question, and the dialog is a separate
+        // decision below.
+        guard AXIsProcessTrusted() else {
+            // The prompt is part of the click: a person who has just asked to be taken
+            // somewhere is the one person for whom a permission dialog needs no explaining.
+            // Once, though — see above.
+            // The key by its own name rather than through `kAXTrustedCheckOptionPrompt`: that
+            // constant is a global `var` in the C header, which Swift 6 will not let a
+            // concurrent program read. Its value is this string, and has been since the option
+            // existed.
+            if !askedForAccessibility {
+                askedForAccessibility = true
+                let prompt = "AXTrustedCheckOptionPrompt" as CFString
+                _ = AXIsProcessTrustedWithOptions([prompt: true] as CFDictionary)
+            }
             return .notAllowed
         }
 

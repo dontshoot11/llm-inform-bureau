@@ -77,9 +77,11 @@ struct MenuContent: View {
     /// One quiet row of icons: the way out of the status line slot, the way back to the
     /// explanation, and the way out of the app.
     ///
-    /// The setting itself lives in the window behind the question mark, where it was already
-    /// being offered during setup — a panel of readings is not where a checkbox belongs, and
-    /// one copy of a control cannot disagree with another. Disconnecting is here for the same
+    /// The setting itself lives in the window behind the gear, where it was already being
+    /// offered during setup — a panel of readings is not where a checkbox belongs, and one
+    /// copy of a control cannot disagree with another. A gear rather than the question mark
+    /// that was here before: the window it opens holds a setting and the list of what is
+    /// connected, and a question mark promises reading rather than doing. Disconnecting is here for the same
     /// reason: it acts on the app rather than on a reading, and putting it under the limits
     /// would leave the place a person reads a number carrying a way to take that number away.
     private var settings: some View {
@@ -118,10 +120,10 @@ struct MenuContent: View {
                 Button {
                     Welcome.show()
                 } label: {
-                    Image(systemName: "questionmark.circle").modifier(Hoverable())
+                    Image(systemName: "gearshape").modifier(Hoverable())
                 }
                 .buttonStyle(.borderless)
-                .help("Where the numbers come from, and whether to open at login")
+                .help("Settings: where the numbers come from, what is connected, and whether to open at login")
 
                 Button {
                     confirmingTerminate.toggle()
@@ -639,7 +641,7 @@ struct MenuContent: View {
     /// line slot itself.
     private func permissionOffer(_ permission: TerminalRaise.Permission) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            explanation(Wording.permissionOffer(permission))
+            explanation(Wording.permissionOffer(permission, signedAdHoc: OwnSignature.isAdHoc))
             Button(Wording.permissionSettings(permission)) { model.openSettings(for: permission) }
                 .controlSize(.small)
         }

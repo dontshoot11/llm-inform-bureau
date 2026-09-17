@@ -67,7 +67,7 @@ look up a number instead.
 | File | Holds |
 | --- | --- |
 | `AlertPhrasing.swift` | A crossed mark — or an agent waiting on the person — as a notification: title, body, command |
-| `Wording.swift` | What a mark is called, what a subagent's row is called, which command shows more of it, what a folded row with no reading yet says, what a service is called — `service` where there is room to say it, `serviceInBar` where the budget is pixels — and what a clickable session row promises, plus the line and button shown when the permission for something closer than the application is missing |
+| `Wording.swift` | What a mark is called, what a subagent's row is called, which command shows more of it, what a folded row with no reading yet says, what a service is called — `service` where there is room to say it, `serviceInBar` where the budget is pixels — and what a clickable session row promises, plus the line and button shown when the permission for something closer than the application is missing — with the extra sentence an ad-hoc-signed copy adds, about a tick that belongs to the version before this one |
 | `Briefing.swift` | What the first run says: where every number comes from, and what is not connected |
 | `TokenDisplay.swift` | Token counts and percentages, rounded the way the widget says them |
 | `TimeDisplay.swift` | Ages, reset times and window lengths |

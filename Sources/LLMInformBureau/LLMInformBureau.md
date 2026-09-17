@@ -227,9 +227,10 @@ The panel carries, in order, its two halves named after the two dots in the bar:
    service whose files stopped parsing: that is a reading, and one nobody would otherwise
    ever see.
 3. **Why the bar is that colour** — the one reading that set it, named.
-4. **The icons**: disconnecting the status line slot, while it is the app's; the way back to
-   the first-run explanation; and the way out. Terminating asks once — the panel is opened to
-   read something, and the icon sits where a thumb lands.
+4. **The icons**: disconnecting the status line slot, while it is the app's; the gear, which
+   leads to the window holding the first-run explanation and the one checkbox; and the way out.
+   Terminating asks once — the panel is opened to read something, and the icon sits where a
+   thumb lands.
 
 Nothing in the panel is styled to be clicked — a caption looks like a caption, an icon like an
 icon — so the few things that do something say so under the pointer, and only then: a plate
@@ -286,6 +287,21 @@ one, and neither is asked for in advance — the click is what asks:
 Refuse either and nothing breaks: the application comes up anyway, and the panel shows one line
 naming what was missing, with a button that opens that pane. The app opens it itself, the way
 the limits button takes the status line slot itself.
+
+The system's dialog goes up once per run of the app, not once per click. Asking for the
+permission *with* the prompt is what puts it on screen, and while the access is missing every
+such ask puts it there again — which a person met as one dialog per click. The state is read
+silently now, the dialog offered once, and past that the line in the panel is what offers the
+pane; it outlives the panel closing no worse than a dialog would.
+
+That line carries one more sentence when this copy is signed ad-hoc, which every copy handed
+out is. Signed that way the app has no identity beyond the hash of its binary —
+`codesign -d --requirements -` prints `designated => cdhash H"…"`, with no name in it — so a
+build that changes the code leaves the tick in the Accessibility pane bound to a copy that no
+longer runs, and nothing in the pane says so. The panel says it: the tick belongs to the
+version before this one, and it has to be given again. `OwnSignature` is what tells the two
+kinds of copy apart, so a properly signed one never sends anybody to undo a tick that works.
+`Scripts/Scripts.md` holds the measurement and the way out.
 
 Why a window is found by its title: a terminal device belongs to a tab, and the applications
 that get this far have no notion of a tab to be asked about. What they do have is a window
@@ -378,7 +394,7 @@ the line going into it, and what happens to any status line command already ther
 the only thing in the panel that does something rather than reports something, and it is the
 reason that whole entry steps aside while the question is on screen.
 
-**Disconnecting is not there.** It is an icon in the panel's settings row, beside the `?` and
+**Disconnecting is not there.** It is an icon in the panel's settings row, beside the gear and
 the power button, shown only while the slot is the app's. It acts on the app rather than on a
 reading, and a control that takes a number away does not belong under that number.
 
@@ -388,7 +404,9 @@ A first launch with no explanation is a menu bar item showing an em dash next to
 no way to find out why. So the app opens one window, once, listing every source with whether it
 has reported and, for the one that has not, where the button is. `SetupInspector` finds the facts, `Briefing` in `Phrasing` says
 them, and `WelcomeRecord` is the note in Application Support that keeps it to once. Deleting
-that note brings the window back, and so does the button in the panel.
+that note brings the window back, and so does the gear in the panel — a gear rather than a
+question mark, because that window holds a setting and the list of what is connected, and a
+question mark promises reading rather than doing.
 
 AppKit rather than a SwiftUI `Window` scene: with `LSUIElement` the app is not active when it
 launches, so the window has to be ordered in front and the app activated by hand. The launch
@@ -419,6 +437,7 @@ the drag first and the first launch after it.
 | `MenuContent.swift` | The panel, the one light a section shows, and the button that takes Claude Code's status line slot |
 | `Notifier.swift` | Putting a notification on screen, silently, over whichever channel works |
 | `TerminalRaiser.swift` | Taking a person to the window their session runs in: the tab where the terminal can name one, the application otherwise, and the settings pane after a refusal |
+| `OwnSignature.swift` | How this copy is signed, which decides whether the panel explains a tick left over from an earlier build |
 | `WelcomeWindow.swift` | The first-run explanation, and the only window this app has |
 | `LoginItem.swift` | Starting with the Mac, and the checkbox both views share |
 

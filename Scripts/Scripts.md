@@ -74,6 +74,28 @@ SwiftPM produces a bare executable; a menu bar app needs a bundle with an `Info.
 it, and re-signs it ad-hoc with the identifier from that plist — the notification centre
 ignores a bundle whose signing identifier does not match its `CFBundleIdentifier`.
 
+### The tick in Accessibility dies with every build
+
+Signed ad-hoc, the app has no identity beyond the hash of its binary —
+`codesign -d --requirements -` prints `designated => cdhash H"…"` and nothing else, not even
+the bundle identifier. A permission given by hand is kept against that hash, so any build that
+changes the binary leaves the tick in Privacy & Security → Accessibility bound to a copy that
+no longer runs. Nothing in the pane says so: the row keeps the app's name and its switch stays
+on. Measured 2026-09-17 — two copies, one bundle identifier, hashes `2dd45f…` and `e67b50…`, a
+tick given an hour earlier, and the system asking again on every click.
+
+A signing certificate of our own would fix it for this Mac and was deliberately not taken:
+what happens here has to be what happens to a person who was handed the app, or it stops being
+something we notice. So the way out is theirs too — remove the row with the minus button, then
+click a session and answer the dialog again. The switch alone is not enough; the row stays
+bound to the identity that asked for it. From the terminal:
+`tccutil reset Accessibility com.artjemnikitin.llm-inform-bureau`.
+
+The panel says this itself when a click stops at the application, for the same reason
+(`Wording.permissionOffer`). And a build beside an installed bundle makes two copies with one
+name, which the pane cannot tell apart at all — the app keeps only the last one launched
+running (`LLMInformBureau.md`), and which one that is, only `ps` knows.
+
 **The build fails if that bundle did not get packed.** It is the only copy of the marks the
 app has, and `Bundle.module` would have found the one in the build directory and run
 perfectly — here, and nowhere else. `ThresholdConfigLoader.bundledConfigURL` is the other half
