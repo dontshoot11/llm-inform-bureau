@@ -167,12 +167,12 @@ Open it from Launchpad or `/Applications`, or with `open -a LLMInformBureau`.
 It opens its settings window: the marks it watches — each scale is a bar you can move, and the
 marks that are one number are fields beside their names — and, folded up underneath, everything
 the app uses on this Mac and whether it has got it. Three sources, Claude Code's status line
-slot, the Accessibility permission a click on a session needs, which name the notifications
-arrive under, the **Open at login** checkbox, and which copy of the app is the one running —
-its path and the date it was built, because several bundles of the same name can sit on one
-disk and the system's own privacy panes list them as one name. Every line says what it costs
-while the answer is no, and the ones with an answer to give carry the button that opens the
-right pane of System Settings. That part opens by itself while something is still missing;
+slot — which is also where the slot is given back once the app holds it — the Accessibility
+permission a click on a session needs, which name the notifications arrive under, the **Open at
+login** checkbox, and which copy of the app is the one running — its path and the date it was
+built, because several bundles of the same name can sit on one disk and the system's own
+privacy panes list them as one name. Every line says what it costs while the answer is no, and
+the ones with an answer to give carry the button that opens the right pane of System Settings. That part opens by itself while something is still missing;
 opening the window asks the system for nothing.
 
 Afterwards the window is reached again from the gear in the panel. Nothing is installed as a
@@ -214,8 +214,9 @@ Claude Code ──payload──▶ LLMInformBureau --status-line ──┬──
                                                          └──▶ the command that was there before ──▶ the status line
 ```
 
-The way back out is the icon beside the `?` in the panel's bottom row: it puts your previous
-command back in the slot and takes the app out of it.
+The way back out is in the settings window behind the gear: on the line about Claude Code's
+status line slot, a **Disconnect** button that puts your previous command back in the slot and
+takes the app out of it. It shows the change before making it, the same way connecting does.
 
 One consequence the preview says out loud: **with any statusLine configured, Claude Code stops
 showing most footer hints**, `esc to interrupt` among them. That is Claude Code's behaviour and
@@ -244,10 +245,11 @@ a copy of the app's own marks, so every mark you left alone arrives with the new
 
 ### Removing it
 
-Untick **Open at login**. Then, in the panel, **disconnect the status line** — that puts your
-previous command back where it was and takes the app's out, which matters because the command
-in that slot names a binary inside the bundle you are about to delete. Then quit from the panel
-and:
+Open the settings from the gear in the panel. Untick **Open at login**, and — under *What it
+uses on this Mac*, on the line about Claude Code's status line slot — press **Disconnect**. That
+puts your previous command back where it was and takes the app's out, which matters because the
+command in that slot names a binary inside the bundle you are about to delete. Then quit from
+the panel and:
 
 ```sh
 rm -rf /Applications/LLMInformBureau.app

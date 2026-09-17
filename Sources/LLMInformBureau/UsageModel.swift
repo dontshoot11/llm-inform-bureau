@@ -625,17 +625,36 @@ final class UsageModel: ObservableObject {
     func applyChange() {
         guard let change = pendingChange else { return }
         pendingChange = nil
+        Task { slotProblem = await write(change) }
+    }
+
+    /// What a change would be, without putting it in front of anybody.
+    ///
+    /// The settings window asks this: the way back out of the slot lives there now, and it
+    /// shows the change in its own row rather than through the panel's question — a preview
+    /// published here would appear under the Claude limits, behind the window somebody is
+    /// reading it in.
+    func plannedChange(_ kind: StatusLineChange.Kind) -> StatusLineChange? {
+        statusLine.change(for: kind)
+    }
+
+    /// Writes a change that was shown first, and answers with what went wrong, or `nil`.
+    ///
+    /// The one way this app edits `settings.json`, wherever the question was asked: the panel
+    /// keeps what comes back in `slotProblem`, and the window shows it beside the row it was
+    /// pressed in. Whoever asked reads the file again afterwards, because both of them show
+    /// what is in it rather than what this method believes it did.
+    func write(_ change: StatusLineChange) async -> String? {
+        var problem: String?
         do {
             try statusLine.apply(change)
-            slotProblem = nil
         } catch let failure as ClaudeSettings.Failure {
-            slotProblem = Self.explain(failure)
+            problem = Self.explain(failure)
         } catch {
-            slotProblem = SlotPhrasing.failed(error.localizedDescription)
+            problem = SlotPhrasing.failed(error.localizedDescription)
         }
-        // Whether it worked or not, what the panel shows next comes from the file rather than
-        // from what this method believes it did.
-        Task { await refresh() }
+        await refresh()
+        return problem
     }
 
     private static func explain(_ failure: ClaudeSettings.Failure) -> String {

@@ -74,16 +74,18 @@ struct MenuContent: View {
 
     // MARK: Settings
 
-    /// One quiet row of icons: the way out of the status line slot, the way back to the
-    /// explanation, and the way out of the app.
+    /// One quiet row of icons: the way back to the explanation, and the way out of the app.
     ///
-    /// The setting itself lives in the window behind the gear, where it was already being
-    /// offered during setup — a panel of readings is not where a checkbox belongs, and one
-    /// copy of a control cannot disagree with another. A gear rather than the question mark
-    /// that was here before: the window it opens holds a setting and the list of what is
-    /// connected, and a question mark promises reading rather than doing. Disconnecting is here for the same
-    /// reason: it acts on the app rather than on a reading, and putting it under the limits
-    /// would leave the place a person reads a number carrying a way to take that number away.
+    /// The settings themselves live in the window behind the gear, where they were already
+    /// being offered during setup — a panel of readings is not where a checkbox belongs, and
+    /// one copy of a control cannot disagree with another. A gear rather than the question mark
+    /// that was here before: the window it opens holds the settings and the list of what is
+    /// connected, and a question mark promises reading rather than doing.
+    ///
+    /// Giving the status line slot back used to be a third icon here. It went into that window
+    /// too, onto the line that says what is in the slot: it edits somebody's `settings.json`,
+    /// which is a thing done once and deliberately, and an icon in a panel read at a glance is
+    /// a place to do it by accident.
     private var settings: some View {
         HStack(spacing: 8) {
             if confirmingTerminate {
@@ -104,19 +106,6 @@ struct MenuContent: View {
             // pointer, and the gap between two plates is what would otherwise read as a gap
             // between two groups.
             HStack(spacing: 0) {
-                // Shown only while there is something to disconnect. An icon that is always
-                // there and does nothing four times out of five is a control a person learns
-                // to ignore.
-                if model.slot.isOurs {
-                    Button {
-                        model.propose(.disconnect)
-                    } label: {
-                        Image(systemName: "bolt.slash").modifier(Hoverable())
-                    }
-                    .buttonStyle(.borderless)
-                    .help(SlotPhrasing.disconnectHelp)
-                }
-
                 Button {
                     // The window is where a mark is moved, and the panel is what reads the
                     // marks — so it hands the window a way to ask for a pass when it closes
@@ -157,7 +146,8 @@ struct MenuContent: View {
     /// The one place this panel opens that window, so the gear and a dead end hand it the same
     /// way of reading the checkup. The reading is the panel's own: the slot and the
     /// notification channel are known here, and a window reading them for itself is how two
-    /// parts of one app come to disagree about the same fact.
+    /// parts of one app come to disagree about the same fact. The way back out of the slot goes
+    /// over with it, for the same reason — the window offers it, the model writes it.
     private func openTheWindow(showing point: CheckupState.Point? = nil) {
         Welcome.show(
             checkup: {
@@ -166,6 +156,10 @@ struct MenuContent: View {
                     notifications: model.notificationChannel
                 )
             },
+            slot: SlotHandover(
+                plan: { model.plannedChange(.disconnect) },
+                write: { await model.write($0) }
+            ),
             askForPass: { Task { await model.refresh() } },
             showing: point
         )

@@ -63,9 +63,13 @@ enum Welcome {
     ///   here by something in the panel that could not do its job rather than by the gear. The
     ///   window is long and the answer is one line of it; scrolling to that line is the
     ///   difference between an explanation and a search.
+    /// - Parameter slot: the way this window gives Claude Code's status line slot back, handed
+    ///   over by whoever opened it. Absent on the first run, which happens before there is a
+    ///   panel to ask and with nothing in the slot to give back anyway.
     static func show(
         checkup: @escaping @MainActor () -> CheckupState = { CheckupReader.read() },
         marks: ThresholdConfigLoad = ThresholdConfigLoader.load(),
+        slot: SlotHandover? = nil,
         askForPass: (@MainActor () -> Void)? = nil,
         showing point: CheckupState.Point? = nil
     ) {
@@ -78,14 +82,14 @@ enum Welcome {
             // Read afresh here as well as on the way back to the window: the panel has been
             // running all the while this window was closed, and the gear is the same gesture
             // as opening it the first time.
-            live?.readAgain(with: checkup)
+            live?.readAgain(with: checkup, handingBack: slot)
             if let point { live?.want(point) }
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
 
-        let live = LiveCheckup(reading: checkup)
+        let live = LiveCheckup(reading: checkup, handingBack: slot)
         // Asked for before the view is built, so the first layout already knows the checkup has
         // to be open: a section unfolding a moment after the window appears reads as the window
         // still loading.
@@ -147,10 +151,32 @@ enum Welcome {
     /// after pressing Done reads as the app having ignored you. So closing the window asks for
     /// one now.
     private static func finishedWithTheWindow() {
+        // Before anything else, and whether a mark moved or not: a question about somebody's
+        // settings.json expires with the window it was asked in, the way the panel's questions
+        // expire when the panel closes.
+        live?.windowClosed()
         guard marksMoved else { return }
         marksMoved = false
         askForPass?()
     }
+}
+
+/// The way out of Claude Code's status line slot, as the settings window is given it.
+///
+/// Both halves belong to the panel — it owns the one `StatusLineSlot` this app writes through,
+/// and it is what re-reads the file afterwards — so the window is handed them rather than
+/// reaching for the slot itself. A window reading and writing that file on its own is how two
+/// parts of one app come to disagree about what is in it.
+@MainActor
+struct SlotHandover {
+    /// What the change would be, before anything is written. `nil` when there is nothing to
+    /// give back: the file already looks the way this would leave it.
+    let plan: () -> StatusLineChange?
+
+    /// Writes the change that was shown, and answers with what went wrong, or `nil`. It does
+    /// not return until the panel has read the file again, so the row that asked can then read
+    /// it too and show what is really there.
+    let write: (StatusLineChange) async -> String?
 }
 
 /// Tells `Welcome` the two things that happen to its window from outside: it came back to the
@@ -205,6 +231,15 @@ final class LiveCheckup: ObservableObject {
 
     @Published private(set) var wanted: WantedRow?
 
+    /// How many times this window has been closed. What a question asked in it watches, so that
+    /// reopening the window does not find a half-pressed decision from an hour ago — a counter
+    /// rather than a flag, because a flag that is already set says nothing the second time.
+    @Published private(set) var closings = 0
+
+    func windowClosed() {
+        closings += 1
+    }
+
     /// Sends whoever opens this window to one row of the checkup.
     func want(_ point: CheckupState.Point) {
         wanted = WantedRow(point: point, journey: (wanted?.journey ?? 0) + 1)
@@ -216,13 +251,23 @@ final class LiveCheckup: ObservableObject {
     /// as well is how two parts of one app come to disagree about the same fact.
     private var reading: @MainActor () -> CheckupState
 
-    init(reading: @escaping @MainActor () -> CheckupState) {
+    /// How to give the slot back, from whoever opened this window — kept beside the reading for
+    /// the same reason, and replaced with it: the panel that reads the slot is the panel that
+    /// writes it.
+    @Published private(set) var handingBack: SlotHandover?
+
+    init(reading: @escaping @MainActor () -> CheckupState, handingBack: SlotHandover? = nil) {
         self.reading = reading
+        self.handingBack = handingBack
         self.state = reading()
     }
 
-    func readAgain(with reading: (@MainActor () -> CheckupState)? = nil) {
+    func readAgain(
+        with reading: (@MainActor () -> CheckupState)? = nil,
+        handingBack: SlotHandover? = nil
+    ) {
         if let reading { self.reading = reading }
+        if let handingBack { self.handingBack = handingBack }
         state = self.reading()
     }
 }
@@ -358,6 +403,14 @@ private struct WelcomeView: View {
     /// is a window with a stuck highlight in it.
     @State private var arrivedAt: LiveCheckup.WantedRow?
 
+    /// The edit that gives the status line slot back, while it is on screen waiting to be
+    /// agreed to. Nothing is written until it is.
+    @State private var handingBack: StatusLineChange?
+
+    /// What went wrong the last time this window wrote to `settings.json`, and nothing while it
+    /// worked: the line above already says what is in the slot now.
+    @State private var slotProblem: String?
+
     var body: some View {
         ScrollViewReader { scroll in
             ScrollView {
@@ -367,6 +420,13 @@ private struct WelcomeView: View {
             // waiting before it appears, and a window already open is told about the next one.
             .onAppear { go(to: live.wanted, with: scroll) }
             .onChange(of: live.wanted) { go(to: $0, with: scroll) }
+            // A question about somebody's settings.json does not outlive the window it was
+            // asked in, and neither does the answer to the last one: reopening this window is
+            // somebody coming to look, not coming back to a decision from an hour ago.
+            .onChange(of: live.closings) { _ in
+                handingBack = nil
+                slotProblem = nil
+            }
         }
         .frame(width: 460)
     }
@@ -648,6 +708,12 @@ private struct WelcomeView: View {
                         .buttonStyle(.link)
                         .font(WindowType.detail)
                 }
+                // The second row of this list to carry a control of its own, after the login
+                // checkbox — and, like that one, it stands where the row's answer is: this is
+                // the line that says what is in the slot, and a control that takes a reading
+                // away belongs beside the sentence explaining the reading rather than under the
+                // number it would take away.
+                if row.point == .statusLineSlot { slotHandover }
             }
         }
         // What a person sent here from the panel is looking for. Taken back off the outside so
@@ -662,6 +728,101 @@ private struct WelcomeView: View {
         // is most of the window by the time it is open, and stopping at its top leaves the line
         // that was the point somewhere below the fold.
         .id(row.point)
+    }
+
+    /// The way back out of Claude Code's status line slot, under the line that says the app is
+    /// in it.
+    ///
+    /// It used to be an icon at the foot of the panel, and it is here now for the reason the
+    /// rest of this window exists: it is a setting, not a reading. The panel is a page of
+    /// numbers read at a glance, and a control that takes one of those numbers away — by
+    /// editing somebody's `settings.json` — is something a person goes looking for once, in the
+    /// place where the app says what it uses on this Mac.
+    ///
+    /// Only while the slot holds this copy's own command, which is the only thing this app ever
+    /// takes out of it: another copy's command and somebody else's alike are given back by
+    /// nothing here.
+    @ViewBuilder
+    private var slotHandover: some View {
+        if let handover = live.handingBack, live.state.slot.isOurs {
+            if let change = handingBack {
+                handoverPreview(change, write: handover.write)
+            } else {
+                Button(SlotPhrasing.disconnect) {
+                    slotProblem = nil
+                    handingBack = handover.plan()
+                    // Nothing to give back means the file has moved on under this window —
+                    // edited by hand, or taken by another copy of the app. Reading it again is
+                    // the answer; a preview of nothing would be the window arguing with the
+                    // file.
+                    if handingBack == nil { live.readAgain() }
+                }
+                .buttonStyle(.link)
+                .font(WindowType.detail)
+                .help(SlotPhrasing.disconnectHelp)
+            }
+        }
+        if let slotProblem {
+            Text(slotProblem)
+                .font(WindowType.detail)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// The edit to `settings.json`, before it is made: the file, the line that will be in the
+    /// slot afterwards, and what that does to what is there now. Then the two answers.
+    ///
+    /// The same sentences the panel shows before it connects (`SlotPhrasing.preview`), set in
+    /// this window's type: one question about somebody's file, asked the same way wherever it
+    /// is asked.
+    private func handoverPreview(
+        _ change: StatusLineChange,
+        write: @escaping (StatusLineChange) async -> String?
+    ) -> some View {
+        let preview = SlotPhrasing.preview(change)
+
+        return VStack(alignment: .leading, spacing: 6) {
+            Text(preview.title)
+                .font(WindowType.detail)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(preview.path)
+                .font(WindowType.detail.monospaced())
+                .fixedSize(horizontal: false, vertical: true)
+            if let command = preview.command {
+                Text(command)
+                    .font(WindowType.detail.monospaced())
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            ForEach(preview.notes, id: \.self) { note in
+                Text(note)
+                    .font(WindowType.detail)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            // Both answers on screen, for the reason the panel has both: a question with one
+            // button leaves saying no to guesswork about where to click.
+            HStack {
+                // Return is Done's in this window, and it stays Done's: the key somebody
+                // presses without reading must be the one that closes the window with nothing
+                // written. Escape means no, which is the other half of the same care.
+                Button(SlotPhrasing.apply) {
+                    handingBack = nil
+                    Task {
+                        slotProblem = await write(change)
+                        // The panel has read the file again by now; this reads what it found,
+                        // so the line above says what is in the slot rather than what this
+                        // window asked for.
+                        live.readAgain()
+                    }
+                }
+                Button(SlotPhrasing.cancel) { handingBack = nil }
+                    .keyboardShortcut(.cancelAction)
+            }
+        }
+        .padding(.top, 2)
     }
 
     /// What the machine said, as one mark before the line.

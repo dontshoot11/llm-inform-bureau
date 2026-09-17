@@ -73,7 +73,7 @@ look up a number instead.
 | `TokenDisplay.swift` | Token counts and percentages, rounded the way the widget says them |
 | `TimeDisplay.swift` | Ages, reset times and window lengths — and the one date that is not an age: when the running copy was built |
 | `StatusLineText.swift` | The one row the app prints when it holds Claude Code's status line and nothing was there before it |
-| `SlotPhrasing.swift` | The button that takes that slot, and what the change to `~/.claude/settings.json` is shown as before it is made |
+| `SlotPhrasing.swift` | The button that takes that slot, in the panel, and the one that gives it back, on the checkup line about the slot in the settings window — and what the change to `~/.claude/settings.json` is shown as before either of them is made |
 
 Tests: `Tests/SessionHealthTests/NotificationTextTests.swift`, `SetupTests.swift`,
 `CheckupTests.swift` and `StatusLineModeTests.swift`.

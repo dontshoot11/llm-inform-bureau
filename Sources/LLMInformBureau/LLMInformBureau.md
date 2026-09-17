@@ -228,16 +228,16 @@ The panel carries, in order, its two halves named after the two dots in the bar:
    service whose files stopped parsing: that is a reading, and one nobody would otherwise
    ever see.
 3. **Why the bar is that colour** — the one reading that set it, named.
-4. **The icons**: disconnecting the status line slot, while it is the app's; the gear, which
-   leads to the settings — the marks, the explanation of where the readings come from folded
-   away under them, and the one checkbox; and the way out.
+4. **The icons**: the gear, which leads to the settings — the marks, the explanation of where
+   the readings come from folded away under them, the checkbox, and the way back out of the
+   status line slot; and the way out of the app.
    Terminating asks once — the panel is opened to read something, and the icon sits where a
    thumb lands.
 
 Nothing in the panel is styled to be clicked — a caption looks like a caption, an icon like an
 icon — so the few things that do something say so under the pointer, and only then: a plate
 appears behind them and nothing else changes. That is `Hoverable`, and it is on the fold
-control and on the three icons at the foot of the panel. A reading never gets one; lighting up
+control and on the two icons at the foot of the panel. A reading never gets one; lighting up
 under a pointer would promise something it does not do.
 
 Under every reading stands the command that shows the rest of it — `/usage` under a service's
@@ -399,9 +399,20 @@ the line going into it, and what happens to any status line command already ther
 the only thing in the panel that does something rather than reports something, and it is the
 reason that whole entry steps aside while the question is on screen.
 
-**Disconnecting is not there.** It is an icon in the panel's settings row, beside the gear and
-the power button, shown only while the slot is the app's. It acts on the app rather than on a
-reading, and a control that takes a number away does not belong under that number.
+**Disconnecting is not in the panel at all.** It is a button in the settings window, under the
+checkup line that says what is in the slot, and it appears only while the slot holds this
+copy's own command. It was an icon at the foot of the panel until it moved, and the move is the
+rule the window is for: this is a setting rather than a reading. A panel is read at a glance,
+an edit to somebody's `settings.json` is done once and deliberately, and a control that takes a
+number away does not belong beside that number.
+
+The window is handed the two halves of it rather than reaching for the slot itself
+(`SlotHandover`): the panel owns the one `StatusLineSlot` this app writes through and is what
+re-reads the file afterwards, so it works out the change (`UsageModel.plannedChange`) and makes
+it (`UsageModel.write`), while the window shows it and asks. The preview is the same one the
+panel shows before connecting, from the same sentences — one question about somebody's file,
+asked the same way wherever it is asked — and it expires when the window closes, the way the
+panel's questions expire when the panel closes.
 
 ## The first run, and the one window
 
@@ -457,7 +468,9 @@ Two lines earn their place by being the ones nothing else on the Mac will give:
 
 The slot reads as held when another copy of this app is in it: the limits are arriving, which
 is what that line is about, and which copy is doing the job is the panel's offer to take over
-rather than a gap in the checkup.
+rather than a gap in the checkup. That line is also where the slot is given back: while it
+holds this copy's own command, the row carries the Disconnect button — see *Connecting the
+limits, from the panel*.
 
 ### The roads into it
 
@@ -530,13 +543,13 @@ the drag first and the first launch after it.
 | --- | --- |
 | `Entry.swift` | Where the process starts: the menu bar app, or Claude Code's status line command |
 | `LLMInformBureauApp.swift` | The `MenuBarExtra` scene |
-| `UsageModel.swift` | What is on screen, and what keeps it current: file events, the heartbeat, the one reader kept across passes, the alerts that come out of a refresh, and the change to `settings.json` waiting for a yes or a no |
-| `MenuContent.swift` | The panel, the one light a section shows, and the button that takes Claude Code's status line slot |
+| `UsageModel.swift` | What is on screen, and what keeps it current: file events, the heartbeat, the one reader kept across passes, the alerts that come out of a refresh, the change to `settings.json` waiting for a yes or a no, and the one path that writes it — wherever the question was asked |
+| `MenuContent.swift` | The panel, the one light a section shows, the button that takes Claude Code's status line slot, and what it hands the settings window: how to read the checkup, and how to give that slot back |
 | `Notifier.swift` | Putting a notification on screen, silently, over whichever channel works |
 | `TerminalRaiser.swift` | Taking a person to the window their session runs in: the tab where the terminal can name one, the application otherwise, and the settings pane after a refusal |
 | `OwnSignature.swift` | How this copy is signed, which decides whether the panel explains a tick left over from an earlier build |
 | `Checkup.swift` | Reading what this Mac has given the app without asking it for anything, and the one line that opens a pane of System Settings |
-| `WelcomeWindow.swift` | The first-run explanation, the only window this app has, the marks it hands over, and the checkup it reads again whenever it comes back to the front |
+| `WelcomeWindow.swift` | The first-run explanation, the only window this app has, the marks it hands over, the checkup it reads again whenever it comes back to the front, and the button on its slot line that gives the slot back |
 | `MarkScaleBar.swift` | A scale as something to move: the bar in the colours of its own lights, a handle on each mark and the number under it |
 | `MinuteMarkField.swift` | A mark that is one number as something to set: the field, the stepper beside it and the unit after them |
 | `LoginItem.swift` | Starting with the Mac, and the checkbox both views share |

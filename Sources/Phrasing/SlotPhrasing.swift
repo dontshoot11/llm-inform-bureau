@@ -37,6 +37,11 @@ public enum SlotPhrasing {
         whatever was there before.
         """
 
+    /// The button that gives the slot back, in the settings window beside the line that says
+    /// what is in it. Named for what it does to the slot rather than for what it does to the
+    /// panel: what goes away is the reading, and what comes back is whatever was there before.
+    public static let disconnect = "Disconnect"
+
     public static let disconnectHelp = "Disconnect: put back the status line that was there before"
 
     /// The button for a slot held by another copy of this app — a Mac set up by the release
