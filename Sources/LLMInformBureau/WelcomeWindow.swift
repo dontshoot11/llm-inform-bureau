@@ -714,6 +714,11 @@ private struct WelcomeView: View {
                 // away belongs beside the sentence explaining the reading rather than under the
                 // number it would take away.
                 if row.point == .statusLineSlot { slotHandover }
+                // Under the sentence rather than in place of the title, which is where the
+                // login checkbox stands: that row is nothing but its checkbox, and this one has
+                // an answer of its own above — whose name a banner arrives under, which is the
+                // machine's to give and not anybody's to tick.
+                if row.point == .notifications { NotificationToggle() }
             }
         }
         // What a person sent here from the panel is looking for. Taken back off the outside so

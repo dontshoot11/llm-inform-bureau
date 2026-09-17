@@ -32,6 +32,7 @@ the cases are plain functions and would port to swift-testing mechanically.
 | `BudgetRulesTests` | The four marks, each boundary from both sides, both services |
 | `AlertMemoryTests` | One mark, one notification — and what makes a scope end |
 | `AlertDispatchTests` | What a whole reading has left to say: scopes, `/clear`, a rolled-over limit window, and the backlog found at launch |
+| `NotificationChoiceTests` | Keeping quiet: that an app nobody told to be silent speaks and leaves nothing on the disk, that the choice comes back off the disk the way it was made and is taken away rather than recorded when notifications go back on, that the file lives with everything else the app keeps — which is what carries it across an update — that the checkbox is named after what it switches while the mark beside the row goes on answering for the channel, that a mark crossed during the silence is not announced afterwards while the next one still is, and that the choice is read at the last step before the screen and nowhere above it |
 | `NotificationTextTests` | What a notification says: the CLI command of its own service at the end, and no claim to have measured quality |
 | `LargeTranscriptTests` | A 400 MB transcript read from its end alone, within a time limit that fails if it is not |
 | `SourceWatcherTests` | That a file change is reported at all, including a source directory that appears later |

@@ -89,6 +89,25 @@ moved mark loses its rationale and its provenance: the sentence under it was wri
 different number. `isChosen` is what is left — the flag the window turns into a "Reset to
 default" button beside that mark and into no explanation at all under it.
 
+## Saying nothing at all
+
+One line of that list is not a reading. Whether the app may interrupt anybody is the person's
+to answer and nobody else's — the machine decides only whether the notification centre will
+take this copy, and whose name a banner arrives under. `NotificationChoice` is that answer: a
+file in the app's own directory whose *being there* means quiet, beside the marks that were
+moved and the note that the first run has been explained. Speaking is the state the app ships
+in, so somebody who never opened the window leaves nothing behind at all, and the file is
+named after what it records — `notifications-off` — for whoever goes looking through that
+directory for the reason their Mac went silent.
+
+It is not a mark and the rules that guard the marks do not reach it: no order to keep, no
+range to fall outside of. What does matter is where the silence is allowed to live, and that
+is at the very edge, in the app (`Notifier`). Everything above it runs exactly as it does for
+somebody who chose nothing — the rules read, the lights change, and `AlertDispatch` goes on
+recording what it has accounted for. A silence higher up would leave a backlog behind it, and
+ticking the box again would empty that backlog onto the person who had just asked to be
+interrupted again.
+
 ## What this Mac has given the app
 
 The app depends on things it did not bring with it: a status line slot, a permission, a source
@@ -257,6 +276,7 @@ Nothing in the loader throws: a broken config file degrades to the values below 
 | `CheckupState.swift` | Everything the app runs on that this Mac had to give it — the sources, the slot, the permissions, the records a click on a session runs on, which copy is running — what each of those answers means, the panes of System Settings where the answers are kept, and which row answers each dead end in the panel (`CheckupRoad`) |
 | `StatusLineSlotState.swift` | Whose Claude Code's one status line slot is, and what taking it or giving it back would change |
 | `TerminalRaise.swift` | How far a click on a session's row can get — the tab, the window titled after the project, or the application — the AppleScript that asks for a tab, and which permission each answer costs |
+| `NotificationChoice.swift` | Whether the app may say anything out loud — the one thing about notifications the person decides, and where that answer is kept |
 | `SupportDirectory.swift` | The directory this app keeps its own files in |
 | `Resources/thresholds.json` | The marks themselves — see `Thresholds.md` |
 

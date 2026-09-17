@@ -376,6 +376,18 @@ Two things about the delivery are worth knowing:
   settled on, and that line is the only honest thing there is to say about notifications before
   one has been sent.
 
+**Whether to say anything at all is the reader's, and it is answered at the last step before
+the screen.** The notifications line of the checkup carries a checkbox, and unticking it stops
+the banners and nothing else: the lights, the signs in the panel and the counting behind them
+are untouched, because the silence sits inside `Notifier` rather than anywhere on the way to
+it. `AlertDispatch` goes on recording what it has accounted for while the app is quiet, which
+is what makes ticking the box again safe — a memory that had stopped would have a backlog in
+it, and the box going back on would empty that backlog onto somebody who had just asked to be
+interrupted again. The choice is `NotificationChoice` in `SessionHealthCore`: a file whose
+being there means quiet, kept beside the marks that were moved, so it survives a restart and a
+copy dragged over the old one. It is read at every delivery rather than at launch, because the
+window writes it while the app is running.
+
 The state found at launch is recorded rather than announced. The app starts at login and finds
 whatever the day has already spent; a handful of notifications about the past every morning is
 how a user learns to dismiss the one that matters.
@@ -458,7 +470,11 @@ Two lines earn their place by being the ones nothing else on the Mac will give:
 - **Notifications**, which get no tick. Signed ad-hoc the app is refused by the notification
   centre outright and falls back to `osascript`, which the system credits to Script Editor —
   and which of the two it will be is not knowable until the first notification is sent. So the
-  line says the channel it got, and before that says it is settled on first use.
+  line says the channel it got, and before that says it is settled on first use. What it does
+  carry is a checkbox — the only thing about notifications that is a decision rather than an
+  answer, and the one place in the app to make it. The tick beside the row goes on answering
+  its own question: the mark is about the channel, the box is about whether to speak, and the
+  line under an unticked box says what did not change with it.
 - **Automation**, which gets no tick either, and never will. macOS has no question that answers
   "may this app control Terminal" — the only way to find out is to send an event and see, and
   the sending is somebody's click on a session. So the row says what the app will ask for and
@@ -545,7 +561,7 @@ the drag first and the first launch after it.
 | `LLMInformBureauApp.swift` | The `MenuBarExtra` scene |
 | `UsageModel.swift` | What is on screen, and what keeps it current: file events, the heartbeat, the one reader kept across passes, the alerts that come out of a refresh, the change to `settings.json` waiting for a yes or a no, and the one path that writes it — wherever the question was asked |
 | `MenuContent.swift` | The panel, the one light a section shows, the button that takes Claude Code's status line slot, and what it hands the settings window: how to read the checkup, and how to give that slot back |
-| `Notifier.swift` | Putting a notification on screen, silently, over whichever channel works |
+| `Notifier.swift` | Putting a notification on screen, silently, over whichever channel works — or not putting one there at all, which is the checkbox in the same file |
 | `TerminalRaiser.swift` | Taking a person to the window their session runs in: the tab where the terminal can name one, the application otherwise, and the settings pane after a refusal |
 | `OwnSignature.swift` | How this copy is signed, which decides whether the panel explains a tick left over from an earlier build |
 | `Checkup.swift` | Reading what this Mac has given the app without asking it for anything, and the one line that opens a pane of System Settings |

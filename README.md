@@ -99,6 +99,12 @@ matter.
 A mark is said once per session; `/clear` starts a new session, so it can be said again there.
 Nothing is said twice about the same crossing.
 
+**Or nothing at all.** The notifications line of the settings window carries a checkbox, and
+unticking it stops the banners and nothing else — the lights, the signs in the bar and
+everything they are counted from go on as they were. It survives a restart and an update, and
+switching it back on does not deliver what you missed: the app goes on keeping count while it
+is quiet, so a mark crossed during the silence is not news afterwards.
+
 ## Install
 
 **Before you start:** macOS 13 or newer. That is the whole list. Nothing is compiled on your
@@ -168,7 +174,8 @@ It opens its settings window: the marks it watches — each scale is a bar you c
 marks that are one number are fields beside their names — and, folded up underneath, everything
 the app uses on this Mac and whether it has got it. Three sources, Claude Code's status line
 slot — which is also where the slot is given back once the app holds it — the Accessibility
-permission a click on a session needs, which name the notifications arrive under, the **Open at
+permission a click on a session needs, which name the notifications arrive under — with the
+checkbox that decides whether they arrive at all — the **Open at
 login** checkbox, and which copy of the app is the one running — its path and the date it was
 built, because several bundles of the same name can sit on one disk and the system's own
 privacy panes list them as one name. Every line says what it costs while the answer is no, and

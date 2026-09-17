@@ -143,9 +143,27 @@ public enum CheckupPhrasing {
         }
     }
 
-    /// The label on the one control in this list that is a control rather than a reading. Said
-    /// here so the checkbox and the line naming it cannot come to disagree.
+    /// The label on the login checkbox. Said here so the control and the line naming it cannot
+    /// come to disagree.
     public static let openAtLogin = "Open at login"
+
+    /// The label on the other checkbox in this list: the only thing about notifications that is
+    /// a decision rather than an answer.
+    ///
+    /// Named after what ticking it does, in the words the line above it already uses — a
+    /// checkbox reading "Notifications" beside a row called Notifications says nothing about
+    /// what it switches.
+    public static let announceMarks = "Announce a crossed mark"
+
+    /// Said under that checkbox while it is off, and about the two things somebody unticking it
+    /// has to be sure of: that nothing else went with it, and that the mark beside the row is
+    /// still answering its own question.
+    public static let silenced = """
+        Off: nothing is announced. The lights, the signs in the panel and everything they are \
+        counted from go on exactly as they are — the difference is that nothing interrupts \
+        you. The mark beside this line is about the channel, which is settled by the first \
+        notification that does go out.
+        """
 
     /// Said where a login item cannot be offered at all, with the reason the system gave.
     public static func openAtLoginUnavailable(_ why: String) -> String {
