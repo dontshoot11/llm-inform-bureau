@@ -31,16 +31,18 @@ It also means the awkward outcomes have a place to be named. Every reader here r
 and they call for different reactions: one waits, the other needs a look at the format. An
 empty list of sessions is a `.value`, not an absence — "nothing is running" is a fact.
 
-## The three sources
+## The four sources
 
 | Source | Gives | Needs installing |
 | --- | --- | --- |
 | Codex rollouts | Codex limits **and** Codex sessions, window size included | no |
 | Claude transcripts | Claude sessions: tokens held, project, turn growth — and the subagents running inside them | no |
 | the status line slot | Claude limits, and the size of a Claude context window | **yes** |
+| Claude session records | which Claude sessions have stopped and are waiting on the person | no |
 
-Three readers, because Codex says everything in one file and Claude says it in two places —
-neither of which is complete on its own.
+Four readers, because Codex says everything in one file and Claude says it in three places —
+none of which is complete on its own. The join between the three Claude ones is
+`UsageReader`, and it happens there and nowhere else.
 
 ### Codex: one file says everything
 
@@ -107,16 +109,24 @@ Three shapes in a transcript the reader has to know about:
   The directory name cannot be decoded back into a path instead: it is the path with every
   `/` and `.` turned into `-`, and `colors.css` and `colors/css` come out the same.
 
-### Whether a session is waiting on its agent
+### Who a session is waiting on
 
-A session's row says not only what it holds but whether the agent owes it an answer right now —
-`SessionSnapshot.replyWait`, which the panel and the bar draw on. Three outcomes, not two:
-nothing owed, an answer owed and still expected (`.waiting`, the blinking light), and an answer
-owed for longer than the fuse (`.stalled`, the figure eight).
+A session's row says not only what it holds but who is being waited on right now —
+`SessionSnapshot.replyWait`, which the panel and the bar draw on. Four outcomes, not two:
 
-Both services answer the question and neither answers it the same way, which is why each reader
-holds its own rule: Claude has to be read between the lines, Codex says it outright. The fuse
-under both is one threshold and one rule — `SessionActivity.replyWait`.
+| Outcome | What it means | How the light is drawn |
+| --- | --- | --- |
+| `.none` | the turn ended, nobody is waiting | a plain dot |
+| `.waiting` | the agent owes an answer and one is still expected | blinking |
+| `.stalled` | the agent has owed one for longer than the fuse | the figure eight |
+| `.asking(since:)` | the *agent* is waiting on the *person* | the pause sign |
+
+The first three are read the same way for both services and neither reads it the same way,
+which is why each reader holds its own rule: Claude has to be read between the lines, Codex
+says it outright. The fuse under both is one threshold and one rule —
+`SessionActivity.replyWait`.
+
+The fourth comes from somewhere else entirely, and is below.
 
 #### Claude: the turn boundaries are inferred
 
@@ -179,6 +189,56 @@ Two things this rule does not do, and both are honest rather than hidden:
   turn ended — so it gets a plain dot however long it stays quiet, and leaves by the activity
   window like any other. The same goes for a turn the person stopped: it is over, and staying
   over for longer does not make it something the agent owes an answer for.
+
+#### Claude: a request to the person is written down, but not in the transcript
+
+The three states above are all about the agent, and the transcript has enough in it to derive
+them. The fourth one it cannot: **a question to the person is written there as a `tool_use`
+entry with no result yet** — `AskUserQuestion`, `stop_reason: "tool_use"`, nothing after it —
+which is character for character what a tool that is still running looks like. A request for
+permission to run something is worse: the transcript carries the ordinary tool call and no
+trace of the dialog at all. Read from the transcript alone, a session standing still with a
+question on the screen blinks exactly like one hard at work.
+
+`~/.claude/sessions/<pid>.json` is what separates them. Claude Code 2.1.27x keeps one small
+record per interactive process, and it says outright what it is doing — measured on a live
+session, with a watcher sampling the file twice a second:
+
+| What was happening | `status` | `waitingFor` |
+| --- | --- | --- |
+| the agent was working | `busy` | — |
+| **the agent asked a question** | **`waiting`** | **`input needed`** |
+| the person answered | `busy` | — |
+| **the turn ended, nothing asked** | **`idle`** | — |
+
+`statusUpdatedAt` moves with the status and with nothing else, so it is the moment the asking
+began: nothing rewrites the record while the person is away. `sessionId` ties it to a row and
+`cwd` to a project.
+
+What the record does *not* carry is the question itself — the `needs` field is empty for this
+kind of dialog — so what is being asked still comes out of the transcript.
+
+Four things bound what this source is allowed to do, and all four are about a file written by a
+process that may no longer exist:
+
+- **Missing is the normal case.** There is no record for a non-interactive run (`claude -p`),
+  none for a CLI old enough not to write them, and there may be none for the next version: the
+  format is the CLI's own undocumented business. A session with no record is read exactly as it
+  was before this source existed — the transcript's verdict, and no pause sign. Nothing in the
+  interface mentions any of this.
+- **A status this app has not seen is not a request.** Only `waiting` raises the sign, so a CLI
+  that renames its states falls back to the previous release's behaviour rather than lighting a
+  sign nobody can explain.
+- **A record cannot add a row.** It is read only for a session the panel already lists on its
+  own activity, so a record matching nothing draws nothing.
+- **A record that stopped moving is not read.** A killed process leaves its last state behind,
+  and a stuck `waiting` would otherwise draw a pause sign with no end. A record whose status has
+  not moved inside the activity window is ignored, and of two records naming the same session —
+  which is what `claude --resume` leaves behind — only the newest is read.
+
+The fuse never applies here. `sessions.abandoned_wait_after_minutes` asks whether an answer is
+still coming from the agent; a person who has not come back in an hour has not stalled, they
+are out of the room, and the request stands until it is answered or the row goes.
 
 #### Codex: the turn boundaries are announced
 
@@ -522,10 +582,11 @@ run against fixtures instead of against whatever the machine happens to have.
 | File | Holds |
 | --- | --- |
 | `SourceReading.swift` | The three outcomes every reader returns |
-| `UsageReader.swift` | Both services read at once, and the join between the two Claude sources |
+| `UsageReader.swift` | Both services read at once, and the join between the three Claude sources |
 | `CodexRollouts.swift` | Codex limits and Codex sessions, out of the rollouts — including whether one is waiting on its agent |
 | `ClaudeTranscripts.swift` | Claude sessions and the subagents running inside them, out of the transcripts — including whether one is waiting on its agent |
 | `ClaudeStatus.swift` | Claude limits and window sizes, out of the payloads the status line command leaves |
+| `ClaudeSessionRecords.swift` | Which Claude sessions have stopped and are waiting on the person, out of the records the running processes keep |
 | `StatusLineMode.swift` | The app run as that command: the payload saved, and the command that held the slot before called |
 | `StatusLineSlot.swift` | Getting into Claude Code's one status line slot and back out of it, keeping whatever was there |
 | `ClaudeSettings.swift` | `~/.claude/settings.json`: what it says about the slot, and the only writes this app makes to it |

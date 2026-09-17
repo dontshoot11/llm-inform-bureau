@@ -140,20 +140,23 @@ final class UsageModel: ObservableObject {
     /// them did"; a row of its own can be honest about which.
     @Published private(set) var sessionPulse: [String: Double] = [:]
 
-    /// Whose wait has gone on past the fuse, by service for the bar and by session for the
-    /// panel — the lights drawn as a sign instead of a dot.
+    /// Whose wait has gone on past the fuse, and who is being asked something, by service for
+    /// the bar and by session for the panel — the lights drawn as a sign instead of a dot.
     ///
-    /// Published rather than kept beside the private sets below, because unlike a blink this
-    /// changes nothing else: a stall starts and ends without a frame being drawn, and a view
-    /// that was not told would go on showing the dot until something else moved.
+    /// Published rather than kept beside the private sets below, because unlike a blink these
+    /// change nothing else: a sign starts and ends without a frame being drawn, and a view that
+    /// was not told would go on showing the dot until something else moved.
     ///
-    /// A service the bar would have to say two things about says the live one. `stalledServices`
-    /// leaves out any service that also has a session blinking: one of them means "something is
-    /// running right now" and the other "nothing has come back for ten minutes", and on a light
-    /// that speaks for every session of a service the first is the newer fact. The panel, which
-    /// has a row per session, shows both without having to choose.
+    /// A service the bar would have to say two things about says the one that asks most of the
+    /// person, and the order is `sign(of:)`. `stalledServices` leaves out any service that also
+    /// has a session blinking or asking: a stall means "nothing has come back for ten minutes",
+    /// and next to "something is running right now" or "this one wants you", it is the fact
+    /// that can wait. The panel, which has a row per session, shows all of them without having
+    /// to choose.
     @Published private(set) var stalledServices: Set<AgentService> = []
     @Published private(set) var stalledSessions: Set<String> = []
+    @Published private(set) var askingServices: Set<AgentService> = []
+    @Published private(set) var askingSessions: Set<String> = []
 
     /// One reader for the life of the app, not one per pass.
     ///
@@ -257,16 +260,37 @@ final class UsageModel: ObservableObject {
     }
 
     /// How far through its pulse this service is, or nil when it is not pulsing.
-    func pulse(of service: AgentService) -> Double? { pulse[service] }
+    ///
+    /// A light wearing a sign never pulses. Blinking is drawn by leaving the light out for a
+    /// frame, so a sign that blinked would be a sign going missing and coming back — and the
+    /// two signals are not equals: a blink says something is happening, a sign says who is
+    /// being waited on, and that is the one a glance is for.
+    func pulse(of service: AgentService) -> Double? {
+        sign(of: service) == nil ? pulse[service] : nil
+    }
 
     /// How far through its pulse this session is, or nil when it is not pulsing.
-    func pulse(ofSession sessionID: String) -> Double? { sessionPulse[sessionID] }
+    func pulse(ofSession sessionID: String) -> Double? {
+        sign(ofSession: sessionID) == nil ? sessionPulse[sessionID] : nil
+    }
 
-    /// Whether this service's light stands for a wait that has gone past the fuse.
-    func isStalled(_ service: AgentService) -> Bool { stalledServices.contains(service) }
+    /// What this service's light is drawn as, or nil for the dot itself.
+    ///
+    /// Asking wins over a stall, because it is the one of the two the person can do something
+    /// about: a service with one session asking and another long silent says the request.
+    func sign(of service: AgentService) -> LightSign? {
+        if askingServices.contains(service) { return .asking }
+        if stalledServices.contains(service) { return .stalled }
+        return nil
+    }
 
-    /// Whether this session's own light does.
-    func isStalled(session sessionID: String) -> Bool { stalledSessions.contains(sessionID) }
+    /// What this session's own light is drawn as. A session is only ever in one of these
+    /// states, so the order here settles nothing — it is the same question asked of a row.
+    func sign(ofSession sessionID: String) -> LightSign? {
+        if askingSessions.contains(sessionID) { return .asking }
+        if stalledSessions.contains(sessionID) { return .stalled }
+        return nil
+    }
 
     func refresh() async {
         // A read already running will see everything this one would have; asking it to go
@@ -349,7 +373,8 @@ final class UsageModel: ObservableObject {
     /// A subagent counts as a session of its own here, the way it does everywhere else: it has
     /// a row in the panel, and a row that is working says so for itself. Its service blinks for
     /// the same reason the bar blinks for any one of its sessions — the bar has one light and
-    /// can only say "one of these".
+    /// can only say "one of these". What a subagent never gets is a sign: an agent asks nothing
+    /// of the person, and a stall inside one ends when the agent does.
     ///
     /// Nothing is stopped here. A light that has stopped waiting simply finishes the blink it
     /// is in and drops out, which is one beat at most and leaves it lit rather than dark: a
@@ -358,12 +383,17 @@ final class UsageModel: ObservableObject {
         let rows = sessions.flatMap { [$0] + $0.subagents }.map(\.snapshot)
         let waiting = rows.filter { $0.replyWait == .waiting }
         let stalled = rows.filter { $0.replyWait == .stalled }
+        let asking = rows.filter { $0.replyWait.isAsking }
         waitingServices = Set(waiting.map(\.service))
         waitingSessions = Set(waiting.map(\.sessionID))
-        // A stalled wait stops blinking and starts being drawn as a sign — nothing here keeps
-        // a frame running for it, which is what leaves an app with nothing but stalls as idle
-        // as one with nothing at all.
-        stalledServices = Set(stalled.map(\.service)).subtracting(waitingServices)
+        // Neither a stall nor a request blinks: both are drawn as a sign, and nothing here
+        // keeps a frame running for them — which is what leaves an app full of them as idle as
+        // one with nothing at all.
+        askingServices = Set(asking.map(\.service))
+        askingSessions = Set(asking.map(\.sessionID))
+        stalledServices = Set(stalled.map(\.service))
+            .subtracting(waitingServices)
+            .subtracting(askingServices)
         stalledSessions = Set(stalled.map(\.sessionID))
         guard !waiting.isEmpty else { return }
 

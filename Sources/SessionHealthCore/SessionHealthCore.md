@@ -157,7 +157,7 @@ Nothing in the loader throws: a broken config file degrades to the values below 
 | --- | --- |
 | `AgentService.swift` | The two services, and why they are not symmetric |
 | `SessionActivity.swift` | Which sessions count as the ones being worked on right now |
-| `SessionSnapshot.swift` | The input: a session's tokens, window, last turn and the model that answered it, what it is waiting on its agent for (nothing, an answer, an answer long overdue) — and, for a subagent, where it came from |
+| `SessionSnapshot.swift` | The input: a session's tokens, window, last turn and the model that answered it, who it is waiting on (nobody, its agent, its agent for a long time, or the person it has asked something) — and, for a subagent, where it came from |
 | `LimitsSnapshot.swift` | The input: one service's limit windows and when they were reported |
 | `BudgetAlert.swift` | What a crossed mark is, and the identity the memory remembers |
 | `AlertMemory.swift` | One mark, one notification — scopes and what ends them |

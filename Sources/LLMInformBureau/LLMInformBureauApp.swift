@@ -22,7 +22,7 @@ struct LLMInformBureauApp: App {
             // renders only the first — the status item takes one image and one title, and
             // names and lights have to interleave, which that cannot express.
             Image(nsImage: BarLights.image(for: AgentService.allCases.map {
-                (Wording.serviceInBar($0), model.lights(of: $0), model.pulse(of: $0), model.isStalled($0))
+                (Wording.serviceInBar($0), model.lights(of: $0), model.pulse(of: $0), model.sign(of: $0))
             }))
         }
         // The panel style, because the panel shows readings and their age rather than a list
@@ -117,7 +117,7 @@ enum BarLights {
     private static var font: NSFont { .systemFont(ofSize: 10, weight: .semibold) }
 
     static func image(
-        for services: [(name: String, lights: ServiceLights, pulse: Double?, stalled: Bool)]
+        for services: [(name: String, lights: ServiceLights, pulse: Double?, sign: LightSign?)]
     ) -> NSImage {
         let widths = services.map { badgeWidth(for: $0.name) }
         let total = widths.reduce(0, +) + betweenServices * Double(max(services.count - 1, 0))
@@ -165,7 +165,7 @@ enum BarLights {
                 draw(service.lights.limits, atX: dotsX, y: middle + betweenDots / 2)
                 let contextY = middle - betweenDots / 2 - diameter
                 if !blinkedOut(service.pulse) {
-                    draw(service.lights.context, stalled: service.stalled, atX: dotsX, y: contextY)
+                    draw(service.lights.context, sign: service.sign, atX: dotsX, y: contextY)
                 }
                 x += width + betweenServices
             }
@@ -225,19 +225,20 @@ enum BarLights {
     /// close", and there is no shade of it that reads as "the end arrived" — a different shape
     /// says that at a glance, which is all the bar is for.
     ///
-    /// A wait that has gone past the fuse is the same light drawn as a figure eight — shape for
-    /// the state, colour still for the budget, the same pair of claims the panel makes in its
-    /// own row. It is not drawn for a light with nothing behind it: in the bar an unreported
+    /// A session being waited on is the same light drawn as a sign — a figure eight for a wait
+    /// past the fuse, the pause bars for an agent asking the person something. Shape for the
+    /// state, colour still for the budget, the same pair of claims the panel makes in its own
+    /// row. Neither is drawn for a light with nothing behind it: in the bar an unreported
     /// reading draws nothing at all, and a sign appearing where there was never a dot would be
     /// the app announcing a wait on a session whose numbers it never had. The panel, which does
     /// draw that reading as an outline, draws the sign for it too.
-    private static func draw(_ light: Light, stalled: Bool = false, atX x: Double, y: Double) {
+    private static func draw(_ light: Light, sign: LightSign? = nil, atX x: Double, y: Double) {
         let box = NSRect(x: x, y: y, width: diameter, height: diameter)
         switch light {
         case .unknown:
             return
-        case .level(let level) where stalled:
-            waitSign(in: box, colour: NSColor(Palette.colour(of: level)))
+        case .level(let level) where sign != nil:
+            draw(sign!, in: box, colour: NSColor(Palette.colour(of: level)))
         case .level(let level):
             NSColor(Palette.colour(of: level)).setFill()
             NSBezierPath(ovalIn: box).fill()
@@ -255,9 +256,22 @@ enum BarLights {
         }
     }
 
-    /// The figure eight, in the bar's own drawing. The shape itself is `WaitSign` — shared with
-    /// the panel so that the two halves of the app draw one sign and not two similar ones.
-    private static func waitSign(in box: NSRect, colour: NSColor) {
+    /// A sign, in the bar's own drawing. The geometry is `WaitSign` and `PauseSign` — shared
+    /// with the panel so that the two halves of the app draw one sign each and not two similar
+    /// ones.
+    private static func draw(_ sign: LightSign, in box: NSRect, colour: NSColor) {
+        let path: NSBezierPath
+        switch sign {
+        case .stalled: path = waitSignPath(in: box)
+        case .asking: path = pauseSignPath(in: box)
+        }
+        path.lineWidth = sign.lineWidth(forDiameter: diameter)
+        path.lineCapStyle = .round
+        colour.setStroke()
+        path.stroke()
+    }
+
+    private static func waitSignPath(in box: NSRect) -> NSBezierPath {
         let (centre, reach, lift) = WaitSign.lobes(in: box)
         let path = NSBezierPath()
         path.move(to: centre)
@@ -271,9 +285,15 @@ enum BarLights {
             controlPoint1: NSPoint(x: centre.x + reach, y: centre.y - lift),
             controlPoint2: NSPoint(x: centre.x + reach, y: centre.y + lift)
         )
-        path.lineWidth = WaitSign.lineWidth(forDiameter: diameter)
-        path.lineCapStyle = .round
-        colour.setStroke()
-        path.stroke()
+        return path
+    }
+
+    private static func pauseSignPath(in box: NSRect) -> NSBezierPath {
+        let path = NSBezierPath()
+        for bar in PauseSign.bars(in: box) {
+            path.move(to: NSPoint(x: bar.from.x, y: bar.from.y))
+            path.line(to: NSPoint(x: bar.to.x, y: bar.to.y))
+        }
+        return path
     }
 }

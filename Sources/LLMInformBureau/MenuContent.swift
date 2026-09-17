@@ -386,7 +386,7 @@ struct MenuContent: View {
         return entry(
             light: light(of: session),
             blinkedOut: blinkedOut(model.pulse(ofSession: snapshot.sessionID)),
-            stalled: model.isStalled(session: snapshot.sessionID),
+            sign: model.sign(ofSession: snapshot.sessionID),
             name: Wording.service(snapshot.service),
             tag: snapshot.model,
             badge: snapshot.project,
@@ -414,7 +414,7 @@ struct MenuContent: View {
             StatusLight(
                 light: light(of: subagent),
                 diameter: 6,
-                stalled: model.isStalled(session: snapshot.sessionID)
+                sign: model.sign(ofSession: snapshot.sessionID)
             )
                 .opacity(blinkedOut(model.pulse(ofSession: snapshot.sessionID)) ? 0 : 1)
                 .alignmentGuide(.firstTextBaseline) { $0.height * 0.5 + 2.5 }
@@ -530,7 +530,7 @@ struct MenuContent: View {
     private func entry(
         light: Light,
         blinkedOut: Bool = false,
-        stalled: Bool = false,
+        sign: LightSign? = nil,
         name: String,
         tag: String? = nil,
         badge: String?,
@@ -539,7 +539,7 @@ struct MenuContent: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                StatusLight(light: light, stalled: stalled)
+                StatusLight(light: light, sign: sign)
                     // Hidden rather than removed: the row must not shift sideways while it
                     // blinks, or the blink reads as the layout moving instead of the light.
                     .opacity(blinkedOut ? 0 : 1)
@@ -648,24 +648,36 @@ struct StatusLight: View {
     let light: Light
     var diameter: Double = 8
 
-    /// Whether this light stands for a wait that has gone past the fuse: the same light in the
-    /// same colour, drawn as a figure eight instead of a dot. Shape carries the state and
-    /// colour goes on carrying the budget — a context against the ceiling shows a red sign,
-    /// which says both things at once and neither of them twice.
-    var stalled: Bool = false
+    /// The sign this light is drawn as instead of a dot, or `nil` for the dot itself. Shape
+    /// carries the state and colour goes on carrying the budget — a session asked something
+    /// with its window against the ceiling shows a red pause sign, which says both things at
+    /// once and neither of them twice.
+    var sign: LightSign?
 
     var body: some View {
         Group {
-            switch light {
-            case _ where stalled:
-                WaitSign.path(in: CGRect(x: 0, y: 0, width: diameter, height: diameter))
+            if let sign {
+                sign.path(in: CGRect(x: 0, y: 0, width: diameter, height: diameter))
                     .stroke(
                         colour(of: light),
                         style: StrokeStyle(
-                            lineWidth: WaitSign.lineWidth(forDiameter: diameter),
+                            lineWidth: sign.lineWidth(forDiameter: diameter),
                             lineCap: .round
                         )
                     )
+            } else {
+                dot
+            }
+        }
+        .frame(width: diameter, height: diameter)
+    }
+
+    /// The light as itself: a filled dot for a reading, an outline for none, a cross for a
+    /// window with nothing left.
+    @ViewBuilder
+    private var dot: some View {
+        Group {
+            switch light {
             case .unknown:
                 Circle().strokeBorder(Color.secondary, lineWidth: 1.5)
             case .level(let level):
@@ -687,18 +699,58 @@ struct StatusLight: View {
                 )
             }
         }
-        .frame(width: diameter, height: diameter)
     }
 
     /// What colour a light of this kind is drawn in when it is drawn as a sign rather than as
     /// itself. An unreported reading keeps the grey its outline would have had: the sign says
-    /// the wait is long, and inventing a budget colour to go with it would say something nobody
-    /// measured.
+    /// who is being waited on, and inventing a budget colour to go with it would say something
+    /// nobody measured.
     private func colour(of light: Light) -> Color {
         switch light {
         case .unknown: .secondary
         case .level(let level): Palette.colour(of: level)
         case .spent: Palette.colour(of: .high)
+        }
+    }
+}
+
+/// A shape a light is drawn as instead of a dot, and the states that earn one.
+///
+/// Both of them answer the same question — who is being waited on — from opposite ends, which
+/// is why they are one type and not two unrelated shapes: a light has at most one of them, and
+/// the choice is made once, here.
+///
+/// Shape and colour say different things on purpose. The shape is the state; the colour goes on
+/// being the budget, so a session asked something with its window against the ceiling wears a
+/// red pause sign and says both at once. A third colour, or a fourth dot, would have said
+/// neither clearly.
+enum LightSign {
+    /// A wait on the agent that has gone past the fuse: no answer for a long time. The figure
+    /// eight.
+    case stalled
+
+    /// The agent has asked the person for something and stopped until they answer. The pause
+    /// sign — two upright bars, the one shape everybody already reads as "stopped, and it is
+    /// your move".
+    case asking
+
+    /// How thick the sign is stroked, given the diameter of the dot it replaces. Per sign
+    /// rather than shared: the eight is one long stroke that closes on itself and reads at a
+    /// hairline, while two short bars at that weight read as a gap between two flecks.
+    func lineWidth(forDiameter diameter: Double) -> Double {
+        switch self {
+        case .stalled: max(diameter * 0.2, 1.1)
+        case .asking: max(diameter * 0.26, 1.4)
+        }
+    }
+
+    /// The sign as the panel draws it. The bar draws the same geometry through `NSBezierPath`,
+    /// out of the same two enums below — one shape each, not two that merely resemble one
+    /// another.
+    func path(in box: CGRect) -> Path {
+        switch self {
+        case .stalled: WaitSign.path(in: box)
+        case .asking: PauseSign.path(in: box)
         }
     }
 }
@@ -726,8 +778,6 @@ enum WaitSign {
     private static let sidewaysReach = 0.75
     private static let verticalReach = 0.2887
 
-    static func lineWidth(forDiameter diameter: Double) -> Double { max(diameter * 0.2, 1.1) }
-
     /// The centre, and the two control offsets that put each lobe where it belongs. Shared so
     /// that the bar's `NSBezierPath` and the panel's `Path` draw one shape and not two that
     /// merely resemble each other.
@@ -753,6 +803,50 @@ enum WaitSign {
                 control1: CGPoint(x: centre.x + reach, y: centre.y - lift),
                 control2: CGPoint(x: centre.x + reach, y: centre.y + lift)
             )
+        }
+    }
+}
+
+/// The pause sign a light becomes while its agent is asking the person for something.
+///
+/// Two upright bars, drawn for the reason the eight and the cross are drawn: a glyph brings its
+/// own line box and sits off-centre in a box six points wide, and a light's position is its
+/// name. Strokes rather than filled rectangles, so the two signs are one drawing problem —
+/// round caps, one line width, the same centre.
+///
+/// It overhangs the dot's slot upwards and downwards, where the eight overhangs it sideways:
+/// each sign grows in the direction its own shape needs, and into padding that both the bar and
+/// the panel have, so nothing beside a light moves when one appears. Half a diameter of bar
+/// plus the round caps stands the sign about one and a sixth diameters tall against five
+/// sixths wide — upright enough to read as a pause at six points, and the whole reason it is
+/// legible there at all. The bars stand a quarter of a diameter apart: closer and they merge
+/// into a stripe at that size, wider and the pair stops reading as one sign.
+enum PauseSign {
+    /// Half the length of a bar, and how far each stands from the centre — both as fractions
+    /// of the light's diameter. The drawn height is larger than the first of them by the round
+    /// caps, which add half a line width at each end.
+    private static let halfHeight = 0.45
+    private static let offset = 0.28
+
+    /// Where the two bars run, top to bottom. Shared so that the bar's `NSBezierPath` and the
+    /// panel's `Path` draw one shape and not two that merely resemble each other.
+    static func bars(in box: CGRect) -> [(from: CGPoint, to: CGPoint)] {
+        let reach = box.height * halfHeight
+        let gap = box.width * offset
+        return [-gap, gap].map { side in
+            (
+                from: CGPoint(x: box.midX + side, y: box.midY - reach),
+                to: CGPoint(x: box.midX + side, y: box.midY + reach)
+            )
+        }
+    }
+
+    static func path(in box: CGRect) -> Path {
+        Path { path in
+            for bar in bars(in: box) {
+                path.move(to: bar.from)
+                path.addLine(to: bar.to)
+            }
         }
     }
 }

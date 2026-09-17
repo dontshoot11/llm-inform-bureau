@@ -2,12 +2,13 @@ import Foundation
 import AgentFiles
 import SessionHealthCore
 
-/// What the other two sources remember between passes, and what a whole pass costs when
-/// nothing has changed.
+/// What the other sources remember between passes, and what a whole pass costs when nothing
+/// has changed.
 ///
 /// The transcripts are the expensive source and have their cases of their own
-/// (`TranscriptMemoryTests`). These are about the other two — the payloads the status line
-/// leaves and the rollouts Codex writes — and about the pass as a whole: a turn is dozens of
+/// (`TranscriptMemoryTests`), and the records of the running processes have theirs
+/// (`AskingStateTests`). These are about the payloads the status line leaves and the rollouts
+/// Codex writes — and about the pass as a whole: a turn is dozens of
 /// file system events, almost all of them about a file that has already been read, and the one
 /// thing such an event must not cost is a single file being opened.
 ///
@@ -339,6 +340,11 @@ func runSourceMemoryTests(_ suite: TestSuite, config: ThresholdConfig) {
                 payload(session: "abc", fiveHour: 23.5, sevenDay: 41.2, windowSize: 1_000_000),
                 to: payloads, named: "abc.json", modified: now.addingTimeInterval(-60), suite
             )
+            let records = makeDirectory(root, "sessions", suite)
+            writeSessionRecord(
+                sessionRecord(pid: 501, session: "abc", status: "waiting", statusUpdatedAt: now.addingTimeInterval(-60)),
+                to: records, named: "501.json", modified: now.addingTimeInterval(-60), suite
+            )
             let rollouts = makeRolloutDirectory(root, "codex", suite)
             write(
                 lines: rollout, to: rollouts, named: "rollout-2026-09-15T17-59-45-aaa.jsonl",
@@ -348,10 +354,15 @@ func runSourceMemoryTests(_ suite: TestSuite, config: ThresholdConfig) {
             let reader = UsageReader(
                 claudeTranscripts: ClaudeTranscriptStore(projectsDirectory: projects),
                 claudeStatus: ClaudeStatusStore(directory: payloads),
+                claudeSessionRecords: ClaudeSessionRecordStore(directory: records),
                 codexRollouts: CodexRolloutStore(sessionsDirectory: rollouts)
             )
             let first = reader.read(config: config, now: now)
             suite.expectEqual(first.claudeSessions.value?.count, 1, "the first pass reads a Claude session")
+            suite.expect(
+                first.claudeSessions.value?.first?.replyWait.isAsking == true,
+                "and the record that says it is asking"
+            )
             suite.expectEqual(first.codexSessions.value?.count, 1, "and a Codex one")
             suite.expect(first.claudeLimits.value != nil, "and Claude's limits")
             suite.expect(first.codexLimits.value != nil, "and Codex's")
@@ -364,6 +375,7 @@ func runSourceMemoryTests(_ suite: TestSuite, config: ThresholdConfig) {
                 let control = UsageReader(
                     claudeTranscripts: ClaudeTranscriptStore(projectsDirectory: projects),
                     claudeStatus: ClaudeStatusStore(directory: payloads),
+                    claudeSessionRecords: ClaudeSessionRecordStore(directory: records),
                     codexRollouts: CodexRolloutStore(sessionsDirectory: rollouts)
                 ).read(config: config, now: now)
                 suite.expect(control != first, "control: a reader with no memory of these files cannot answer")

@@ -39,11 +39,12 @@ public struct UsageReading: Equatable, Sendable {
 
 /// Reads both services and hands back one picture of them.
 ///
-/// The one thing that happens here and nowhere else is the join between the two Claude
-/// sources. A transcript is always there and knows the tokens held; the status line is there
-/// only once the slot is connected and knows the size of the window. Neither is complete, so a
-/// Claude session is read from the transcript and then told how big its window is, when
-/// something knows.
+/// The one thing that happens here and nowhere else is the join between the three Claude
+/// sources, none of which is complete on its own. The transcript is always there and knows the
+/// tokens held; the status line is there once the slot is connected and knows the size of the
+/// window; the session record is there while an interactive process is running and is the only
+/// one that knows the agent has stopped and is waiting on the person. So a Claude session is
+/// read from its transcript and then told what the other two know about it, when they know it.
 ///
 /// Usage:
 /// ```swift
@@ -52,19 +53,22 @@ public struct UsageReading: Equatable, Sendable {
 public struct UsageReader: Sendable {
     public let claudeTranscripts: ClaudeTranscriptStore
     public let claudeStatus: ClaudeStatusStore
+    public let claudeSessionRecords: ClaudeSessionRecordStore
     public let codexRollouts: CodexRolloutStore
 
     public init(
         claudeTranscripts: ClaudeTranscriptStore = ClaudeTranscriptStore(),
         claudeStatus: ClaudeStatusStore = ClaudeStatusStore(),
+        claudeSessionRecords: ClaudeSessionRecordStore = ClaudeSessionRecordStore(),
         codexRollouts: CodexRolloutStore = CodexRolloutStore()
     ) {
         self.claudeTranscripts = claudeTranscripts
         self.claudeStatus = claudeStatus
+        self.claudeSessionRecords = claudeSessionRecords
         self.codexRollouts = codexRollouts
     }
 
-    /// One pass: one walk of each of the three trees, and nothing opened that has not changed.
+    /// One pass: one walk of each of the four trees, and nothing opened that has not changed.
     ///
     /// Each source answers everything it is asked in a single call, because each of them is
     /// asked about twice — Claude for its limits and its window sizes, Codex for its limits and
@@ -74,6 +78,7 @@ public struct UsageReader: Sendable {
         let activity = SessionActivity(config: config)
         let transcripts = claudeTranscripts.activeSessions(activity: activity, now: now)
         let status = claudeStatus.read()
+        let records = claudeSessionRecords.read()
         let codex = codexRollouts.read(activity: activity, now: now)
 
         var installed: Set<AgentService> = []
@@ -83,7 +88,12 @@ public struct UsageReader: Sendable {
         return UsageReading(
             claudeLimits: status.limits,
             codexLimits: codex.limits,
-            claudeSessions: Self.withWindowSizes(transcripts, from: status.payloads),
+            claudeSessions: Self.withAsking(
+                Self.withWindowSizes(transcripts, from: status.payloads),
+                from: records,
+                activity: activity,
+                now: now
+            ),
             codexSessions: codex.sessions,
             installed: installed
         )
@@ -136,6 +146,56 @@ public struct UsageReader: Sendable {
                       let window = sessionWindows[origin.parentSessionID]
                 else { return snapshot }
                 return snapshot.withWindow(window)
+            }
+        )
+    }
+
+    /// Marks the sessions whose agent has stopped and is waiting on the person.
+    ///
+    /// This overrides whatever the transcript concluded, and has to: a question is written
+    /// there as a tool call with no result yet, which the waiting rule reads — correctly, for
+    /// everything it can see — as an agent still at work. The record is the only source that
+    /// knows better, so where it speaks it decides.
+    ///
+    /// Three things bound what a record is allowed to do, and all three are about records that
+    /// outlive the process that wrote them:
+    ///
+    /// - **Only a session already on the list.** A record matching no row draws nothing. The
+    ///   panel lists what has been written to recently, and a record cannot add a row of its
+    ///   own — a session nobody is working on is not made interesting by a file left behind.
+    /// - **Only the newest record of a session.** A session resumed in a new process has a
+    ///   record under each pid, and the older one is frozen at whatever it last said. The
+    ///   freshest one is the only one telling the truth about now.
+    /// - **Only while it is fresh.** A record whose status has not moved inside the activity
+    ///   window is not read at all, which is what keeps a killed process from leaving a pause
+    ///   sign standing. Nothing rewrites a record while the person is away, so this is the
+    ///   same half hour after which the row itself would go — the sign never outlives the row.
+    ///
+    /// Subagents are left out: they have no record of their own, and a request is something a
+    /// session makes of the person, never an agent running inside one.
+    public static func withAsking(
+        _ sessions: SessionsReading,
+        from records: [ClaudeSessionRecord],
+        activity: SessionActivity,
+        now: Date = Date()
+    ) -> SessionsReading {
+        guard case .value(let snapshots) = sessions else { return sessions }
+        var newest: [String: ClaudeSessionRecord] = [:]
+        for record in records {
+            guard let known = newest[record.sessionID] else {
+                newest[record.sessionID] = record
+                continue
+            }
+            if record.statusUpdatedAt > known.statusUpdatedAt { newest[record.sessionID] = record }
+        }
+        return .value(
+            snapshots.map { snapshot in
+                guard !snapshot.isSubagent,
+                      let record = newest[snapshot.sessionID],
+                      record.isAsking,
+                      activity.isActive(lastActivityAt: record.statusUpdatedAt, now: now)
+                else { return snapshot }
+                return snapshot.asking(since: record.statusUpdatedAt)
             }
         )
     }

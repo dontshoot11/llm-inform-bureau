@@ -36,27 +36,52 @@ public struct SubagentOrigin: Equatable, Sendable {
     }
 }
 
-/// Whether anybody is waiting on this session's agent, and for how long that has been true.
+/// Who is being waited on in this session, and — for the two cases where it matters — since
+/// when.
 ///
-/// Three outcomes rather than a yes and a no, because an answer that has not come in ten
-/// seconds and one that has not come in an hour are different things to a person glancing at
-/// the bar — and the app cannot tell the second from a session that died. What it can say is
-/// how long the silence has run, and that is the whole difference between the middle case and
-/// the last one.
-public enum ReplyWait: String, Equatable, Sendable {
-    /// Nothing is owed: the turn ended, or the person is the one who owes the next move.
+/// Four outcomes rather than a yes and a no. Three of them are about the agent: an answer that
+/// has not come in ten seconds and one that has not come in an hour are different things to a
+/// person glancing at the bar, and the app cannot tell the second from a session that died.
+/// What it can say is how long the silence has run, and that is the whole difference between
+/// `.waiting` and `.stalled`.
+///
+/// The fourth is the other direction entirely: the agent has asked for something and is
+/// standing still until the person answers. It is one question — "who are we waiting on" —
+/// with four answers, so it is one value and not a state beside a flag: two fields would
+/// leave every reader of them, the bar and the panel and the rules, to put them back together
+/// on its own.
+public enum ReplyWait: Equatable, Sendable {
+    /// Nothing is owed: the turn ended, and nobody is being waited on.
     case none
-    /// An answer is owed and the silence is still short enough to believe in. The blinking
-    /// light.
+    /// An answer is owed by the agent and the silence is still short enough to believe in.
+    /// The blinking light.
     case waiting
-    /// An answer is owed and has been owed past the fuse
+    /// An answer is owed by the agent and has been owed past the fuse
     /// (`sessions.abandoned_wait_after_minutes`). Either the agent is thinking very hard or
     /// the session is gone; nothing on disk separates the two, so the app says the one thing
     /// it knows — there has been no answer for a long time — and draws the sign for it.
     case stalled
+    /// The agent is asking the person for something — a question, or permission to run
+    /// something — and nothing moves until they answer. The pause sign.
+    ///
+    /// Carries the moment the asking started, which the other two cases have no use for and
+    /// this one does: the fuse above never applies to it — a request does not go stale, the
+    /// person simply has not come back yet — and how long it has stood is what a notification
+    /// waits on.
+    case asking(since: Date)
 
-    /// Whether an answer is owed at all, however long it has been owed.
-    public var isOwed: Bool { self != .none }
+    /// Whether the *agent* owes an answer, however long it has been owed. Being asked
+    /// something is not that: the next move is the person's.
+    public var isOwed: Bool { self == .waiting || self == .stalled }
+
+    /// When the agent started asking the person for something, or `nil` when it is not asking.
+    public var askingSince: Date? {
+        guard case .asking(let since) = self else { return nil }
+        return since
+    }
+
+    /// Whether the person, rather than the agent, is the one being waited on.
+    public var isAsking: Bool { askingSince != nil }
 }
 
 /// One reading of a coding-agent session, as it was found on disk.
@@ -99,14 +124,16 @@ public struct SessionSnapshot: Equatable, Sendable {
     /// first reading of the session and there is nothing to compare against.
     public let turnGrowthTokens: Int?
 
-    /// Whether the agent owes this session an answer right now, and whether it is still
-    /// plausible that one is coming.
+    /// Who this session is waiting on right now — its agent, or the person at the keyboard.
     ///
-    /// Derived, not observed: nothing on disk announces a request in flight, so this is read
-    /// off the last thing written — whose entry it was, and whether it promised another. The
-    /// rule belongs to whichever reader knows the shape of its own source, and it is a fact
-    /// about the session rather than a decision of the view, so it is carried here beside
-    /// `lastActivityAt`.
+    /// Mostly derived rather than observed: nothing on disk announces a request in flight, so
+    /// the agent's side is read off the last thing written — whose entry it was, and whether it
+    /// promised another. The one case that *is* observed is the other side, where Claude Code
+    /// writes down that it is waiting on the person (`ClaudeSessionRecordStore`).
+    ///
+    /// Either way the rule belongs to whichever reader knows the shape of its own source, and
+    /// it is a fact about the session rather than a decision of the view, so it is carried here
+    /// beside `lastActivityAt`.
     public let replyWait: ReplyWait
 
     /// Set when this reading is a subagent's rather than a session's. Everything above means
@@ -155,6 +182,28 @@ public struct SessionSnapshot: Equatable, Sendable {
             project: project,
             lastActivityAt: lastActivityAt,
             replyWait: replyWait,
+            subagent: subagent
+        )
+    }
+
+    /// The same reading, told that its agent is asking the person for something.
+    ///
+    /// Told rather than read, because the two halves of this come from two files. The
+    /// transcript says what the session holds and whether the agent owes it an answer; only
+    /// the session record says the agent has stopped and is waiting on the person, and that
+    /// answer overrides the transcript's — a question is written there as a tool call like any
+    /// other, which is exactly what "the agent is working" looks like.
+    public func asking(since: Date) -> SessionSnapshot {
+        SessionSnapshot(
+            sessionID: sessionID,
+            service: service,
+            contextTokens: contextTokens,
+            contextWindowTokens: contextWindowTokens,
+            turnGrowthTokens: turnGrowthTokens,
+            model: model,
+            project: project,
+            lastActivityAt: lastActivityAt,
+            replyWait: .asking(since: since),
             subagent: subagent
         )
     }

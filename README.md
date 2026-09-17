@@ -55,6 +55,15 @@ and Claude's boundaries are read off the last entry of the transcript — whose 
 whether it promised another. The blink runs while something is waiting and stops with it;
 nothing is polled and no timer runs when nobody is waiting.
 
+**And when the agent is waiting on you, its light is a pause sign.** A Claude session that has
+asked a question is standing still, and until now it looked in the bar exactly like one hard at
+work — the same blinking light for the opposite situation. Two upright bars say *stopped, and
+it is your move*: they appear the moment the question does and go the moment you answer, so the
+bar answers "who are we waiting on" without opening anything. The fuse above does not apply —
+somebody who has not come back in an hour has not stalled, they are out of the room. This comes
+from a record Claude Code keeps per running process, and a session it says nothing about — a
+non-interactive run, an older CLI — goes on blinking as before.
+
 No numbers in the bar on purpose. The bar answers *is anything worth looking at*; the panel
 behind it answers *how much exactly* — each service's limit windows with their reset times and
 the age of the reading, then every session running right now with its project, tokens, window
@@ -250,6 +259,7 @@ a network API ever appears in the sources.
 | Claude Code | `~/.claude/projects/**/*.jsonl` | context held, turn growth, project | no |
 | Claude Code | `~/.claude/projects/**/<session>/subagents/agent-*.jsonl` | a subagent's context, its kind and its task | no |
 | Claude Code | [statusLine contract](https://code.claude.com/docs/en/statusline), with the app in the slot | limits, context window size | **yes** |
+| Claude Code | `~/.claude/sessions/<pid>.json` | whether a session has stopped and is waiting on you | no |
 
 **Running only one of the two agents is normal.** The other keeps its place in the bar and the
 panel, with hollow lights and one line saying it is not installed — nothing errors, and nothing

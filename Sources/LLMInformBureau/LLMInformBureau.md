@@ -93,6 +93,21 @@ both ends of a turn in its rollout and the state is simply read off them. Either
 is told a `ReplyWait` and nothing about where it came from — the rules, and what they cannot
 cover, are in `AgentFiles.md`.
 
+**A session waiting on the person is the other direction, and gets a sign of its own.** An
+agent that has asked a question, or asked to be allowed to run something, is standing still and
+looks in the bar exactly like one hard at work — the same blinking light, and the same light
+for the opposite situation. So its light is drawn as a pause sign instead: two upright bars, the
+shape everybody already reads as *stopped, and it is your move*. It appears the moment the
+request does and goes in the pass that reads the answer; the bar then answers "who are we
+waiting on" without the panel and without a notification. Which sessions those are comes from a
+file Claude Code keeps per running process (`AgentFiles.md`), and a session it says nothing
+about behaves exactly as it did before that file was read.
+
+A light wearing a sign does not blink, and asking wins over a stall. Blinking is drawn by
+leaving the light out for a frame, so a blinking sign would be a sign going missing and coming
+back; and of the things the bar's one light per service could say, "this one wants you" is the
+one a glance is for. The panel has a row per session and never has to choose.
+
 **And a wait that drags on stops blinking and becomes a sign.** A closed terminal, a killed
 process and an agent hard at work leave the same thing on disk, so what ends the blinking when
 no answer is ever coming is time: past `sessions.abandoned_wait_after_minutes` of silence the
@@ -103,19 +118,20 @@ which would claim the wait was over. It lasts until an answer arrives or until t
 goes by the activity window; there is no second fuse under it. Stopping the agent on purpose
 needs no fuse at all: the interrupt is written down, and the light goes steady on the next pass.
 
-**Shape carries the state, colour goes on carrying the budget.** The sign is the light's own
+**Shape carries the state, colour goes on carrying the budget.** Either sign is the light's own
 colour — green because `.normal` is green, red when the context is against the ceiling, which
-says both things at once and neither of them twice. It keeps the dot's slot and its centre,
-overhanging it by about an eighth of a diameter into the padding on either side: at six points
+says both things at once and neither of them twice. Each keeps the dot's slot and its centre and
+overhangs it into the padding, the eight sideways and the pause sign up and down: at six points
 a figure eight squeezed into a dot's width is a smudge, and a light that moved its neighbour
 would read as a different light. A sign is drawn only where a dot would have been drawn — in
 the bar an unreported reading draws nothing, so a Claude session with the slot unconnected
 stalls invisibly there, exactly as it blinks invisibly today, and the panel shows it in the
 grey of its outline.
 
-Only a wait can become a sign. A session nobody has typed into for an hour owes nothing, so it
-keeps its plain dot however long it stays quiet and leaves by the half-hour window like any
-other — the sign is about an answer that has not come, not about a session that is idle.
+Only somebody being waited on gets a sign. A session nobody has typed into for an hour owes
+nothing and asks nothing, so it keeps its plain dot however long it stays quiet and leaves by
+the half-hour window like any other. Neither sign is drawn for a subagent either: an agent
+finishes by itself and asks the person nothing.
 
 Why blinking and not a glow: a halo fading in alpha over a point or two was drawn first and
 was simply invisible in a menu bar — the eye gets nothing from a gradient that small. A light
@@ -126,8 +142,9 @@ same reason it is kept for a light with nothing behind it: position is what name
 The animation runs only while a blink does, and a wait is what keeps one going: the frames stop
 the moment nothing is blinking and nothing is waiting. There is no timer the rest of the time —
 the app still wakes only when a file changes, which is what makes this affordable at all. A
-stalled light costs nothing on top of that: it is a shape and not a beat, so a machine full of
-abandoned sessions animates exactly as much as an empty one does, which is not at all.
+light wearing a sign costs nothing on top of that: it is a shape and not a beat, so a machine
+full of abandoned sessions and unanswered questions animates exactly as much as an empty one
+does, which is not at all.
 
 **Three colours on one scale, under every light.** Yellow, orange and red mark the same three
 shares of a window whether the window is a subscription limit or a session's context, so a

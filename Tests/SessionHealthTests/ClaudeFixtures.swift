@@ -197,6 +197,42 @@ private func write(_ lines: [String], to url: URL, modified: Date?, _ suite: Tes
     }
 }
 
+// MARK: What a running Claude Code process leaves behind
+
+/// One record of `~/.claude/sessions`, trimmed to the fields this app reads and keeping enough
+/// of the rest to be the file the CLI actually writes.
+///
+/// `status` is passed as a string rather than as a case of something, because the point of
+/// most of these cases is a value this app has no case for: the three it has seen are `busy`,
+/// `waiting` and `idle`, and the format is the CLI's own undocumented business.
+func sessionRecord(
+    pid: Int,
+    session: String,
+    status: String,
+    statusUpdatedAt: Date
+) -> String {
+    let millis = Int(statusUpdatedAt.timeIntervalSince1970 * 1000)
+    return """
+    {"pid":\(pid),"sessionId":"\(session)","cwd":"\(workingDirectory)",    "startedAt":\(millis - 600_000),"version":"2.1.274","kind":"interactive","entrypoint":"cli",    "name":"llm-inform-bureau-e7","nameSource":"derived","status":"\(status)",    "updatedAt":\(millis),"statusUpdatedAt":\(millis)}
+    """
+}
+
+func writeSessionRecord(
+    _ contents: String,
+    to directory: URL,
+    named name: String,
+    modified: Date,
+    _ suite: TestSuite
+) {
+    let url = directory.appendingPathComponent(name)
+    do {
+        try Data(contents.utf8).write(to: url)
+        try FileManager.default.setAttributes([.modificationDate: modified], ofItemAtPath: url.path)
+    } catch {
+        suite.expect(false, "could not write \(name): \(error)")
+    }
+}
+
 // MARK: What the status line leaves behind
 
 /// A statusLine payload, trimmed to the fields this app reads.

@@ -24,11 +24,17 @@ import Foundation
 /// watcher.start()
 /// ```
 public final class SourceWatcher: @unchecked Sendable {
-    /// The three trees the readers read: Claude's transcripts, Codex's rollouts, and what the
-    /// status line leaves for this app.
+    /// The four trees the readers read: Claude's transcripts and the records of its running
+    /// processes, Codex's rollouts, and what the status line leaves for this app.
+    ///
+    /// The records are watched for the same reason the rest are — they are how a request to
+    /// the person shows up at all, and the person is the one waiting for the sign to appear.
+    /// They also move when nothing else does: a turn ending writes both a transcript line and
+    /// a record, but a question writes the record and then goes quiet.
     public static var defaultPaths: [URL] {
         [
             ClaudeTranscriptStore.defaultProjectsDirectory,
+            ClaudeSessionRecordStore.defaultDirectory,
             CodexRolloutStore.defaultSessionsDirectory,
             ClaudeStatusStore.defaultDirectory
         ]
