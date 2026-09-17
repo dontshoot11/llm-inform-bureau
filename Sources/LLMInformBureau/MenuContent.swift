@@ -118,7 +118,9 @@ struct MenuContent: View {
                 }
 
                 Button {
-                    Welcome.show()
+                    // The window is where a mark is moved, and the panel is what reads the
+                    // marks — so it hands the window a way to ask for a pass when it closes.
+                    Welcome.show(askForPass: { Task { await model.refresh() } })
                 } label: {
                     Image(systemName: "gearshape").modifier(Hoverable())
                 }

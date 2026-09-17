@@ -28,6 +28,7 @@ the cases are plain functions and would port to swift-testing mechanically.
 | Suite | Covers |
 | --- | --- |
 | `ThresholdConfigTests` | The shipped config itself, and every way a file on disk can be broken without taking the app down |
+| `ThresholdChoiceTests` | Moving a mark: the arithmetic of the bar (a point on it, the stop against a neighbour, the ends), what a choice is kept as, and that a later release still reaches every mark nobody moved |
 | `BudgetRulesTests` | The four marks, each boundary from both sides, both services |
 | `AlertMemoryTests` | One mark, one notification — and what makes a scope end |
 | `AlertDispatchTests` | What a whole reading has left to say: scopes, `/clear`, a rolled-over limit window, and the backlog found at launch |

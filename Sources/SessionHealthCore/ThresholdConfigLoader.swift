@@ -26,23 +26,44 @@ public struct ThresholdConfigLoad: Equatable, Sendable {
     /// editing the file — the author, with the suite in front of them.
     public let problems: [String]
 
+    /// The marks before anything the person chose was applied — what "put it back the way it
+    /// was" goes back to. The same values as `config` on every run where nobody moved a mark,
+    /// which is most of them.
+    public let shipped: ThresholdConfig
+
     /// `true` when at least one value had to fall back.
     public var usesFallbackValues: Bool { !problems.isEmpty }
 
-    public init(config: ThresholdConfig, source: ThresholdConfigSource, problems: [String]) {
+    /// `shipped` defaults to the config itself: a load that never met a choice has nothing
+    /// else it could go back to.
+    public init(
+        config: ThresholdConfig,
+        source: ThresholdConfigSource,
+        problems: [String],
+        shipped: ThresholdConfig? = nil
+    ) {
         self.config = config
         self.source = source
         self.problems = problems
+        self.shipped = shipped ?? config
     }
 }
 
-/// Reads the threshold config the app ships with.
+/// Reads the threshold config the app ships with, and the marks the person moved on top of it.
 ///
 /// The marks are data rather than code so that changing one is an edit to a file and a commit,
-/// not a number hunted down in a rule — but the file is the app's, not the reader's. There is
-/// no copy in Application Support, nothing is created on a first launch, and a copy left behind
-/// by an older release is not read: nobody was going to hand-edit JSON to move a percentage,
-/// and the way to choose these numbers will be the app's own settings.
+/// not a number hunted down in a rule — but the *file* is the app's, not the reader's. There is
+/// no editable copy in Application Support, nothing is created on a first launch, and a copy
+/// left behind by an older release is not read: nobody was going to hand-edit JSON to move a
+/// percentage. What a person moves, they move in the settings window, and what is kept is the
+/// choice alone (`ThresholdChoices`) — so the app's own marks go on arriving with each release
+/// and only the ones somebody disagreed with stay theirs. The order is:
+///
+///     built-in values  →  the thresholds.json this app ships  →  what the person chose
+///
+/// A run that names a config file is the exception, and takes the whole of it: an override is
+/// for the tests and for a working copy, and a suite that half-read the marks of whichever Mac
+/// it happened to run on would not be a suite.
 ///
 /// Nothing here throws: a broken file must not take the menu bar down with it, so every failure
 /// degrades to the next copy down and is listed in `problems` for whoever is editing it.
@@ -66,11 +87,16 @@ public enum ThresholdConfigLoader {
         return URL(fileURLWithPath: override)
     }
 
-    /// The shipped copy, or the file an override names; the compiled-in values as the last
-    /// resort.
-    public static func load(at externalURL: URL? = nil) -> ThresholdConfigLoad {
+    /// The shipped copy with the person's choices over it, or the whole of the file an override
+    /// names; the compiled-in values as the last resort.
+    ///
+    /// `choicesAt` is named by the tests and by nothing else — a suite that read the choices of
+    /// the Mac it runs on would pass or fail by whatever its author happens to have moved.
+    public static func load(at externalURL: URL? = nil, choicesAt choicesURL: URL? = nil) -> ThresholdConfigLoad {
         let bundled = loadBundled()
-        guard let url = externalURL ?? overrideConfigURL() else { return bundled }
+        guard let url = externalURL ?? overrideConfigURL() else {
+            return chosen(over: bundled, at: choicesURL ?? ThresholdChoicesStore.url())
+        }
 
         guard FileManager.default.fileExists(atPath: url.path) else {
             return bundled
@@ -88,6 +114,23 @@ public enum ThresholdConfigLoader {
             config: parsed.config,
             source: .external(url),
             problems: bundled.problems + parsed.problems
+        )
+    }
+
+    /// A load with the marks the person moved applied over it.
+    ///
+    /// Nothing is reported when the choices cannot be read: `problems` is written for whoever
+    /// is editing the config file, and this file is not one anybody edits by hand. A choice
+    /// that could not be read is a mark back where the app put it, which is a state the window
+    /// shows plainly.
+    private static func chosen(over load: ThresholdConfigLoad, at url: URL) -> ThresholdConfigLoad {
+        let choices = ThresholdChoicesStore.read(at: url)
+        guard !choices.isEmpty else { return load }
+        return ThresholdConfigLoad(
+            config: choices.applied(to: load.config),
+            source: load.source,
+            problems: load.problems,
+            shipped: load.config
         )
     }
 
@@ -241,7 +284,10 @@ enum ThresholdConfigParser {
             problems.append("\(path): \(defaults) are in use")
             return fallback
         }
-        guard notice > 0, elevated > notice, high > elevated, high <= 100 else {
+        // One rule for a scale, wherever it comes from: the file, and the marks a person moved
+        // in the settings window, are refused by the same type rather than by two guards that
+        // can drift apart.
+        guard MarkScale(notice: notice, elevated: elevated, high: high) != nil else {
             problems.append(
                 "\(path): \(notice)% / \(elevated)% / \(high)% is not an ordered scale inside 0-100 — \(defaults) are in use"
             )

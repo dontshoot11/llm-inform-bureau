@@ -111,19 +111,22 @@ func runThresholdConfigTests(_ suite: TestSuite, config: ThresholdConfig) {
         )
     }
 
-    // And so a copy in Application Support, left behind by the release that had an installer,
-    // is a leftover rather than a config: there is no path from here to it to take.
-    suite.test("an ordinary run reads the copy the app ships and nothing else") {
-        let load = ThresholdConfigLoader.load()
-        suite.expectEqual(load.source, .bundled, "source")
-        suite.expectEqual(load.config, config, "the marks the app ships with")
-        suite.expectEqual(load.problems.count, 0, "problems: \(load.problems)")
-    }
-
     // MARK: Reading it from disk
 
     withTemporaryDirectory(suite, named: "threshold-config") { directory in
         let external = directory.appendingPathComponent("thresholds.json")
+
+        // And so a copy in Application Support, left behind by the release that had an
+        // installer, is a leftover rather than a config: there is no path from here to it to
+        // take. The one file an ordinary run does read beside the shipped marks is what the
+        // person moved, and it is named here rather than taken from this Mac — a suite that
+        // read its author's own choices would pass or fail by them.
+        suite.test("an ordinary run reads the copy the app ships and nothing else") {
+            let load = ThresholdConfigLoader.load(choicesAt: directory.appendingPathComponent("nothing-chosen.json"))
+            suite.expectEqual(load.source, .bundled, "source")
+            suite.expectEqual(load.config, config, "the marks the app ships with")
+            suite.expectEqual(load.problems.count, 0, "problems: \(load.problems)")
+        }
 
         suite.test("an installed config outside the bundle wins over the bundled copy") {
             write(configJSON(activeMinutes: 11), to: external, suite)

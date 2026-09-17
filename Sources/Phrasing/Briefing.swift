@@ -38,6 +38,8 @@ public struct ScaleStep: Equatable, Sendable {
 /// One mark, as the first-run window presents it: what it is, what it is set to, and who says
 /// so — a published source with its date, or an admission that nobody published one.
 public struct MarkNote: Equatable, Sendable {
+    /// Which mark this is — the identity the window moves, rather than the title it shows.
+    public let mark: ThresholdMark
     public let title: String
     /// The lights this mark turns on, when it is a scale. Empty for a mark that is one number.
     public let scale: [ScaleStep]
@@ -45,29 +47,58 @@ public struct MarkNote: Equatable, Sendable {
     public let value: String
     private let unmeasuredNote: String
     public let provenance: ThresholdProvenance?
+    /// `true` when the person moved this mark themselves.
+    public let isChosen: Bool
 
     public init(
+        mark: ThresholdMark,
         title: String,
         scale: [ScaleStep] = [],
         value: String = "",
         unmeasuredNote: String,
-        provenance: ThresholdProvenance?
+        provenance: ThresholdProvenance?,
+        isChosen: Bool = false
     ) {
+        self.mark = mark
         self.title = title
         self.scale = scale
         self.value = value
         self.unmeasuredNote = unmeasuredNote
         self.provenance = provenance
+        self.isChosen = isChosen
     }
 
-    /// The line under the number. A measured mark names its date; an unmeasured one says it is
-    /// a guess, because a number with an invented source lies silently and nothing catches it.
+    /// The line under the number, or nothing at all.
+    ///
+    /// A measured mark names its date; an unmeasured one says it is a guess, because a number
+    /// with an invented source lies silently and nothing catches it. A mark somebody moved says
+    /// neither: the reasoning that shipped was written about a different number, and what has
+    /// replaced it is the button beside the mark, which only appears when the mark is not where
+    /// the app put it. A line saying the same thing in words was one line too many.
     public var note: String {
+        if isChosen { return "" }
         guard let provenance else { return unmeasuredNote }
         return "Published \(provenance.measuredAt)"
     }
 
-    public var source: URL? { provenance?.source }
+    /// No source under a mark the person set: there is nothing published about a number
+    /// somebody chose for themselves.
+    public var source: URL? { isChosen ? nil : provenance?.source }
+}
+
+/// What one of the colours means, for the key above the marks.
+///
+/// The marks below it say where each colour begins; this says what being in it is like. A
+/// reader who has just been handed a widget of coloured dots knows neither, and the numbers
+/// are the half that cannot be guessed from the dot.
+public struct LevelMeaning: Equatable, Sendable {
+    public let level: BudgetLevel
+    public let meaning: String
+
+    public init(level: BudgetLevel, meaning: String) {
+        self.level = level
+        self.meaning = meaning
+    }
 }
 
 /// One piece of published work behind the idea that context length matters.
@@ -104,6 +135,10 @@ public struct Reading: Equatable, Sendable {
 /// The claim about the network is in the first sentence on purpose: an app that reads the
 /// transcripts of two coding agents should say what it does with them before it is asked.
 public enum Briefing {
+    /// The window's own name. It is a settings window now — the marks are moved in it — and
+    /// the explanation of where the readings come from is one of the things folded up inside.
+    public static let windowTitle = "Settings"
+
     public static let title = "Where the numbers come from"
 
     public static let intro = """
@@ -128,11 +163,15 @@ public enum Briefing {
 
     public static let marksTitle = "The marks it watches"
 
-    /// Said under the marks, because it is the one thing the dots beside them cannot show.
-    public static let marksNote = """
-        Yellow only colours a light. Orange and red also send a notification — each one once \
-        per session.
-        """
+    /// What each colour is like to be in, above the marks that say where it starts. Every
+    /// colour the widget can draw is here, green included: a dot that never gets explained is
+    /// the one a reader invents a meaning for.
+    public static let levelKey: [LevelMeaning] = [
+        LevelMeaning(level: .normal, meaning: "Comfort zone."),
+        LevelMeaning(level: .notice, meaning: "Noticeable, nothing to do about it yet."),
+        LevelMeaning(level: .elevated, meaning: "Worth your attention."),
+        LevelMeaning(level: .high, meaning: "Step away from the keyboard. Go and touch some grass.")
+    ]
 
     /// The same scale in one line, for the tooltip on a light in the panel.
     public static func scaleHelp(_ config: ThresholdConfig) -> String {
@@ -141,6 +180,27 @@ public enum Briefing {
             + "\(TokenDisplay.percent(config.windowFill.high)) — how full it is. Orange and red notify."
     }
 
+    /// Puts a mark back where the app had it. Shown only on a mark that was moved: a button
+    /// that undoes nothing is a control a reader learns to skip over.
+    public static let resetMark = "Reset to default"
+
+    /// How the bar is worked, said once under it. Dragging is discoverable; the arrow keys are
+    /// not, and they are the only way to land on an exact number.
+    public static let markEditHint = "Drag a mark to move it, or click one and use the arrow keys."
+
+    /// What a handle of a scale is called when it is read out rather than looked at — a mark
+    /// is a colour, and a colour is exactly what a screen reader cannot pass on.
+    public static func handleLabel(_ handle: MarkScale.Handle, of markTitle: String) -> String {
+        switch handle {
+        case .notice: "\(markTitle): the yellow mark"
+        case .elevated: "\(markTitle): the orange mark"
+        case .high: "\(markTitle): the red mark"
+        }
+    }
+
+    /// The marks this window shows. Not every mark the app watches: the quiet rule about a
+    /// limit window that is about to reset does its work without anybody deciding anything
+    /// about it, and a settings window is a list of things to act on.
     public static func marks(of config: ThresholdConfig) -> [MarkNote] {
         func steps(_ marks: PercentMarks) -> [ScaleStep] {
             [
@@ -152,6 +212,7 @@ public enum Briefing {
 
         return [
             MarkNote(
+                mark: .windowFill,
                 title: "Context window filled",
                 scale: steps(config.windowFill),
                 unmeasuredNote: """
@@ -159,22 +220,19 @@ public enum Briefing {
                     of it is history that has stopped earning its place — and the more of that \
                     there is, the more it weighs on what the model concludes.
                     """,
-                provenance: config.windowFill.provenance
+                provenance: config.windowFill.provenance,
+                isChosen: config.windowFill.isChosen
             ),
             MarkNote(
+                mark: .limitUsage,
                 title: "Subscription limit spent",
                 scale: steps(config.limitUsage),
                 unmeasuredNote: """
                     The same scale, so a colour means one thing everywhere in the widget. Not \
                     measured: nobody publishes where a quota starts being worth planning around.
                     """,
-                provenance: config.limitUsage.provenance
-            ),
-            MarkNote(
-                title: "A limit window about to reset",
-                value: "under \(TokenDisplay.percent(config.limitWindowNearlyReset.remainingSharePercent)) of it left to run",
-                unmeasuredNote: "Not measured. Below this the limit marks stay quiet: the window comes back before it can get in the way.",
-                provenance: config.limitWindowNearlyReset.provenance
+                provenance: config.limitUsage.provenance,
+                isChosen: config.limitUsage.isChosen
             )
         ]
     }

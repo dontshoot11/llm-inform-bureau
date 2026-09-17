@@ -14,9 +14,10 @@ than fixtures.
 
 ## What it measures
 
-Four marks, all of them in `Resources/thresholds.json`, none of them in the code — and none of
-them the reader's to set: the file ships inside the app, and choosing these numbers from its own
-settings is a task of its own (`TODO/settings-and-checkup/`).
+Four marks, all of them in `Resources/thresholds.json`, none of them in the code. The file
+ships inside the app and is nobody's to edit — but the marks are not the app's last word: the
+limit scale is moved in the settings window behind the gear, and what is kept is the choice
+rather than a copy of the file (`ThresholdChoices`, and "Marks the reader moved" below).
 
 | Mark | Applies to | What it means | What the user can do |
 | --- | --- | --- | --- |
@@ -63,6 +64,24 @@ variant of a model with the larger window is written exactly like the ordinary o
 given a model of its own therefore shows tokens and no percentage, like any session whose
 window nobody reported. `SubagentOrigin.inheritsParentWindow` is that decision; `AgentFiles.md`
 has what it is read from.
+
+## Marks the reader moved
+
+The marks that ship are placed for everybody, and the person reading them is allowed to
+disagree. `MarkScale` is what a scale becomes when it can be moved: three marks that stay in
+order, inside 0-100 and never on top of one another, with the arithmetic of the bar in the
+window — where a point along it falls, where a mark may go, what an arrow key does — under
+tests, because a mark that slips past its neighbour leaves three colours in no order and a
+widget that means nothing. The config file is read by the same rule, so a scale from a file and
+a scale from a person are held to one standard rather than two.
+
+`ThresholdChoices` is what is kept: which mark was moved and where to, in
+`chosen-thresholds.json` beside the app's other files, and nothing else. Not a copy of the
+config with one number changed — that would quietly freeze every later release at the version
+somebody edited once. `applied(to:)` is where a choice meets the marks that shipped, and where a
+moved mark loses its rationale and its provenance: the sentence under it was written about a
+different number. `isChosen` is what is left — the flag the window turns into a "Reset to
+default" button beside that mark and into no explanation at all under it.
 
 ## Marks are exclusive
 
@@ -192,7 +211,9 @@ Nothing in the loader throws: a broken config file degrades to the values below 
 | `AlertDispatch.swift` | What is news: scoping every alert of a whole reading, and staying quiet about the backlog found at launch |
 | `BudgetRules.swift` | The rules themselves, and the two assessments they return |
 | `ThresholdConfig.swift` | The marks, and the built-in copy of them |
-| `ThresholdConfigLoader.swift` | Reading the marks the app ships with, and the built-in values under them |
+| `ThresholdConfigLoader.swift` | Reading the marks the app ships with, the choices over them, and the built-in values under both |
+| `MarkScale.swift` | A scale somebody can move: where a mark sits on the bar, how far it may go, and what a drag or an arrow key comes to |
+| `ThresholdChoices.swift` | The marks the reader moved — what is kept of them, where, and what they become when the app's own marks are read |
 | `SetupState.swift` | Which sources have written anything on this machine |
 | `StatusLineSlotState.swift` | Whose Claude Code's one status line slot is, and what taking it or giving it back would change |
 | `TerminalRaise.swift` | How far a click on a session's row can get — the tab, the window titled after the project, or the application — the AppleScript that asks for a tab, and which permission each answer costs |

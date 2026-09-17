@@ -2,10 +2,12 @@ import Foundation
 
 /// The directory this app keeps its own files in.
 ///
-/// Three things live in it and nothing else does: the payloads the status line command leaves,
-/// the command that held the slot before this app took it, and the note that the first-run
-/// explanation has been shown. The marks this app watches are not among them — they ship inside
-/// the app, where nobody is asked to have an opinion about them.
+/// Four things live in it and nothing else does: the payloads the status line command leaves,
+/// the command that held the slot before this app took it, the note that the first-run
+/// explanation has been shown, and the marks the person moved for themselves
+/// (`ThresholdChoicesStore`). The marks the app *watches by default* are not among them — those
+/// ship inside the app, and what is kept here is a disagreement with one of them rather than a
+/// copy of the lot.
 ///
 /// `~/.codex` is never written to at all, and `~/.claude` only in one place: the
 /// `statusLine.command` key of `settings.json`, which is the only way the subscription limits

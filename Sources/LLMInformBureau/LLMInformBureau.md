@@ -1,6 +1,7 @@
 # LLMInformBureau
 
-The menu bar app: four lights in the bar, a panel behind them, and one window it opens once.
+The menu bar app: four lights in the bar, a panel behind them, and one window — the settings,
+opened by itself on the first run and by the gear whenever it is wanted after that.
 
 The same binary is also something else. Run with `--status-line`, it is the command Claude Code
 calls after every answer — the only way the subscription limits and the size of the context
@@ -151,8 +152,8 @@ shares of a window whether the window is a subscription limit or a session's con
 colour means one thing everywhere and nobody has to remember which light counts differently.
 The first of the three only colours a dot: almost every session passes it, and a notification
 there would teach the reader to ignore the two that matter. The marks themselves are in
-`Thresholds.md`, and the first-run window shows them as the lights they turn on rather than
-describing them in a sentence.
+`Thresholds.md`, and the settings window shows them as the lights they turn on rather than
+describing them in a sentence — the limit scale as a bar the reader can move.
 
 **A session whose window size nobody reported has no light.** Every mark is a share of a
 window, so there is nothing to place: the session is still listed with its tokens, and its
@@ -228,7 +229,8 @@ The panel carries, in order, its two halves named after the two dots in the bar:
    ever see.
 3. **Why the bar is that colour** — the one reading that set it, named.
 4. **The icons**: disconnecting the status line slot, while it is the app's; the gear, which
-   leads to the window holding the first-run explanation and the one checkbox; and the way out.
+   leads to the settings — the marks, the explanation of where the readings come from folded
+   away under them, and the one checkbox; and the way out.
    Terminating asks once — the panel is opened to read something, and the icon sits where a
    thumb lands.
 
@@ -408,6 +410,20 @@ that note brings the window back, and so does the gear in the panel — a gear r
 question mark, because that window holds a setting and the list of what is connected, and a
 question mark promises reading rather than doing.
 
+The marks come with a key above them: what each colour is like to be in, green included. The
+marks say where a colour begins, which is the half a dot cannot show; being told neither leaves
+a reader to invent a meaning for a colour they will be looking at all day.
+
+It is also where a mark is moved. The limit scale is drawn as the bar it is — the colours the
+lights are drawn in, a handle where each colour gives way to the next — and dragging a handle
+or walking it with the arrow keys writes down the choice (`ThresholdChoices`). The panel reads
+the marks on every pass of its own, so nothing has to be restarted — but a pass is up to half a
+minute away, and half a minute of the old colour after pressing Done reads as the app having
+ignored you, so closing the window asks for one pass right then. Only after a mark was actually
+moved: closing a window nobody touched is not a reason to read anything. The
+arithmetic belongs to `MarkScale` in `SessionHealthCore` and not to the view: a mark that slips
+past its neighbour is a rule broken, and rules are tested.
+
 AppKit rather than a SwiftUI `Window` scene: with `LSUIElement` the app is not active when it
 launches, so the window has to be ordered in front and the app activated by hand. The launch
 itself is caught by an `NSApplicationDelegate`, because `MenuBarExtra` offers no callback until
@@ -438,7 +454,8 @@ the drag first and the first launch after it.
 | `Notifier.swift` | Putting a notification on screen, silently, over whichever channel works |
 | `TerminalRaiser.swift` | Taking a person to the window their session runs in: the tab where the terminal can name one, the application otherwise, and the settings pane after a refusal |
 | `OwnSignature.swift` | How this copy is signed, which decides whether the panel explains a tick left over from an earlier build |
-| `WelcomeWindow.swift` | The first-run explanation, and the only window this app has |
+| `WelcomeWindow.swift` | The first-run explanation, the only window this app has, and the one mark it hands over |
+| `MarkScaleBar.swift` | A scale as something to move: the bar in the colours of its own lights, a handle on each mark and the number under it |
 | `LoginItem.swift` | Starting with the Mac, and the checkbox both views share |
 
 The English it speaks is its own target: see `Sources/Phrasing/Phrasing.md`.

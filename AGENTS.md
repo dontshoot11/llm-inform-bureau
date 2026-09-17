@@ -18,7 +18,10 @@ Keeping them current is a deliberate, human-reviewed step, not an automated fetc
 
 The two scales are one scale: both lights of both services run 40 / 60 / 90. Changing one of
 them and not the other makes a colour mean two things, which is the thing the scale exists to
-prevent — so change both, or neither.
+prevent — so change both, or neither. That rule is about what ships. A reader who moves one of
+them in the settings window is choosing their own colour language for two different dangers,
+and the app does not argue; one scale for both **services** is not theirs to change and stays
+the rule.
 
 **The app never fetches anything at runtime.** It works offline and holds no credentials.
 Threshold updates land in the repository as commits.
@@ -58,11 +61,16 @@ Threshold updates land in the repository as commits.
    `ThresholdConfig.currentVersion` and the `version` in the file together, because the app
    falls back wholesale on a version it does not read.
 
-   Nobody has to be told: the file ships inside the app and is the only one it reads. A copy
+   Nobody has to be told: the file ships inside the app and is the only config it reads. A copy
    in Application Support, left over from the release that had an installer, is not read at
    all, and the panel says nothing about any of it — a reader who never chose a number has
-   nothing to do about one. Choosing them from the app's own settings is a task of its own
-   (`TODO/settings-and-checkup/`).
+   nothing to do about one.
+
+   What a reader *can* do is move a mark in the settings window behind the gear (today: the
+   limit scale). That is kept as a choice against a named mark, in
+   `chosen-thresholds.json`, and applied over whatever this file ships — so an edit here still
+   reaches everybody who left that mark alone, and a moved mark keeps no rationale from here:
+   it was written about the number that shipped.
 
    To run against marks other than the shipped ones, name a file:
    `LLM_INFORM_BUREAU_THRESHOLDS=/path/to/thresholds.json`. That override is the only way

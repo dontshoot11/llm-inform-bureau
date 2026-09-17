@@ -30,6 +30,14 @@ public struct PercentMarks: Equatable, Sendable {
     public let rationale: String
     public let provenance: ThresholdProvenance?
 
+    /// `true` when these marks are where somebody put them rather than where they shipped.
+    ///
+    /// The difference is not decoration: a chosen mark has no rationale behind it and no
+    /// measurement it could ever have, so the window has to stop offering one — see
+    /// `ThresholdChoices`. Nothing in the rules reads this; it is what the interface says
+    /// under the number.
+    public let isChosen: Bool
+
     public var isMeasured: Bool { provenance != nil }
 
     public init(
@@ -37,13 +45,15 @@ public struct PercentMarks: Equatable, Sendable {
         elevated: Double,
         high: Double,
         rationale: String,
-        provenance: ThresholdProvenance?
+        provenance: ThresholdProvenance?,
+        isChosen: Bool = false
     ) {
         self.notice = notice
         self.elevated = elevated
         self.high = high
         self.rationale = rationale
         self.provenance = provenance
+        self.isChosen = isChosen
     }
 
     /// Where a measured percentage falls. Every mark is exclusive: a session sitting exactly

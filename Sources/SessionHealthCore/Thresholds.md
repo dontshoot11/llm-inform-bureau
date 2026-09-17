@@ -60,17 +60,30 @@ So the marks measure what the app can actually read: how full the window is.
 In order:
 
 1. `$LLM_INFORM_BUREAU_THRESHOLDS`, if set — used by the tests and when running against a
-   working copy. It is the only way the app ever reads marks that are not its own.
+   working copy. It is the only way the app ever reads a *config* that is not its own, and it
+   takes the whole of one: a run that names a file reads that file and no choices.
 2. The copy inside the app — what every ordinary run uses.
 3. `ThresholdConfig.builtIn` — the values compiled into the app, in case even the shipped
    copy is unreadable. A test fails if they ever drift from the shipped file.
 
-**There is no copy in Application Support**, nothing is created on a first launch, and one
-left behind by the release that had an installer is not read. The marks are the app's own:
-nobody was going to hand-edit JSON to move a percentage, and the way to choose these numbers
-will be the app's own settings (`TODO/settings-and-checkup/`). Installing this app is a drag
-and one command, and a file the reader is expected to find and edit is exactly the kind of
-step that path is meant to be free of.
+On top of whichever of those was read come **the marks the person moved themselves**, in the
+settings window behind the gear. Today that is the limit scale; the rest of the marks are shown
+there and not yet movable.
+
+**There is no editable copy of this file in Application Support**, nothing is created on a first
+launch, and one left behind by the release that had an installer is not read. Nobody was going
+to hand-edit JSON to move a percentage. What Application Support does hold is
+`chosen-thresholds.json` — the *choice* and nothing else: which mark was moved and where to
+(`ThresholdChoices`). That is the difference that matters on an update. A copy of the config
+with one number changed would freeze every later improvement at the release somebody happened
+to edit, and a change of format would throw their number away with it; a choice against a named
+mark survives both, and every mark they left alone arrives new with the app.
+
+A moved mark loses the rationale that shipped under it. The sentence was written about a
+different number, and leaving it there would be the app justifying a mark nobody measured —
+the one thing the rules below forbid. Nothing is written in its place: the window puts a "Reset
+to default" button beside a mark that is not where the app had it, which says the same thing
+and also undoes it.
 
 Inside the app the file travels in SwiftPM's resource bundle, in `Contents/Resources`, and
 `ThresholdConfigLoader.bundledConfigURL` is what finds it there. Not `Bundle.module`:

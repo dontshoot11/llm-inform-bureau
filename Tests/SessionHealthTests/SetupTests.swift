@@ -121,7 +121,8 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
     // never grades the session.
     suite.test("nothing in the briefing claims to have measured quality") {
         let said = ([Briefing.title, Briefing.intro, Briefing.closing,
-                     Briefing.marksTitle, Briefing.marksNote, Briefing.scaleHelp(config)]
+                     Briefing.marksTitle, Briefing.scaleHelp(config)]
+            + Briefing.levelKey.map(\.meaning)
             + Briefing.marks(of: config).flatMap { [$0.title, $0.value, $0.note] }
             + Briefing.items(for: nothing).flatMap { [$0.title, $0.detail] }
             + Briefing.items(for: everything).flatMap { [$0.title, $0.detail] })
@@ -156,15 +157,17 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
         }
     }
 
-    // The dots show which colour comes when; the one thing they cannot show is that the first
-    // of them stays silent, and a reader who is not told that reads the silence as a fault.
-    suite.test("the window says that the first light does not notify") {
-        let note = Briefing.marksNote.lowercased()
-        suite.expect(note.contains("yellow"), "the silent mark has to be named: \(Briefing.marksNote)")
-        suite.expect(
-            note.contains("orange") && note.contains("red"),
-            "and the ones that do notify have to be named too: \(Briefing.marksNote)"
-        )
+    // A colour nobody explained is a colour the reader gives a meaning of their own, and the
+    // marks underneath say only where it starts. Green is in the key for exactly that reason:
+    // it is the colour the widget spends most of its life in.
+    suite.test("every colour the widget can draw is explained above the marks") {
+        let explained = Briefing.levelKey.map(\.level)
+        for level in [BudgetLevel.normal, .notice, .elevated, .high] {
+            suite.expect(explained.contains(level), "no key entry for \(level)")
+        }
+        for entry in Briefing.levelKey {
+            suite.expect(!entry.meaning.isEmpty, "\(entry.level): an empty meaning explains nothing")
+        }
     }
 
     // MARK: A machine with only one of the two agents
