@@ -12,13 +12,17 @@ public struct ClaudeSessionRecord: Equatable, Sendable {
     /// file is named after the pid, and no other reading in this app knows a pid.
     public let sessionID: String
 
-    /// Whether the CLI is waiting on the person rather than working.
+    /// What the CLI is waiting on the person for, or `nil` when it is not waiting on them.
     ///
-    /// The one distinction a transcript cannot make. A question to the person is written there
+    /// The one distinction a transcript cannot make. Both kinds of request are written there
     /// as a tool call with no result yet, which is precisely what a tool that is still running
-    /// looks like; the record separates them outright — measured on a live session, a question
-    /// puts it in `waiting` and the end of a turn in `idle`.
-    public let isAsking: Bool
+    /// looks like; the record separates them outright — measured on live sessions, a question
+    /// puts it in `waiting` with `waitingFor: "input needed"`, a permission prompt in `waiting`
+    /// with `waitingFor: "permission prompt"`, and the end of a turn in `idle`.
+    public let asking: Asking?
+
+    /// Whether the person is being waited on at all, whatever for.
+    public var isAsking: Bool { asking != nil }
 
     /// When the status above was last written, which for a request is the moment it was made:
     /// nothing rewrites the record while the person is away.
@@ -40,13 +44,13 @@ public struct ClaudeSessionRecord: Equatable, Sendable {
 
     public init(
         sessionID: String,
-        isAsking: Bool,
+        asking: Asking?,
         statusUpdatedAt: Date,
         pid: Int32,
         startedAt: Date
     ) {
         self.sessionID = sessionID
-        self.isAsking = isAsking
+        self.asking = asking
         self.statusUpdatedAt = statusUpdatedAt
         self.pid = pid
         self.startedAt = startedAt
@@ -167,11 +171,32 @@ public struct ClaudeSessionRecordStore: Sendable {
             // app has never seen — is read as "not asking", so a CLI that renames its states
             // falls back to the behaviour of the release before this one rather than lighting
             // a sign nobody can explain.
-            isAsking: (root["status"] as? String) == "waiting",
+            asking: (root["status"] as? String) == "waiting"
+                ? Self.asked(for: root["waitingFor"] as? String)
+                : nil,
             // Milliseconds since the epoch, as the CLI writes every moment in this file.
             statusUpdatedAt: Date(timeIntervalSince1970: updated.doubleValue / 1000),
             pid: pid.int32Value,
             startedAt: Date(timeIntervalSince1970: started.doubleValue / 1000)
         )
+    }
+
+    /// What `waitingFor` names, for the two values this app has seen a live session write.
+    ///
+    /// Measured on Claude Code 2.1.274, each on its own run and each held long enough to be
+    /// read twice: a question to the person writes `input needed`, a permission prompt writes
+    /// `permission prompt`. The binary carries other strings beside them — `dialog open`,
+    /// `sandbox request` — and no run here produced either, so they are not matched: a guess
+    /// at what an unseen string means is worth less than the honest fallback.
+    ///
+    /// Anything else, including a missing field, is still a request — `status` already said
+    /// the person is being waited on, and that is not in doubt. Only the wording of the
+    /// notification loses by it.
+    private static func asked(for waitingFor: String?) -> Asking {
+        switch waitingFor {
+        case "input needed": return .question
+        case "permission prompt": return .permission
+        default: return .unnamed
+        }
     }
 }

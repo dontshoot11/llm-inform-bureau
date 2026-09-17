@@ -18,6 +18,7 @@ func runAttentionNoticeTests(_ suite: TestSuite, config: ThresholdConfig) {
     func session(
         _ id: String = "a",
         asking since: Date? = nil,
+        asked: Asking = .question,
         about: String? = "Which approach should I take?",
         project: String? = "llm-inform-bureau",
         subagentOf parent: String? = nil
@@ -29,7 +30,7 @@ func runAttentionNoticeTests(_ suite: TestSuite, config: ThresholdConfig) {
             contextWindowTokens: 200_000,
             project: project,
             lastActivityAt: since ?? now,
-            replyWait: since.map { .asking(since: $0) } ?? .waiting,
+            replyWait: since.map { .asking(since: $0, for: asked) } ?? .waiting,
             request: since == nil ? nil : about,
             subagent: parent.map {
                 SubagentOrigin(parentSessionID: $0, type: "Explore", task: "look around", inheritsParentWindow: true)
@@ -141,11 +142,15 @@ func runAttentionNoticeTests(_ suite: TestSuite, config: ThresholdConfig) {
     }
 
     /// What one wait is announced as, in the words the person reads.
-    func announcement(about asked: String?, project: String? = "llm-inform-bureau") -> NotificationText? {
+    func announcement(
+        about asked: String?,
+        for what: Asking = .question,
+        project: String? = "llm-inform-bureau"
+    ) -> NotificationText? {
         var dispatch = warmedUp()
         let announced = pass(
             &dispatch,
-            [session(asking: now, about: asked, project: project)],
+            [session(asking: now, asked: what, about: asked, project: project)],
             at: now.addingTimeInterval(delay + 1)
         )
         guard let alert = announced.first else {
@@ -171,6 +176,29 @@ func runAttentionNoticeTests(_ suite: TestSuite, config: ThresholdConfig) {
         guard let said = announcement(about: nil) else { return }
         suite.expect(said.title.contains("llm-inform-bureau"), "title: \(said.title)")
         suite.expect(!said.body.isEmpty, "an empty body")
+        suite.expect(said.body.lowercased().contains("question"), "a question unread is still a question: \(said.body)")
+    }
+
+    // The PRD's second reason, and the whole of what it asks of the text: a request is called a
+    // request. The person reading this in another window has to know there is a yes or a no to
+    // give, not merely that something stopped — nothing on disk carries the words of a
+    // permission prompt, so naming what it is is all there is to say.
+    suite.test("a permission prompt is announced as a request, not as a session that stopped") {
+        guard let said = announcement(about: nil, for: .permission) else { return }
+        suite.expect(said.title.contains("llm-inform-bureau"), "title: \(said.title)")
+        suite.expect(said.body.lowercased().contains("tool"), "what is being asked for: \(said.body)")
+        suite.expect(
+            !said.body.lowercased().contains("has stopped"),
+            "a request read as a stoppage: \(said.body)"
+        )
+        suite.expect(!said.body.contains("/"), "a command on a request: \(said.body)")
+    }
+
+    // A request the record did not name keeps the wording every request had before this app
+    // could tell them apart: it is true of both and claims nothing that was not read.
+    suite.test("a request the record did not name keeps the wording it always had") {
+        guard let said = announcement(about: nil, for: .unnamed) else { return }
+        suite.expectEqual(said.body, "The agent has stopped and is waiting for an answer.", "the honest fallback")
     }
 
     suite.test("a session whose project nobody named still says which agent is waiting") {

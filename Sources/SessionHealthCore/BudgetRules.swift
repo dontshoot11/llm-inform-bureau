@@ -135,6 +135,7 @@ public struct BudgetRules: Sendable {
                     request: BudgetAlert.Request(
                         since: since,
                         project: snapshot.project,
+                        asked: snapshot.replyWait.askingFor ?? .unnamed,
                         about: snapshot.request
                     )
                 )

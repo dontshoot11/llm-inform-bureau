@@ -68,8 +68,66 @@ func runAskingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                 transcript: askedTurn,
                 records: [sessionRecord(pid: 501, session: "abc", status: "waiting", statusUpdatedAt: askedAt)]
             ) else { return }
-            suite.expectEqual(snapshot.replyWait, .asking(since: askedAt), "asking, dated by the record")
+            suite.expectEqual(snapshot.replyWait, .asking(since: askedAt, for: .question), "asking, dated by the record")
             suite.expect(!snapshot.replyWait.isOwed, "and the agent owes nothing: the next move is the person's")
+        }
+
+        // The second reason a session stops with the next move belonging to the person, and the
+        // one the transcript cannot see at all: a tool held until it is allowed is written
+        // there exactly as a tool that is merely slow. Measured on a live session — the record
+        // says `waiting` with `waitingFor: "permission prompt"`, and says it from the moment
+        // the prompt opened until it is answered.
+        suite.test("a record that says permission prompt is the agent asking to use a tool") {
+            let askedAt = now.addingTimeInterval(-90)
+            guard let snapshot = pass(
+                root, "permission",
+                transcript: askedTurn,
+                records: [
+                    sessionRecord(
+                        pid: 501, session: "abc", status: "waiting",
+                        statusUpdatedAt: askedAt, waitingFor: "permission prompt"
+                    )
+                ]
+            ) else { return }
+            suite.expectEqual(
+                snapshot.replyWait, .asking(since: askedAt, for: .permission),
+                "the pause sign, and a notification that can name what it is about"
+            )
+            suite.expect(!snapshot.replyWait.isOwed, "the agent owes nothing: it is held, not thinking")
+        }
+
+        // The CLI's own internal business, and nothing documents it: the strings may be renamed
+        // or joined by others at any release. An unfamiliar one costs the wording of one
+        // notification — never the pause sign, never the row.
+        suite.test("a waitingFor this app has never seen is still a request") {
+            guard let snapshot = pass(
+                root, "unfamiliar",
+                transcript: askedTurn,
+                records: [
+                    sessionRecord(
+                        pid: 501, session: "abc", status: "waiting",
+                        statusUpdatedAt: now, waitingFor: "sandbox request"
+                    )
+                ]
+            ) else { return }
+            suite.expectEqual(
+                snapshot.replyWait, .asking(since: now, for: .unnamed),
+                "waiting is believed, the reason is not invented"
+            )
+        }
+
+        suite.test("a record that says waiting and nothing more is still a request") {
+            guard let snapshot = pass(
+                root, "no-reason",
+                transcript: askedTurn,
+                records: [
+                    sessionRecord(
+                        pid: 501, session: "abc", status: "waiting",
+                        statusUpdatedAt: now, waitingFor: nil
+                    )
+                ]
+            ) else { return }
+            suite.expectEqual(snapshot.replyWait, .asking(since: now, for: .unnamed), "status is the whole of the rule")
         }
 
         // The same transcript, unchanged, read twice: once with the record saying the agent is
@@ -101,7 +159,7 @@ func runAskingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                 records: [sessionRecord(pid: 501, session: "abc", status: "waiting", statusUpdatedAt: now)]
             ) else { return }
             suite.expectEqual(snapshot.request, "Which approach should I take?", "the question")
-            suite.expectEqual(snapshot.replyWait, .asking(since: now), "and the state it belongs to")
+            suite.expectEqual(snapshot.replyWait, .asking(since: now, for: .question), "and the state it belongs to")
         }
 
         // The rule is the name of one tool, which is the vendor's to change. What a renamed
@@ -113,7 +171,7 @@ func runAskingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                 records: [sessionRecord(pid: 501, session: "abc", status: "waiting", statusUpdatedAt: now)]
             ) else { return }
             suite.expectEqual(snapshot.request, nil, "a running tool is not a question")
-            suite.expectEqual(snapshot.replyWait, .asking(since: now), "and the record is still believed")
+            suite.expectEqual(snapshot.replyWait, .asking(since: now, for: .question), "and the record is still believed")
         }
 
         // Answered, and the question with it: what is carried is the request in flight, not the
@@ -298,7 +356,7 @@ func runAskingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                 // activity window decides how long it is shown, and that is unchanged.
                 transcriptModified: now.addingTimeInterval(-60)
             ) else { return }
-            suite.expectEqual(snapshot.replyWait, .asking(since: askedAt), "the pause sign stays a pause sign")
+            suite.expectEqual(snapshot.replyWait, .asking(since: askedAt, for: .question), "the pause sign stays a pause sign")
         }
 
         // The other three states are what the light did before this, and they are meant to be
@@ -379,7 +437,7 @@ func runAskingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
                 ).level
             }
             let full = 199_000
-            let asking = ReplyWait.asking(since: now)
+            let asking = ReplyWait.asking(since: now, for: .question)
             suite.expectEqual(assess(asking, tokens: full), assess(.none, tokens: full), "at the ceiling")
             suite.expectEqual(assess(asking, tokens: full), .high, "and the ceiling is red")
             suite.expectEqual(assess(asking, tokens: 1_000), assess(.none, tokens: 1_000), "well under it")

@@ -216,15 +216,25 @@ private func write(_ lines: [String], to url: URL, modified: Date?, _ suite: Tes
 /// `status` is passed as a string rather than as a case of something, because the point of
 /// most of these cases is a value this app has no case for: the three it has seen are `busy`,
 /// `waiting` and `idle`, and the format is the CLI's own undocumented business.
+/// A session record as Claude Code writes one.
+///
+/// `waitingFor` rides with `waiting` and with nothing else, which is what a live session does:
+/// measured on 2.1.274, a question writes `input needed` and a permission prompt writes
+/// `permission prompt`, and neither ever appears beside `busy` or `idle`. A question is the
+/// default because it is the case every test here was written around; the permission prompt,
+/// the unfamiliar string and the missing field (`waitingFor: nil`) belong to the tests that
+/// are about them.
 func sessionRecord(
     pid: Int,
     session: String,
     status: String,
-    statusUpdatedAt: Date
+    statusUpdatedAt: Date,
+    waitingFor: String? = "input needed"
 ) -> String {
     let millis = Int(statusUpdatedAt.timeIntervalSince1970 * 1000)
+    let reason = status == "waiting" ? waitingFor.map { ",\"waitingFor\":\"\($0)\"" } ?? "" : ""
     return """
-    {"pid":\(pid),"sessionId":"\(session)","cwd":"\(workingDirectory)",    "startedAt":\(millis - 600_000),"version":"2.1.274","kind":"interactive","entrypoint":"cli",    "name":"llm-inform-bureau-e7","nameSource":"derived","status":"\(status)",    "updatedAt":\(millis),"statusUpdatedAt":\(millis)}
+    {"pid":\(pid),"sessionId":"\(session)","cwd":"\(workingDirectory)",    "startedAt":\(millis - 600_000),"version":"2.1.274","kind":"interactive","entrypoint":"cli",    "name":"llm-inform-bureau-e7","nameSource":"derived","status":"\(status)",    "updatedAt":\(millis),"statusUpdatedAt":\(millis)\(reason)}
     """
 }
 

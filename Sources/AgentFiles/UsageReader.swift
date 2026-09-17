@@ -211,6 +211,7 @@ public struct UsageReader: Sendable {
                 guard asking || process != nil else { return snapshot }
                 return snapshot.withRecord(
                     asking: asking ? record.statusUpdatedAt : nil,
+                    for: record.asking ?? .unnamed,
                     process: process
                 )
             }

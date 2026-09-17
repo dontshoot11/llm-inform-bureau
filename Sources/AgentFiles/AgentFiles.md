@@ -119,7 +119,7 @@ A session's row says not only what it holds but who is being waited on right now
 | `.none` | the turn ended, nobody is waiting | a plain dot |
 | `.waiting` | the agent owes an answer and one is still expected | blinking |
 | `.stalled` | the agent has owed one for longer than the fuse | the figure eight |
-| `.asking(since:)` | the *agent* is waiting on the *person* | the pause sign |
+| `.asking(since:for:)` | the *agent* is waiting on the *person* | the pause sign |
 
 The first three are read the same way for both services and neither reads it the same way,
 which is why each reader holds its own rule: Claude has to be read between the lines, Codex
@@ -208,15 +208,27 @@ session, with a watcher sampling the file twice a second:
 | --- | --- | --- |
 | the agent was working | `busy` | — |
 | **the agent asked a question** | **`waiting`** | **`input needed`** |
-| the person answered | `busy` | — |
+| **a permission prompt was open** | **`waiting`** | **`permission prompt`** |
+| the person answered, or refused | `busy` / `idle` | — |
 | **the turn ended, nothing asked** | **`idle`** | — |
 
 `statusUpdatedAt` moves with the status and with nothing else, so it is the moment the asking
-began: nothing rewrites the record while the person is away. `sessionId` ties it to a row and
-`cwd` to a project.
+began: nothing rewrites the record while the person is away — measured on a prompt held open
+for four minutes, where it did not move once. `sessionId` ties it to a row and `cwd` to a
+project.
 
-What the record does *not* carry is the question itself — the `needs` field is empty for this
-kind of dialog — so what is being asked still comes out of the transcript. That is the other
+`status` alone decides whether anybody is being waited on, and it is the only part of this the
+pause sign rides on. `waitingFor` decides nothing; it is read for one thing only — so that a
+notification can say which of the two it is, because "answer the question" and "allow or refuse
+this" are different errands to be pulled out of another window for. Only the two strings above
+are matched, both measured on live sessions; anything else, including a missing field, is read
+as a request whose reason this app was not told, and worded as every request was worded before
+it could tell them apart. The binary carries other candidates — `dialog open`, `sandbox
+request` — and no run here produced either, so they are not guessed at.
+
+What the record does *not* carry is the question itself — the `needs` field never appeared on
+either kind of dialog — so what is being asked still comes out of the transcript. A permission
+prompt has no words anywhere on disk, and its notification says what it is and stops there. That is the other
 half of the same entry: the `tool_use` block named `AskUserQuestion` carries the whole of what
 was asked, and the first of its `questions` is what a notification says. Measured over 395
 transcripts here: 217 entries call it and none carries two tool calls at once, so "the last

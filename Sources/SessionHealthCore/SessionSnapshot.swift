@@ -50,6 +50,30 @@ public struct SubagentOrigin: Equatable, Sendable {
 /// with four answers, so it is one value and not a state beside a flag: two fields would
 /// leave every reader of them, the bar and the panel and the rules, to put them back together
 /// on its own.
+/// What the agent stopped for, when it has stopped and is waiting on the person.
+///
+/// Two things bring a session to a halt with the next move belonging to the person, and the
+/// bar draws them the same — the pause sign says "you" and nothing finer. The difference is
+/// for the notification, which has a sentence to spend and owes the person the reason they are
+/// being interrupted: a question is answered by reading it, a permission prompt by deciding.
+///
+/// Measured on live sessions of Claude Code 2.1.274 (see the task's research.md): a question
+/// puts the session record in `waiting` with `waitingFor: "input needed"`, a permission prompt
+/// in `waiting` with `waitingFor: "permission prompt"`. Neither carries what is being asked
+/// about — the question's own words come from the transcript, and the permission prompt's
+/// words are nowhere on disk at all.
+public enum Asking: Equatable, Sendable {
+    /// The agent put a question to the person. Its words, when the transcript carries them,
+    /// travel separately in `SessionSnapshot.request`.
+    case question
+    /// The agent wants to use a tool and is held until the person allows or refuses it.
+    case permission
+    /// The record says the person is being waited on and does not say what for — an unfamiliar
+    /// `waitingFor`, or none at all. Read as a request, worded as the release before this one
+    /// worded every request: the app never invents a reason it was not told.
+    case unnamed
+}
+
 public enum ReplyWait: Equatable, Sendable {
     /// Nothing is owed: the turn ended, and nobody is being waited on.
     case none
@@ -67,8 +91,9 @@ public enum ReplyWait: Equatable, Sendable {
     /// Carries the moment the asking started, which the other two cases have no use for and
     /// this one does: the fuse above never applies to it — a request does not go stale, the
     /// person simply has not come back yet — and how long it has stood is what a notification
-    /// waits on.
-    case asking(since: Date)
+    /// waits on. It carries what was asked for beside it, because the two arrive from the same
+    /// file in the same reading and only the notification tells them apart.
+    case asking(since: Date, for: Asking)
 
     /// Whether the *agent* owes an answer, however long it has been owed. Being asked
     /// something is not that: the next move is the person's.
@@ -76,8 +101,14 @@ public enum ReplyWait: Equatable, Sendable {
 
     /// When the agent started asking the person for something, or `nil` when it is not asking.
     public var askingSince: Date? {
-        guard case .asking(let since) = self else { return nil }
+        guard case .asking(let since, _) = self else { return nil }
         return since
+    }
+
+    /// What it is asking for, or `nil` when it is not asking.
+    public var askingFor: Asking? {
+        guard case .asking(_, let what) = self else { return nil }
+        return what
     }
 
     /// Whether the person, rather than the agent, is the one being waited on.
@@ -229,10 +260,11 @@ public struct SessionSnapshot: Equatable, Sendable {
     /// story: nothing a transcript contains leads to the window a person is sitting in front
     /// of.
     ///
-    /// Both arguments are optional and independent. A record may say a session is asking while
-    /// its process has already been checked and found gone, and a live process says nothing
-    /// about anybody waiting.
-    public func withRecord(asking since: Date?, process: Int32?) -> SessionSnapshot {
+    /// The moment and the process are optional and independent. A record may say a session is
+    /// asking while its process has already been checked and found gone, and a live process
+    /// says nothing about anybody waiting. What is being asked for is read only when there is
+    /// a moment to go with it — nothing is asked for at no time.
+    public func withRecord(asking since: Date?, for what: Asking, process: Int32?) -> SessionSnapshot {
         SessionSnapshot(
             sessionID: sessionID,
             service: service,
@@ -242,7 +274,7 @@ public struct SessionSnapshot: Equatable, Sendable {
             model: model,
             project: project,
             lastActivityAt: lastActivityAt,
-            replyWait: since.map { .asking(since: $0) } ?? replyWait,
+            replyWait: since.map { .asking(since: $0, for: what) } ?? replyWait,
             request: request,
             processID: process,
             subagent: subagent

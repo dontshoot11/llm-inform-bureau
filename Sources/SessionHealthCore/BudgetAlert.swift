@@ -65,13 +65,23 @@ public struct BudgetAlert: Equatable, Sendable {
         /// reading the notification can find the row it is about.
         public let project: String?
 
+        /// What was asked for: a question, permission to use a tool, or a request the record
+        /// did not name. The notification owes the person the reason they are being
+        /// interrupted, and this is the whole of what is known about it for certain.
+        public let asked: Asking
+
         /// What was asked, in the agent's own words, or `nil` when the transcript does not
         /// carry it. A notification that cannot say what about still says who is waiting.
+        ///
+        /// Only a question ever has words here. A permission prompt is written nowhere on
+        /// disk — the record says one is open and stops there — so its notification is the
+        /// one above and nothing more.
         public let about: String?
 
-        public init(since: Date, project: String?, about: String?) {
+        public init(since: Date, project: String?, asked: Asking, about: String?) {
             self.since = since
             self.project = project
+            self.asked = asked
             self.about = about
         }
     }

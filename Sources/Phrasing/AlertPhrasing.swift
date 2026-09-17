@@ -81,14 +81,10 @@ public enum AlertPhrasing {
         // stopped" — because the difference between the two is the whole reason this arrives
         // at all.
         case .attention:
-            let asked = alert.request?.about.flatMap { Self.oneLine($0) }
             return NotificationText(
                 title: alert.request?.project.map { "\(service) is waiting on you in \($0)" }
                     ?? "\(service) is waiting on you",
-                body: detail(
-                    [asked ?? "The agent has stopped and is waiting for an answer."],
-                    command: command
-                )
+                body: detail([Self.asked(alert.request)], command: command)
             )
         }
     }
@@ -102,6 +98,30 @@ public enum AlertPhrasing {
         let said = sentences.compactMap { $0 }.joined(separator: " ")
         guard let command else { return said }
         return said + "\n" + command
+    }
+
+    /// What the session is being held up by, in one sentence.
+    ///
+    /// A question says itself: its own words are better than any sentence about them, and they
+    /// are used whenever the transcript carried them. A permission prompt has no words
+    /// anywhere on disk, so it is named for what it is — the person has a yes or a no to give,
+    /// and telling them that is the difference between a notification worth opening and one
+    /// that only says a session stopped.
+    ///
+    /// A request the record did not name gets the sentence every request got before this app
+    /// could tell them apart: true of both, and it claims nothing it was not told.
+    private static func asked(_ request: BudgetAlert.Request?) -> String {
+        let stopped = "The agent has stopped and is waiting for an answer."
+        guard let request else { return stopped }
+        switch request.asked {
+        case .question:
+            return request.about.flatMap { Self.oneLine($0) }
+                ?? "The agent has put a question to you and is waiting on the answer."
+        case .permission:
+            return "The agent is asking to use a tool and waits on a yes or a no."
+        case .unnamed:
+            return request.about.flatMap { Self.oneLine($0) } ?? stopped
+        }
     }
 
     /// A question as a notification can carry it: one line, and short enough to be read at a

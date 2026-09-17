@@ -112,6 +112,13 @@ request.
 The pause sign in the bar does not wait for any of this. It is drawn from `ReplyWait.asking`
 the moment the request appears; the delay belongs to the interruption alone.
 
+The sign is also the whole of what the bar says about it: a question and a permission prompt
+are one shape, because the bar answers "who is being waited on" and both answer "you". The
+difference between them (`Asking`) is spent on the notification, which has a sentence and owes
+the person the errand they are being pulled out of another window for — a question to read, or
+a yes and a no to give. A request the record did not name keeps the wording both had before
+they could be told apart.
+
 ## Which mark made the bar that colour
 
 An assessment carries `levelSource` beside `level`: the mark that set the colour, not merely

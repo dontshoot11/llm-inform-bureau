@@ -120,7 +120,7 @@ func runSessionRaiseTests(_ suite: TestSuite, config: ThresholdConfig) {
     ) -> ClaudeSessionRecord {
         ClaudeSessionRecord(
             sessionID: session,
-            isAsking: status == "waiting",
+            asking: status == "waiting" ? .question : nil,
             statusUpdatedAt: statusUpdatedAt,
             pid: pid,
             startedAt: statusUpdatedAt.addingTimeInterval(-600)
