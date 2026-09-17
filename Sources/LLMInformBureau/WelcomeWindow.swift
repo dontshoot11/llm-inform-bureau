@@ -475,7 +475,12 @@ private struct WelcomeView: View {
             }
             .padding(.bottom, 2)
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(Briefing.marks(of: config), id: \.mark) { mark in
+                // Listed as the app ships them, not as they were read: the numbers come from
+                // this window's own state anyway, and the words that must not go stale are the
+                // ones under a mark — a note built from the config would say "Chosen by you"
+                // about a mark put back a moment ago, and nothing at all about one moved a
+                // moment ago.
+                ForEach(Briefing.marks(of: shipped), id: \.mark) { mark in
                     markRow(mark)
                 }
             }
@@ -583,13 +588,18 @@ private struct WelcomeView: View {
                 .font(WindowType.detail)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            if !mark.origin.isEmpty {
+            // Decided by what this window knows rather than by the note: a mark moved or put
+            // back since it was built is the one case where the two disagree, and it is the
+            // only case a reader is looking at this line for.
+            let origin = isChosen ? MarkNote.chosen : mark.origin
+            if !origin.isEmpty {
                 HStack(spacing: 6) {
-                    Text(mark.origin)
+                    Text(origin)
                         .font(WindowType.detail)
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
-                    if let source = mark.source {
+                    // Nothing published stands behind a number somebody chose for themselves.
+                    if !isChosen, let source = mark.source {
                         Link("source", destination: source)
                             .font(WindowType.detail)
                     }
