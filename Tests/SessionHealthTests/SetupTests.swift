@@ -84,8 +84,8 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
             suite.expectEqual(items.count, SetupState.Source.allCases.count, "items")
             suite.expectEqual(Set(items.map(\.source)), Set(SetupState.Source.allCases), "sources")
             for item in items {
-                suite.expect(!item.title.isEmpty, "an item with no title")
-                suite.expect(!item.detail.isEmpty, "\(item.title): no detail")
+                suite.expect(item.title.holds { !$0.isEmpty }, "an item with a side of its title missing")
+                suite.expect(item.detail.holds { !$0.isEmpty }, "\(item.title.shown): no detail")
             }
         }
     }
@@ -95,43 +95,48 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
     suite.test("the missing Claude limits name what connects them") {
         let limits = Briefing.items(for: nothing).first { $0.source == .claudeLimits }
         suite.expect(limits?.isConnected == false, "must read as not connected")
-        suite.expect(limits?.detail.contains(Briefing.connectAction) == true, "detail: \(limits?.detail ?? "—")")
+        suite.expect(
+            limits?.detail.carries(Briefing.connectAction) == true,
+            "detail: \(limits?.detail.shown ?? "—")"
+        )
     }
 
     suite.test("the sources that connect themselves never send anybody anywhere") {
         for item in Briefing.items(for: nothing) where item.source != .claudeLimits {
             suite.expect(
-                !item.detail.contains(Briefing.connectAction),
-                "\(item.title) offers a button it does not need: \(item.detail)"
+                !item.detail.carries(Briefing.connectAction),
+                "\(item.title.shown) offers a button it does not need: \(item.detail.shown)"
             )
         }
     }
 
     suite.test("a connected source is not told how to connect itself") {
         for item in Briefing.items(for: everything) {
-            suite.expect(item.isConnected, "\(item.title) reads as missing on a complete machine")
+            suite.expect(item.isConnected, "\(item.title.shown) reads as missing on a complete machine")
             suite.expect(
-                !item.detail.contains(Briefing.connectAction),
-                "\(item.title) still says how to connect itself: \(item.detail)"
+                !item.detail.carries(Briefing.connectAction),
+                "\(item.title.shown) still says how to connect itself: \(item.detail.shown)"
             )
         }
     }
 
     // The same line AGENTS.md draws for notifications: the app reports what it read, and
     // never grades the session.
-    suite.test("nothing in the briefing claims to have measured quality") {
-        var lines: [String] = [
+    // Both sides, because a promise the English half does not make is not one the Russian half
+    // may make instead.
+    suite.test("nothing in the briefing claims to have measured quality, in either language") {
+        var lines: [Phrase] = [
             CheckupPhrasing.title, CheckupPhrasing.intro, CheckupPhrasing.closing,
-            Briefing.marksTitle.english, Briefing.marksTitle.russian, Briefing.scaleHelp(config)
+            Briefing.marksTitle, Briefing.scaleHelp(config)
         ]
         lines += Briefing.levelKey.map(\.meaning)
-        lines += Briefing.marks(of: config).flatMap { [$0.title, $0.what, $0.origin] }
+        lines += Briefing.marks(of: config).flatMap { [$0.title, $0.what, $0.origin].compactMap { $0 } }
         lines += Briefing.items(for: nothing).flatMap { [$0.title, $0.detail] }
         lines += Briefing.items(for: everything).flatMap { [$0.title, $0.detail] }
-        let said = lines.joined(separator: " ").lowercased()
-        suite.expect(!said.contains("quality:"), "a measured-quality claim: \(said)")
-        suite.expect(!said.contains("health"), "a health score: \(said)")
-        suite.expect(!said.contains("degraded"), "a verdict on the session: \(said)")
+        for side in [lines.map(\.english).joined(separator: " "), lines.map(\.russian).joined(separator: " ")] {
+            let claims = QualityClaims.found(in: side)
+            suite.expect(claims.isEmpty, "a claim about the answers themselves — \(claims) — in: \(side)")
+        }
     }
 
     // A scale is shown as the lights it turns on rather than described, so what a test can
@@ -141,11 +146,14 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
     suite.test("each scale mark reaches the window with the light it turns on") {
         let shown = Briefing.marks(of: config)
 
-        for (title, marks) in [("Context window filled", config.windowFill), ("Subscription limit spent", config.limitUsage)] {
-            guard let note = shown.first(where: { $0.title == title }) else {
-                suite.expect(false, "no mark called \(title)")
+        // Found by the mark it is rather than by what it is called: the title is a phrase with
+        // two sides now, and which side a test reads is not what this one is about.
+        for (mark, marks) in [(ThresholdMark.windowFill, config.windowFill), (.limitUsage, config.limitUsage)] {
+            guard let note = shown.first(where: { $0.mark == mark }) else {
+                suite.expect(false, "no mark for \(mark.rawValue)")
                 continue
             }
+            let title = mark.rawValue
             suite.expect(
                 note.scale.map(\.percent) == [marks.notice, marks.elevated, marks.high],
                 "\(title): the window must show the config's own marks, got \(note.scale.map(\.percent))"
@@ -169,8 +177,8 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
                 continue
             }
             suite.expect(note.scale.isEmpty, "\(mark.rawValue): a number is not a scale")
-            suite.expect(!note.title.isEmpty, "\(mark.rawValue): a mark with no title")
-            suite.expect(!note.what.isEmpty, "\(mark.rawValue): nothing says what this number does")
+            suite.expect(note.title.holds { !$0.isEmpty }, "\(mark.rawValue): a mark with a side of its title missing")
+            suite.expect(note.what.holds { !$0.isEmpty }, "\(mark.rawValue): a side says nothing about what this number does")
             suite.expect(config.duration(of: mark) != nil, "\(mark.rawValue): no duration in the config")
         }
 
@@ -198,7 +206,7 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
         suite.expectEqual(moved.count, Briefing.marks(of: config).count, "marks shown")
         for note in moved {
             suite.expect(note.isChosen, "\(note.mark.rawValue): the fixture moved every mark")
-            suite.expect(!note.what.isEmpty, "\(note.mark.rawValue): nothing says what this mark decides")
+            suite.expect(note.what.holds { !$0.isEmpty }, "\(note.mark.rawValue): a side says nothing about what this mark decides")
             suite.expectEqual(note.origin, MarkNote.chosen, "\(note.mark.rawValue) origin")
             suite.expect(note.source == nil, "\(note.mark.rawValue): nothing published backs a moved mark")
         }
@@ -206,7 +214,7 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
         // And a mark nobody moved keeps saying both things — what it decides and where its
         // number came from, which is the half the reader takes over by moving it.
         for note in Briefing.marks(of: config) {
-            suite.expect(!note.what.isEmpty, "\(note.mark.rawValue): nothing says what this mark decides")
+            suite.expect(note.what.holds { !$0.isEmpty }, "\(note.mark.rawValue): a side says nothing about what this mark decides")
             suite.expect(
                 note.origin != MarkNote.chosen,
                 "\(note.mark.rawValue): a shipped mark must not claim the reader chose it"
@@ -223,7 +231,7 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
             suite.expect(explained.contains(level), "no key entry for \(level)")
         }
         for entry in Briefing.levelKey {
-            suite.expect(!entry.meaning.isEmpty, "\(entry.level): an empty meaning explains nothing")
+            suite.expect(entry.meaning.holds { !$0.isEmpty }, "\(entry.level): an empty side explains nothing")
         }
     }
 

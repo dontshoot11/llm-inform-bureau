@@ -8,6 +8,38 @@ untranslated line does not compile rather than reaching a reader as English in t
 Russian window. Which side is showing is the app's to decide (`InterfaceLanguage`) and is
 decided where the text is drawn, which is why the language can change while a window is open.
 
+## Where the second language lives, and what it may claim
+
+Beside the first one, in the same file, on the same line. English is written first because it
+is the side this project is reviewed in; neither side is a translation of a source of record,
+and both are read as what the app says.
+
+**Both sides say the same thing, and neither may say more than the other.** The line
+`AGENTS.md` draws — that the widget reports a mark being crossed and never grades the answers —
+is a rule about what the app claims, not about English, so a Russian sentence that graded a
+session would be the same lie told where fewer people would catch it. The suite reads it in
+both (`QualityClaims`, `TranslationTests`).
+
+**What has no second side, and why.** Three kinds of thing legitimately read the same in both
+windows, and each of them says so in the code rather than by being a bare `String`:
+
+| What | Where | Why |
+| --- | --- | --- |
+| Names and commands — a paper's title, a path, an agent's own name, `/context` | `Phrase.name` | It is what the reader will type, search for or compare against a terminal; a translated one points at nothing |
+| Numbers and their suffixes — `121K`, `+4K`, `62%` | `TokenDisplay` | Digits with a suffix, read the same by both readers; the nouns beside them are phrases |
+| The status line row | `StatusLineText` | No prose in it, and it is printed into somebody's terminal by Claude Code rather than drawn by this app |
+
+**Numbers and time.** A duration in a panel row is short on both sides — `2h 5m`, `2 ч 5 мин`.
+A duration read out in a sentence is spelled out, and then the Russian noun agrees with the
+number it follows (`RussianCount`): a window is «5 часов» and «7 дней», never «7 день». A date
+is formatted in each language's own locale rather than the Mac's, so a Russian sentence never
+has an English month standing in it.
+
+**What holds this together.** The compiler does most of it — a `Phrase` cannot be built without
+both sides — and `TranslationTests` does the rest by reading these files: a sentence that never
+became a phrase, a second side with the English copied into it, and either side making a claim
+about the answers.
+
 ## Why this is its own target
 
 It started inside the app target. A notification, unlike a line in a panel, has to be right
@@ -72,17 +104,18 @@ look up a number instead.
 
 | File | Holds |
 | --- | --- |
-| `Phrase.swift` | Something the app says, in both languages at once: one value with two sides, and no way to build one without writing both |
+| `Phrase.swift` | Something the app says, in both languages at once: one value with two sides, and no way to build one without writing both — plus `joined`, the one way sides are put together, and `name`, the declared exception for what is the same in both |
+| `RussianCount.swift` | A noun after a number, in the form Russian puts it in — the three forms and the rule for picking one |
 | `LanguageInUse.swift` | Which language the app opens in — the choice on disk, and failing that the Mac's own list |
 | `AlertPhrasing.swift` | A crossed mark — or an agent waiting on the person — as a notification: title, body, command |
 | `Wording.swift` | What a mark is called, what a subagent's row is called, which command shows more of it, what a folded row with no reading yet says, what a service is called — `service` where there is room to say it, `serviceInBar` where the budget is pixels — and what a clickable session row promises, what the panel's dead ends promise instead — a reading with no numbers, a session that cannot be brought up, a click that got partway — plus the line and button shown when the permission for something closer than the application is missing, the name of the button that opens any pane of System Settings, and the sentence an ad-hoc-signed copy adds about a tick that belongs to the version before this one — said in one place because both the panel and the checkup say it |
 | `Briefing.swift` | What the settings window says about its marks: what each colour is like to be in, how a scale is worked, what each mark decides, said under every one of them whether the app placed it or the reader did — because that describes the mark and not the number standing on it — and, under that, where the number itself came from: a published date, an admission that nobody measured it, or, for a mark somebody moved, that they chose it, since the reasoning that shipped was about another number — plus each source of readings, as the checkup lists it |
 | `CheckupPhrasing.swift` | The other half of that window: every thing the app uses on this Mac as one line — what it is, what the machine answered, what it costs while the answer is no, and the pane of System Settings where that answer is kept; for the two answers macOS gives only on use — controlling a terminal, and the channel a notification goes out over — what the app will ask for and when instead of a tick; and what a click on a session runs on before any permission comes into it, which is a record the CLI writes only while a session is running and Codex never writes at all; plus the labels on the two controls that stand in that list rather than beside it — starting with the Mac, and announcing a crossed mark at all — and what a reader who unticks the second one has to be told went with it, which is nothing |
-| `TokenDisplay.swift` | Token counts and percentages, rounded the way the widget says them |
-| `TimeDisplay.swift` | Ages, reset times and window lengths — and the one date that is not an age: when the running copy was built |
+| `TokenDisplay.swift` | Token counts and percentages, rounded the way the widget says them — the one file here whose output has no second side, because digits with a suffix have none |
+| `TimeDisplay.swift` | Ages, reset times and window lengths, short in a row and spelled out in a sentence — and the one date that is not an age: when the running copy was built, written in each language's own way |
 | `StatusLineText.swift` | The one row the app prints when it holds Claude Code's status line and nothing was there before it |
 | `SlotPhrasing.swift` | The button that takes that slot, in the panel, and the one that gives it back, on the checkup line about the slot in the settings window — and what the change to `~/.claude/settings.json` is shown as before either of them is made |
 
 Tests: `Tests/SessionHealthTests/NotificationTextTests.swift`, `SetupTests.swift`,
-`CheckupTests.swift`, `NotificationChoiceTests.swift`, `LanguageChoiceTests.swift` and
-`StatusLineModeTests.swift`.
+`CheckupTests.swift`, `NotificationChoiceTests.swift`, `LanguageChoiceTests.swift`,
+`TranslationTests.swift` and `StatusLineModeTests.swift`.

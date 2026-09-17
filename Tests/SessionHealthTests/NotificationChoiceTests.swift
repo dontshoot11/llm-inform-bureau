@@ -115,19 +115,19 @@ func runNotificationChoiceTests(_ suite: TestSuite, config: ThresholdConfig) {
             notifications: nil,
             copy: RunningCopy(path: "/Applications/App.app", builtAt: nil, isAdHoc: true)
         )).first { $0.point == .notifications }?.title
-        suite.expect(!CheckupPhrasing.announceMarks.isEmpty, "a checkbox with no label")
+        suite.expect(CheckupPhrasing.announceMarks.holds { !$0.isEmpty }, "a checkbox with a side of its label missing")
         suite.expect(
             CheckupPhrasing.announceMarks != title,
             "a checkbox labelled after the row it stands in says nothing about what it switches"
         )
-        let silent = CheckupPhrasing.silenced.lowercased()
+        let silent = CheckupPhrasing.silenced
         suite.expect(
-            silent.contains("lights") && silent.contains("panel"),
-            "somebody switching this off has to be told what went with it: \(CheckupPhrasing.silenced)"
+            silent.carries(Phrase("lights", "Огни")) && silent.carries(Phrase("panel", "панели")),
+            "somebody switching this off has to be told what went with it: \(silent.shown)"
         )
         suite.expect(
-            silent.contains("channel"),
-            "and that the mark beside the row is still answering its own question"
+            silent.carries(Phrase("channel", "канал")),
+            "and that the mark beside the row is still answering its own question: \(silent.shown)"
         )
     }
 

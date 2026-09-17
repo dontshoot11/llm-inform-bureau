@@ -1,16 +1,21 @@
 import Foundation
 import SessionHealthCore
 
-/// The English the widget speaks.
+/// What the widget calls things, in both of the languages it speaks.
 ///
 /// Every sentence here says what was crossed and how full something is — never how good the
 /// answers are. There is no signal for that in anything this app can read, and a sentence that
-/// implies one would be the widget's only lie.
+/// implies one would be the widget's only lie. The rule holds on both sides: a Russian phrase
+/// that graded a session would be the same lie said where fewer reviewers would catch it.
 ///
 /// Where a mark comes from is part of what it says, and every mark is now the project's own.
 /// The wording says so rather than letting a number pass for a vendor's line; what it can
 /// attribute is the published compaction point the red mark sits below, and it says a session
 /// *may* be rewritten past it rather than promising it will be.
+///
+/// What is not a phrase here is what is not this app's to say: the names of the two services,
+/// the slash commands of their CLIs, and the name an agent gave itself. Translating any of
+/// those would be inventing a word the reader cannot type back into a terminal.
 public enum Wording {
     public static func service(_ service: AgentService) -> String { service.shortLabel }
 
@@ -19,7 +24,10 @@ public enum Wording {
 
     /// Said for an agent whose CLI is not on this machine at all. Not a fault and not a gap:
     /// there is nothing to install for this app's sake, and nothing to wait for.
-    public static let notInstalled = "Not installed on this Mac — nothing to connect."
+    public static let notInstalled = Phrase(
+        "Not installed on this Mac — nothing to connect.",
+        "Не установлено на этом Маке — подключать нечего."
+    )
 
     /// Said in a folded row whose service has reported nothing yet — the slot is connected and
     /// the first answer of a session has not come back.
@@ -28,28 +36,40 @@ public enum Wording {
     /// sentence and never a zero; folded away there is no room for the sentence, and what was
     /// there instead was an empty right-hand side, which reads as an app that did not do what
     /// the button promised. The sentence itself is one fold away.
-    public static let noReadingYet = "no data yet"
+    public static let noReadingYet = Phrase("no data yet", "данных пока нет")
 
     /// A window with nothing left, where there is room for a word and not for a sentence.
     /// What it costs is said in full when the limits are opened out; folded away, the cross
     /// beside it is already saying most of it.
-    public static let spentLabel = "spent"
+    public static let spentLabel = Phrase("spent", "исчерпано")
 
     /// The shortest name a limit window has, for a row that has room for a number and little
     /// else. The opened-out rows say "5-hour window" and "Weekly window"; folded away, next to
     /// its own percentage, the only question left is which of the two windows this is.
-    public static func limitWindowShort(_ kind: LimitWindow.Kind) -> String {
-        kind == .short ? "5h" : "7d"
+    public static func limitWindowShort(_ kind: LimitWindow.Kind) -> Phrase {
+        kind == .short ? Phrase("5h", "5 ч") : Phrase("7d", "7 дн")
     }
 
     /// A limit window inside a sentence about it: "Claude weekly limit 62% used".
-    public static func limitName(_ kind: LimitWindow.Kind) -> String {
-        kind == .short ? "5-hour limit" : "weekly limit"
+    public static func limitName(_ kind: LimitWindow.Kind) -> Phrase {
+        kind == .short
+            ? Phrase("5-hour limit", "лимит за 5 часов")
+            : Phrase("weekly limit", "недельный лимит")
     }
 
-    public static func limitWindow(_ kind: LimitWindow.Kind, minutes: Int?) -> String {
-        if let minutes { return "\(TimeDisplay.windowLength(minutes)) window" }
-        return kind == .short ? "5-hour window" : "Weekly window"
+    /// A limit window as a row of the panel names it, and as a sentence about it names it.
+    ///
+    /// One phrase for both, which is why the Russian side is lower case where the English one
+    /// is not: Russian capitalises a heading far less readily, and the same words have to stand
+    /// in the middle of "Claude: недельное окно перешло 62%" without reading as a new sentence.
+    public static func limitWindow(_ kind: LimitWindow.Kind, minutes: Int?) -> Phrase {
+        if let minutes {
+            let length = TimeDisplay.windowLength(minutes)
+            return Phrase("\(length.english) window", "окно \(length.russian)")
+        }
+        return kind == .short
+            ? Phrase("5-hour window", "окно 5 часов")
+            : Phrase("Weekly window", "недельное окно")
     }
 
     /// Said when a subscription window has nothing left.
@@ -62,39 +82,74 @@ public enum Wording {
         window: LimitWindow.Kind,
         resetsAt: Date?,
         now: Date = Date()
-    ) -> String {
-        let comesBack = resetsAt.map { "back \(TimeDisplay.until($0, now: now))" } ?? "reset time not reported"
-        return "\(self.service(service)) \(limitName(window)) is spent — \(comesBack)"
+    ) -> Phrase {
+        let comesBack: Phrase
+        if let resetsAt {
+            let when = TimeDisplay.until(resetsAt, now: now)
+            comesBack = Phrase("back \(when.english)", "вернётся \(when.russian)")
+        } else {
+            comesBack = Phrase("reset time not reported", "время сброса не сообщено")
+        }
+        let name = limitName(window)
+        return Phrase(
+            "\(self.service(service)) \(name.english) is spent — \(comesBack.english)",
+            "\(self.service(service)): \(name.russian) исчерпан — \(comesBack.russian)"
+        )
     }
 
     /// Which reading lit the worst light, in one line.
-    public static func reason(for kind: BudgetAlert.Kind, service: AgentService, config: ThresholdConfig) -> String {
+    public static func reason(
+        for kind: BudgetAlert.Kind,
+        service: AgentService,
+        config: ThresholdConfig
+    ) -> Phrase {
+        let name = self.service(service)
         switch kind {
         case .windowFill(let percent):
-            "\(self.service(service)) context window past \(TokenDisplay.percent(percent))"
+            let mark = TokenDisplay.percent(percent)
+            return Phrase(
+                "\(name) context window past \(mark)",
+                "\(name): окно контекста перешло \(mark)"
+            )
         case .limitUsage(let window, let percent):
-            "\(self.service(service)) \(limitWindow(window, minutes: nil)) past \(TokenDisplay.percent(percent))"
+            let mark = TokenDisplay.percent(percent)
+            let named = limitWindow(window, minutes: nil)
+            return Phrase(
+                "\(name) \(named.english) past \(mark)",
+                "\(name): \(named.russian) перешло \(mark)"
+            )
         // A request lights nothing — form carries the state and colour carries the budget — so
         // nothing asks this of a request today. It answers all the same, and truthfully: the
         // alternative is a stand-in sentence waiting for the first reading that does ask.
         case .attention:
-            "\(self.service(service)) is waiting on you"
+            return Phrase("\(name) is waiting on you", "\(name) ждёт вашего ответа")
         }
     }
 
     /// What a subagent's row is called: the kind of agent it is, or the plain word for one
     /// when its metadata file is missing. Never an empty row — the tokens it holds are worth
     /// showing whether or not anything said what the agent was.
-    public static func subagentName(_ type: String?) -> String { type ?? "Subagent" }
+    ///
+    /// A name an agent gave itself has one side written twice, because it is the same name in
+    /// both windows: it came out of somebody's configuration file, and translating it would
+    /// leave a reader looking for a row that is not called that anywhere else.
+    public static func subagentName(_ type: String?) -> Phrase {
+        guard let type else { return Phrase("Subagent", "Субагент") }
+        return Phrase.name(type)
+    }
 
     /// What a subagent's row says under its name: the task it was given, when one was
     /// recorded. `nil` rather than a stand-in sentence — the row's other half is the numbers.
+    ///
+    /// Not a phrase: these are the words somebody wrote to their agent, and the app has no
+    /// business rewriting them into another language.
     public static func subagentTask(_ task: String?) -> String? {
         guard let task, !task.isEmpty else { return nil }
         return task
     }
 
-    /// The command that shows the subscription limits in full. The same in both CLIs.
+    /// The command that shows the subscription limits in full. The same in both CLIs, and the
+    /// same in both languages: it is typed, not read.
     public static func limitsCommand(_ service: AgentService) -> String { "/usage" }
 
     /// The command that shows what the context holds. The two services do not share one.
@@ -120,7 +175,12 @@ public enum Wording {
     }
 
     /// The hint under a reading in the panel: the command, and what it is for.
-    public static func moreDetails(_ command: String) -> String { "\(command) for more details" }
+    ///
+    /// The command leads on both sides — it is what the reader's eye is looking for, and what
+    /// follows it is the reason to read the rest of the line.
+    public static func moreDetails(_ command: String) -> Phrase {
+        Phrase("\(command) for more details", "\(command) — подробности")
+    }
 
     /// What a click on a session's row does, said where the pointer already is.
     ///
@@ -128,7 +188,10 @@ public enum Wording {
     /// several can give (`TerminalRaise`) and the panel has no business guessing which one a
     /// person is in. Getting the tab when the terminal can name it is better than what was
     /// promised, which is the only direction this app is allowed to surprise anybody in.
-    public static let raiseSession = "Click to bring up the window this session is running in."
+    public static let raiseSession = Phrase(
+        "Click to bring up the window this session is running in.",
+        "Щелчок поднимет окно, в котором идёт эта сессия."
+    )
 
     /// What the panel's dead ends promise when the pointer is on them.
     ///
@@ -136,13 +199,20 @@ public enum Wording {
     /// tell what they are about to get: a reading that never arrived, a row that cannot be
     /// clicked through, and a click that got partway. Each says what is wrong before it says
     /// where it leads — the window is the answer, not the news.
-    public static let whyNoNumbers = "No numbers here. Click to see what they are waiting on."
+    public static let whyNoNumbers = Phrase(
+        "No numbers here. Click to see what they are waiting on.",
+        "Чисел здесь нет. Щёлкните, чтобы увидеть, чего они ждут."
+    )
 
-    public static let whyNoRaise = """
-        This session cannot be brought up. Click to see what a click on a session needs.
-        """
+    public static let whyNoRaise = Phrase(
+        "This session cannot be brought up. Click to see what a click on a session needs.",
+        "Эту сессию не поднять. Щёлкните, чтобы увидеть, что для этого нужно."
+    )
 
-    public static let whereThisIsExplained = "Click for the line that explains this in full."
+    public static let whereThisIsExplained = Phrase(
+        "Click for the line that explains this in full.",
+        "Щёлкните, чтобы открыть строку, где это объяснено целиком."
+    )
 
     /// Said after a click got the application but not the tab or window inside it.
     ///
@@ -166,16 +236,28 @@ public enum Wording {
     public static func permissionOffer(
         _ permission: TerminalRaise.Permission,
         signedAdHoc: Bool = false
-    ) -> String {
+    ) -> Phrase {
         switch permission {
         case .automation:
-            "Its application was brought up, but its tab could not be asked for. If you refused "
-                + "the permission to control other apps, that answer is kept in System Settings."
+            return Phrase(
+                "Its application was brought up, but its tab could not be asked for. If you "
+                    + "refused the permission to control other apps, that answer is kept in "
+                    + "System Settings.",
+                "Приложение поднялось, но спросить его о вкладке не вышло. Если вы отказали в "
+                    + "праве управлять другими программами, этот ответ хранится в настройках "
+                    + "системы."
+            )
         case .accessibility:
-            "Its application was brought up, but its windows could not be looked through, so the "
-                + "one in front is whichever you used last. Picking the right window needs this "
-                + "app allowed in Accessibility."
-                + (signedAdHoc ? " " + tickFromAnEarlierBuild : "")
+            let said = Phrase(
+                "Its application was brought up, but its windows could not be looked through, "
+                    + "so the one in front is whichever you used last. Picking the right window "
+                    + "needs this app allowed in Accessibility.",
+                "Приложение поднялось, но заглянуть в его окна не вышло, поэтому впереди то, "
+                    + "которым вы пользовались последним. Чтобы выбрать нужное окно, программе "
+                    + "нужен доступ в разделе «Универсальный доступ»."
+            )
+            guard signedAdHoc else { return said }
+            return Phrase.joined([said, tickFromAnEarlierBuild])
         }
     }
 
@@ -187,23 +269,30 @@ public enum Wording {
     /// name the person can see ticked in System Settings. Measured 2026-09-17 — a tick given an
     /// hour earlier, the system asking again on every click (`Scripts/Scripts.md`, "Why a
     /// development Mac wants a certificate of its own").
-    public static let tickFromAnEarlierBuild = """
-        If it is ticked there already, that tick was given to the version before this one — \
-        untick it and tick it again.
-        """
+    public static let tickFromAnEarlierBuild = Phrase(
+        "If it is ticked there already, that tick was given to the version before this one — "
+            + "untick it and tick it again.",
+        "Если галочка там уже стоит, её дали прошлой версии — снимите и поставьте заново."
+    )
 
     /// The button under the sentence above.
-    public static func permissionSettings(_ permission: TerminalRaise.Permission) -> String {
+    public static func permissionSettings(_ permission: TerminalRaise.Permission) -> Phrase {
         openSettings(permission.pane)
     }
 
     /// The button that opens a pane of System Settings, named after the pane it opens. One
     /// place, so the panel and the checkup cannot come to call the same pane two things.
-    public static func openSettings(_ pane: SystemSettingsPane) -> String {
+    ///
+    /// The Russian side names each pane as macOS itself names it in a Russian system, because
+    /// the button is a promise about what the reader will be looking at a second later.
+    public static func openSettings(_ pane: SystemSettingsPane) -> Phrase {
         switch pane {
-        case .automation: "Open Automation settings"
-        case .accessibility: "Open Accessibility settings"
-        case .notifications: "Open Notification settings"
+        case .automation:
+            return Phrase("Open Automation settings", "Открыть раздел «Автоматизация»")
+        case .accessibility:
+            return Phrase("Open Accessibility settings", "Открыть раздел «Универсальный доступ»")
+        case .notifications:
+            return Phrase("Open Notification settings", "Открыть раздел «Уведомления»")
         }
     }
 }

@@ -83,13 +83,15 @@ final class LoginItem: ObservableObject {
 struct LoginItemToggle: View {
     @ObservedObject var loginItem: LoginItem
 
+    @EnvironmentObject private var interface: InterfaceLanguage
+
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             switch loginItem.state {
             case .unavailable(let why):
-                note(CheckupPhrasing.openAtLoginUnavailable(why))
+                note(interface.say(CheckupPhrasing.openAtLoginUnavailable(why)))
             case .on, .off, .waitingForApproval:
-                Toggle(CheckupPhrasing.openAtLogin, isOn: Binding(
+                Toggle(interface.say(CheckupPhrasing.openAtLogin), isOn: Binding(
                     get: { loginItem.state != .off },
                     set: { loginItem.set($0) }
                 ))

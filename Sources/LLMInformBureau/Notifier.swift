@@ -111,8 +111,8 @@ final class Notifier {
 
     private func postThroughCentre(_ text: NotificationText) {
         let content = UNMutableNotificationContent()
-        content.title = text.title
-        content.body = text.body
+        content.title = said(text.title)
+        content.body = said(text.body)
         // `sound` is deliberately left unset: that is what makes it silent.
 
         UNUserNotificationCenter.current().add(
@@ -123,15 +123,24 @@ final class Notifier {
     private func postThroughScript(_ text: NotificationText) {
         // `display notification` without `sound name` is silent, which is the whole reason
         // this is a usable fallback rather than a worse one.
-        let script = "display notification \(quoted(text.body)) with title \(quoted(text.title))"
+        let script = "display notification \(quoted(said(text.body))) with title \(quoted(said(text.title)))"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
         process.arguments = ["-e", script]
         try? process.run()
     }
 
+    /// Which side of a phrase goes on the screen, asked at the moment it goes there.
+    ///
+    /// Not when the notification was built: a mark crossed while the permission dialog was open
+    /// can be minutes old by the time it is shown, and the language it should arrive in is the
+    /// one the reader is looking at now.
+    private func said(_ phrase: Phrase) -> String { InterfaceLanguage.shared.say(phrase) }
+
     /// An AppleScript string literal. The body carries a slash command and a line break, so
-    /// this is not decoration.
+    /// this is not decoration. Cyrillic needs nothing added to it: the argument leaves this
+    /// process as UTF-8 and an AppleScript string takes it as it is — what the escaping is for
+    /// is the quote, the backslash and the newline, in either language.
     private func quoted(_ text: String) -> String {
         let escaped = text
             .replacingOccurrences(of: "\\", with: "\\\\")
@@ -152,6 +161,8 @@ final class Notifier {
 /// nowhere else in this window. The system is not involved at any point: this is not a
 /// permission, and there is nothing to ask anybody for.
 struct NotificationToggle: View {
+    @EnvironmentObject private var interface: InterfaceLanguage
+
     /// Seeded from the disk when the row is built, and read again whenever it appears — the
     /// file can be deleted by hand while the app runs, which is the other half of keeping a
     /// choice where a person can see it.
@@ -159,7 +170,7 @@ struct NotificationToggle: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Toggle(CheckupPhrasing.announceMarks, isOn: Binding(
+            Toggle(interface.say(CheckupPhrasing.announceMarks), isOn: Binding(
                 get: { isAnnouncing },
                 set: { wanted in
                     isAnnouncing = wanted
@@ -168,7 +179,7 @@ struct NotificationToggle: View {
             ))
             .toggleStyle(.checkbox)
             if !isAnnouncing {
-                Text(CheckupPhrasing.silenced)
+                Text(interface.say(CheckupPhrasing.silenced))
                     .font(WindowType.detail)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

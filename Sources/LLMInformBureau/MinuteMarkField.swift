@@ -16,7 +16,7 @@ import SessionHealthCore
 struct MinuteMarkField: View {
     /// What this mark is called. Not drawn — the row carries the title — but read out beside
     /// the field, where a bare number says nothing about what it sets.
-    let title: String
+    let title: Phrase
 
     @Binding var minutes: Int
 
@@ -25,6 +25,8 @@ struct MinuteMarkField: View {
     /// field gives up the focus.
     let settled: (Int) -> Void
 
+    @EnvironmentObject private var interface: InterfaceLanguage
+
     var body: some View {
         HStack(spacing: 4) {
             TextField("", value: value, format: .number)
@@ -32,11 +34,11 @@ struct MinuteMarkField: View {
                 .font(WindowType.number)
                 .multilineTextAlignment(.trailing)
                 .frame(width: 54)
-                .accessibilityLabel(Text(Briefing.minuteFieldLabel(of: title)))
+                .accessibilityLabel(Text(interface.say(Briefing.minuteFieldLabel(of: title))))
             Stepper("", value: value, in: MinuteMark.allowed)
                 .labelsHidden()
-                .accessibilityLabel(Text(Briefing.minuteFieldLabel(of: title)))
-            Text(Briefing.minuteUnit)
+                .accessibilityLabel(Text(interface.say(Briefing.minuteFieldLabel(of: title))))
+            Text(interface.say(Briefing.minuteUnit))
                 .font(WindowType.detail)
                 .foregroundStyle(.secondary)
         }

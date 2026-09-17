@@ -164,19 +164,36 @@ func runAttentionNoticeTests(_ suite: TestSuite, config: ThresholdConfig) {
     // session. The panel lists sessions by project, so the project is how it points at a row.
     suite.test("the text names the project and what was asked") {
         guard let said = announcement(about: "Which approach should I take?") else { return }
-        suite.expect(said.title.contains("llm-inform-bureau"), "title without the project: \(said.title)")
-        suite.expect(said.title.lowercased().contains("waiting on you"), "title: \(said.title)")
-        suite.expect(said.body.contains("Which approach should I take?"), "body without the question: \(said.body)")
+        suite.expect(
+            said.title.holds { $0.contains("llm-inform-bureau") },
+            "title without the project: \(said.title.shown)"
+        )
+        suite.expect(
+            said.title.carries(Phrase("waiting on you", "ждёт вашего ответа")),
+            "title: \(said.title.shown)"
+        )
+        // The question is the agent's own words and goes through untranslated, so both sides
+        // carry it as it was written.
+        suite.expect(
+            said.body.holds { $0.contains("Which approach should I take?") },
+            "body without the question: \(said.body.shown)"
+        )
         // Every other notification ends with a slash command; this one has nothing to send
         // anybody to look up, and a command here would send them away from answering.
-        suite.expect(!said.body.contains("/"), "a command on a request: \(said.body)")
+        suite.expect(said.body.holds { !$0.contains("/") }, "a command on a request: \(said.body.shown)")
     }
 
     suite.test("a request whose question was not readable still says who is waiting") {
         guard let said = announcement(about: nil) else { return }
-        suite.expect(said.title.contains("llm-inform-bureau"), "title: \(said.title)")
-        suite.expect(!said.body.isEmpty, "an empty body")
-        suite.expect(said.body.lowercased().contains("question"), "a question unread is still a question: \(said.body)")
+        suite.expect(
+            said.title.holds { $0.contains("llm-inform-bureau") },
+            "title: \(said.title.shown)"
+        )
+        suite.expect(said.body.holds { !$0.isEmpty }, "an empty side of the body")
+        suite.expect(
+            said.body.carries(Phrase("question", "вопрос")),
+            "a question unread is still a question: \(said.body.shown)"
+        )
     }
 
     // The PRD's second reason, and the whole of what it asks of the text: a request is called a
@@ -185,38 +202,57 @@ func runAttentionNoticeTests(_ suite: TestSuite, config: ThresholdConfig) {
     // permission prompt, so naming what it is is all there is to say.
     suite.test("a permission prompt is announced as a request, not as a session that stopped") {
         guard let said = announcement(about: nil, for: .permission) else { return }
-        suite.expect(said.title.contains("llm-inform-bureau"), "title: \(said.title)")
-        suite.expect(said.body.lowercased().contains("tool"), "what is being asked for: \(said.body)")
         suite.expect(
-            !said.body.lowercased().contains("has stopped"),
-            "a request read as a stoppage: \(said.body)"
+            said.title.holds { $0.contains("llm-inform-bureau") },
+            "title: \(said.title.shown)"
         )
-        suite.expect(!said.body.contains("/"), "a command on a request: \(said.body)")
+        suite.expect(
+            said.body.carries(Phrase("tool", "инструмент")),
+            "what is being asked for: \(said.body.shown)"
+        )
+        suite.expect(
+            !said.body.carries(Phrase("has stopped", "остановился")),
+            "a request read as a stoppage: \(said.body.shown)"
+        )
+        suite.expect(said.body.holds { !$0.contains("/") }, "a command on a request: \(said.body.shown)")
     }
 
     // A request the record did not name keeps the wording every request had before this app
     // could tell them apart: it is true of both and claims nothing that was not read.
     suite.test("a request the record did not name keeps the wording it always had") {
         guard let said = announcement(about: nil, for: .unnamed) else { return }
-        suite.expectEqual(said.body, "The agent has stopped and is waiting for an answer.", "the honest fallback")
+        suite.expectEqual(
+            said.body,
+            Phrase("The agent has stopped and is waiting for an answer.", "Агент остановился и ждёт ответа."),
+            "the honest fallback"
+        )
     }
 
     suite.test("a session whose project nobody named still says which agent is waiting") {
         guard let said = announcement(about: "Which approach?", project: nil) else { return }
-        suite.expect(said.title.lowercased().contains("waiting on you"), "title: \(said.title)")
-        suite.expect(said.title.contains(AgentService.claude.shortLabel), "title: \(said.title)")
+        suite.expect(
+            said.title.carries(Phrase("waiting on you", "ждёт вашего ответа")),
+            "title: \(said.title.shown)"
+        )
+        suite.expect(
+            said.title.holds { $0.contains(AgentService.claude.shortLabel) },
+            "title: \(said.title.shown)"
+        )
     }
 
     // A question is written for a terminal: it arrives with line breaks in it and it can run
     // for a paragraph. A banner shows neither.
     suite.test("a long question is cut to one line rather than shown whole") {
         guard let wrapped = announcement(about: "Which one?\nThe first\nor the second?") else { return }
-        suite.expectEqual(wrapped.body, "Which one? The first or the second?", "the line breaks")
+        suite.expectEqual(wrapped.body, Phrase.name("Which one? The first or the second?"), "the line breaks")
 
         let long = "Should I " + String(repeating: "keep going and ", count: 40) + "stop?"
         guard let cut = announcement(about: long) else { return }
-        suite.expect(cut.body.count < long.count, "the whole paragraph went into a banner")
-        suite.expect(cut.body.hasSuffix("…"), "a cut question must not read as the whole of it: \(cut.body)")
-        suite.expect(!cut.body.contains("  "), "the words ran together: \(cut.body)")
+        suite.expect(cut.body.holds { $0.count < long.count }, "the whole paragraph went into a banner")
+        suite.expect(
+            cut.body.holds { $0.hasSuffix("…") },
+            "a cut question must not read as the whole of it: \(cut.body.shown)"
+        )
+        suite.expect(cut.body.holds { !$0.contains("  ") }, "the words ran together: \(cut.body.shown)")
     }
 }

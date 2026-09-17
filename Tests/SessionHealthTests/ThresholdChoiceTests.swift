@@ -141,11 +141,11 @@ func runThresholdChoiceTests(_ suite: TestSuite, config: ThresholdConfig) {
         // number on it, and somebody who has just moved a handle is the reader who most needs
         // it. What goes is the provenance: the sentence that shipped was about the number the
         // app chose, and what replaces it says whose the number is now.
-        suite.expect(!note.what.isEmpty, "a moved mark must still say what it decides")
+        suite.expect(note.what.holds { !$0.isEmpty }, "a moved mark must still say what it decides")
         suite.expectEqual(note.origin, MarkNote.chosen, "a moved mark says who chose it")
         suite.expect(
-            note.origin.lowercased().contains("you"),
-            "and says it to the reader: \(note.origin)"
+            note.origin?.carries(Phrase("you", "вами")) == true,
+            "and says it to the reader: \(note.origin?.shown ?? "—")"
         )
         suite.expect(note.source == nil, "a moved mark has no published source to link to")
     }
@@ -205,7 +205,7 @@ func runThresholdChoiceTests(_ suite: TestSuite, config: ThresholdConfig) {
             suite.expect(false, "the wait is missing from the window")
             return
         }
-        suite.expect(!note.what.isEmpty, "a chosen number must still say what it decides")
+        suite.expect(note.what.holds { !$0.isEmpty }, "a chosen number must still say what it decides")
         suite.expectEqual(note.origin, MarkNote.chosen, "a chosen number says who chose it")
     }
 

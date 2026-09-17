@@ -187,7 +187,7 @@ struct SlotHandover {
     /// Writes the change that was shown, and answers with what went wrong, or `nil`. It does
     /// not return until the panel has read the file again, so the row that asked can then read
     /// it too and show what is really there.
-    let write: (StatusLineChange) async -> String?
+    let write: (StatusLineChange) async -> Phrase?
 }
 
 /// Tells `Welcome` the two things that happen to its window from outside: it came back to the
@@ -424,7 +424,7 @@ private struct WelcomeView: View {
 
     /// What went wrong the last time this window wrote to `settings.json`, and nothing while it
     /// worked: the line above already says what is in the slot now.
-    @State private var slotProblem: String?
+    @State private var slotProblem: Phrase?
 
     var body: some View {
         ScrollViewReader { scroll in
@@ -489,7 +489,7 @@ private struct WelcomeView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         StatusLight(light: .level(meaning.level), diameter: 7)
                             .alignmentGuide(.firstTextBaseline) { $0.height * 0.5 + 2.5 }
-                        Text(meaning.meaning)
+                        Text(interface.say(meaning.meaning))
                             .font(WindowType.detail)
                             .foregroundStyle(.secondary)
                     }
@@ -513,7 +513,7 @@ private struct WelcomeView: View {
             // window and the only part nobody has to read to use the app: it is here so the
             // premise behind the marks can be checked, which is a thing somebody does once.
             FoldingSection(title: interface.say(Briefing.furtherReadingTitle), isOpen: $readingOpen) {
-                Text(Briefing.furtherReadingNote)
+                Text(interface.say(Briefing.furtherReadingNote))
                     .font(WindowType.detail)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -529,14 +529,14 @@ private struct WelcomeView: View {
             // itself while something is, which is the whole reason the list exists: every one
             // of these fails quietly, and a widget that has not been allowed to do its job
             // looks exactly like a broken one.
-            FoldingSection(title: CheckupPhrasing.title, isOpen: $checkupOpen, spacing: 12) {
-                Text(CheckupPhrasing.intro)
+            FoldingSection(title: interface.say(CheckupPhrasing.title), isOpen: $checkupOpen, spacing: 12) {
+                Text(interface.say(CheckupPhrasing.intro))
                     .font(WindowType.item)
                     .fixedSize(horizontal: false, vertical: true)
                 ForEach(CheckupPhrasing.rows(for: live.state), id: \.point) { row in
                     checkupRow(row)
                 }
-                Text(CheckupPhrasing.closing)
+                Text(interface.say(CheckupPhrasing.closing))
                     .font(WindowType.detail)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -570,7 +570,7 @@ private struct WelcomeView: View {
         let isChosen = chosen.contains(mark.mark)
         return VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline) {
-                Text(mark.title)
+                Text(interface.say(mark.title))
                     .font(WindowType.item)
                     // Onto a second line rather than into an ellipsis: a row that reads
                     // "Announce a request for…" beside a field of minutes says nothing.
@@ -606,7 +606,7 @@ private struct WelcomeView: View {
             // is the reader who most needs it. Under it, where the number itself came from —
             // which is the half a moved mark takes with it, because what shipped here was
             // written about the app's number and not about theirs.
-            Text(mark.what)
+            Text(interface.say(mark.what))
                 .font(WindowType.detail)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -614,9 +614,9 @@ private struct WelcomeView: View {
             // back since it was built is the one case where the two disagree, and it is the
             // only case a reader is looking at this line for.
             let origin = isChosen ? MarkNote.chosen : mark.origin
-            if !origin.isEmpty {
+            if let origin {
                 HStack(spacing: 6) {
-                    Text(origin)
+                    Text(interface.say(origin))
                         .font(WindowType.detail)
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -697,17 +697,17 @@ private struct WelcomeView: View {
         VStack(alignment: .leading, spacing: 1) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 if let source = reading.source {
-                    Link(reading.title, destination: source)
+                    Link(interface.say(reading.title), destination: source)
                         .font(WindowType.item)
                 } else {
-                    Text(reading.title)
+                    Text(interface.say(reading.title))
                         .font(WindowType.item)
                 }
                 Text(reading.year)
                     .font(WindowType.detail)
                     .foregroundStyle(.secondary)
             }
-            Text(reading.note)
+            Text(interface.say(reading.note))
                 .font(WindowType.detail)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -731,10 +731,10 @@ private struct WelcomeView: View {
                 if row.point == .openAtLogin {
                     LoginItemToggle(loginItem: .shared)
                 } else {
-                    Text(row.title)
+                    Text(interface.say(row.title))
                         .font(WindowType.item)
                 }
-                Text(row.detail)
+                Text(interface.say(row.detail))
                     .font(WindowType.item)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -742,7 +742,7 @@ private struct WelcomeView: View {
                     // a path is copy it somewhere else.
                     .textSelection(.enabled)
                 if let pane = row.settings {
-                    Button(Wording.openSettings(pane)) { SystemSettings.open(pane) }
+                    Button(interface.say(Wording.openSettings(pane))) { SystemSettings.open(pane) }
                         .buttonStyle(.link)
                         .font(WindowType.detail)
                 }
@@ -791,7 +791,7 @@ private struct WelcomeView: View {
             if let change = handingBack {
                 handoverPreview(change, write: handover.write)
             } else {
-                Button(SlotPhrasing.disconnect) {
+                Button(interface.say(SlotPhrasing.disconnect)) {
                     slotProblem = nil
                     handingBack = handover.plan()
                     // Nothing to give back means the file has moved on under this window —
@@ -802,11 +802,11 @@ private struct WelcomeView: View {
                 }
                 .buttonStyle(.link)
                 .font(WindowType.detail)
-                .help(SlotPhrasing.disconnectHelp)
+                .help(interface.say(SlotPhrasing.disconnectHelp))
             }
         }
         if let slotProblem {
-            Text(slotProblem)
+            Text(interface.say(slotProblem))
                 .font(WindowType.detail)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -821,12 +821,12 @@ private struct WelcomeView: View {
     /// is asked.
     private func handoverPreview(
         _ change: StatusLineChange,
-        write: @escaping (StatusLineChange) async -> String?
+        write: @escaping (StatusLineChange) async -> Phrase?
     ) -> some View {
         let preview = SlotPhrasing.preview(change)
 
         return VStack(alignment: .leading, spacing: 6) {
-            Text(preview.title)
+            Text(interface.say(preview.title))
                 .font(WindowType.detail)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -840,7 +840,7 @@ private struct WelcomeView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             ForEach(preview.notes, id: \.self) { note in
-                Text(note)
+                Text(interface.say(note))
                     .font(WindowType.detail)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -851,7 +851,7 @@ private struct WelcomeView: View {
                 // Return is Done's in this window, and it stays Done's: the key somebody
                 // presses without reading must be the one that closes the window with nothing
                 // written. Escape means no, which is the other half of the same care.
-                Button(SlotPhrasing.apply) {
+                Button(interface.say(SlotPhrasing.apply)) {
                     handingBack = nil
                     Task {
                         slotProblem = await write(change)
@@ -861,7 +861,7 @@ private struct WelcomeView: View {
                         live.readAgain()
                     }
                 }
-                Button(SlotPhrasing.cancel) { handingBack = nil }
+                Button(interface.say(SlotPhrasing.cancel)) { handingBack = nil }
                     .keyboardShortcut(.cancelAction)
             }
         }

@@ -14,6 +14,14 @@ import SessionHealthCore
 /// limit` — because this shares one terminal row with the prompt. The numbers are not: they go
 /// through `TokenDisplay` like every other number the app says, so the line and the panel
 /// round the same way and cannot drift apart.
+///
+/// The one thing the app says that has no second language, and for a reason that is not
+/// oversight. There is no prose in it: a model's name, two token counts, two percentages and
+/// the two labels `5h` and `7d`. It is also the one thing the app says that nobody is looking
+/// at the app for — it is printed into somebody's terminal, beside a prompt, by a command
+/// Claude Code runs; the reader of that row is reading their own shell, and a row that changed
+/// shape with a setting in a menu bar app would be the app redecorating a place it was let
+/// into. Should a sentence ever be wanted here, it becomes a `Phrase` like every other.
 public enum StatusLineText {
     /// Said instead of a model name when the payload did not carry one. Never an empty line:
     /// the status line is a row that exists whether or not there is anything to put in it.

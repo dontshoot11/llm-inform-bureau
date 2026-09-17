@@ -34,7 +34,7 @@ the cases are plain functions and would port to swift-testing mechanically.
 | `AlertDispatchTests` | What a whole reading has left to say: scopes, `/clear`, a rolled-over limit window, and the backlog found at launch |
 | `NotificationChoiceTests` | Keeping quiet: that an app nobody told to be silent speaks and leaves nothing on the disk, that the choice comes back off the disk the way it was made and is taken away rather than recorded when notifications go back on, that the file lives with everything else the app keeps — which is what carries it across an update — that the checkbox is named after what it switches while the mark beside the row goes on answering for the channel, that a mark crossed during the silence is not announced afterwards while the next one still is, and that the choice is read at the last step before the screen and nowhere above it |
 | `LanguageChoiceTests` | Which language the app opens in: that nobody having chosen leaves nothing on the disk and means following the Mac, that a language picked comes back off the disk the way it was picked and outranks the system whichever way round they are, that choosing English is an answer rather than the absence of one, that an empty, hand-edited or no-longer-understood file is nobody having chosen, that the code is the file's first line with a note for a person under it, that the choice lives where a new copy dragged over the old one cannot touch it, and that a phrase answers to both languages in one run |
-| `NotificationTextTests` | What a notification says: the CLI command of its own service at the end, and no claim to have measured quality |
+| `NotificationTextTests` | What a notification says, on both sides of every phrase: the CLI command of its own service at the end, the mark in the title and the measurement in the body, a reset time it does not invent, and no claim to have measured quality in either language |
 | `LargeTranscriptTests` | A 400 MB transcript read from its end alone, within a time limit that fails if it is not |
 | `SourceWatcherTests` | That a file change is reported at all, including a source directory that appears later |
 | `SessionActivityTests` | Which sessions count as being worked on right now, and both sides of the edge |
@@ -50,6 +50,7 @@ the cases are plain functions and would port to swift-testing mechanically.
 | `SetupTests` | Which sources read as connected, what the first run says about the ones that do not, showing that explanation once, and that every mark the settings window offers arrives with the lights it turns on or as the plain number it is |
 | `CheckupTests` | The list the settings window shows of everything the app runs on that this Mac had to give it: that every point reaches the list with a title, a line saying what it costs and the standing the state actually holds, that the three sources keep the wording the first run already had, that a slot held by another copy of this app still reads as held, that an ad-hoc copy explains the tick belonging to the build before it while a properly signed one does not, that notifications get no tick before the first one is sent, that automation is settled on use whatever else the machine answered and never counts as something missing, that each permission a click can need is offered by exactly one row and its own pane, that two bundles of the same name do not read alike, that every pane of System Settings has a URL of its own — and that the prompting form of the accessibility check is made in the one file a click can reach |
 | `StatusLineSlotTests` | `~/.claude/settings.json` edited from Swift: the key set and removed, every other byte of a hand-used file where it was, a command already in the slot saved and put back, the two branches that refuse to write, and taking over from the shell wrapper an earlier release installed |
+| `TranslationTests` | That the app speaks both languages everywhere: read off the text of `Sources/Phrasing`, because the rule is about what is not written. Every sentence in that target is one side of a `Phrase` rather than a bare string that would reach a Russian window in English, every phrase writes its second side in the second language rather than the first copied across, a duration said in full agrees with the number in front of it, and neither side grades the session |
 | `OfflineTests` | That no source file reaches for a network API — the reason the app works with the network off |
 
 ## Writing a case
@@ -90,6 +91,14 @@ and status line payloads — and `CodexFixtures.swift` for what Codex writes. De
 copy of each: a subagent's file holds the same lines as a session's, the limits and the session
 of a rollout are read out of the same file, and a second set of builders would let the halves of
 one reader be tested against two different ideas of what its files look like.
+
+**A phrase is asked its question on both sides.** `PhraseChecks.swift` holds the three ways a
+case reads one — `holds`, for what has to be true of either side; `carries`, for a phrase whose
+own two sides are what is being looked for; and `shown`, so a failure prints both. A case that
+read only English would pass a Russian notification with its command missing, which is precisely
+the mistake a second language brings with it. `QualityClaims.swift` holds the other rule that
+crosses both: the words neither language may use about how good the answers are, as stems,
+because Russian inflects.
 
 **A case that waits for something waits for the real thing.** The watcher cases block on a
 semaphore with a generous timeout instead of sleeping for a fixed while: a loaded machine does

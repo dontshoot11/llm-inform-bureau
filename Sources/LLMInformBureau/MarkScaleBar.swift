@@ -20,7 +20,7 @@ import SessionHealthCore
 struct MarkScaleBar: View {
     /// What this scale is called. Not drawn — the row above it carries the title — but read out
     /// beside each handle, where "the yellow mark" alone would not say of what.
-    let title: String
+    let title: Phrase
 
     @Binding var scale: MarkScale
 
@@ -28,6 +28,8 @@ struct MarkScaleBar: View {
     /// drag so that a mark dragged across the bar is written down once rather than a hundred
     /// times.
     let settled: (MarkScale) -> Void
+
+    @EnvironmentObject private var interface: InterfaceLanguage
 
     @FocusState private var focused: MarkScale.Handle?
 
@@ -101,7 +103,7 @@ struct MarkScaleBar: View {
                 }
             }
             .accessibilityElement()
-            .accessibilityLabel(Text(Briefing.handleLabel(handle, of: title)))
+            .accessibilityLabel(Text(interface.say(Briefing.handleLabel(handle, of: title))))
             .accessibilityValue(Text(TokenDisplay.percent(scale.value(of: handle))))
             .accessibilityAdjustableAction { direction in
                 switch direction {

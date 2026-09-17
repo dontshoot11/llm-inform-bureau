@@ -4,6 +4,13 @@ import Foundation
 ///
 /// Rounded to thousands, because the difference between 121 300 and 121 800 tokens is not a
 /// difference anyone acts on, and the full number costs the line its readability.
+///
+/// The one file in this target whose output has no sides, and deliberately: `121K`, `+4K` and
+/// `62%` are digits with a suffix, and the suffixes are read the same by both of this app's
+/// readers. Giving them a Russian side would mean inventing `121К` in Cyrillic — a character
+/// that looks like the one it replaces, does not paste back into anything, and would be the
+/// only place in the app where a number is spelled differently depending on who is looking.
+/// The nouns that stand next to these numbers are phrases; the numbers themselves are not.
 public enum TokenDisplay {
     public static func short(_ tokens: Int) -> String {
         if tokens >= 1_000_000 {

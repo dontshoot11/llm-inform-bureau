@@ -12,6 +12,8 @@ import SessionHealthCore
 struct MenuContent: View {
     @ObservedObject var model: UsageModel
 
+    @EnvironmentObject private var interface: InterfaceLanguage
+
     /// Whether the power icon has been pressed once. Quitting is two taps rather than one
     /// because the panel is opened to read something, and the icon sits where a thumb lands.
     @State private var confirmingTerminate = false
@@ -58,7 +60,7 @@ struct MenuContent: View {
                         // instead of in it. This puts its middle where the lower-case letters
                         // are, which is where a reader expects a bullet.
                         .alignmentGuide(.firstTextBaseline) { $0.height * 0.5 + 2.5 }
-                    Text(reason)
+                    Text(interface.say(reason))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -186,7 +188,7 @@ struct MenuContent: View {
         .buttonStyle(.plain)
         .padding(.horizontal, -4)
         .padding(.vertical, -2)
-        .help(Wording.whereThisIsExplained)
+        .help(interface.say(Wording.whereThisIsExplained))
     }
 
     // MARK: The limits half, folded and opened out
@@ -262,7 +264,7 @@ struct MenuContent: View {
                 .buttonStyle(.plain)
                 .padding(.horizontal, -4)
                 .padding(.vertical, -2)
-                .help(Wording.whyNoNumbers)
+                .help(interface.say(Wording.whyNoNumbers))
             } else {
                 foldedName(service)
             }
@@ -271,9 +273,9 @@ struct MenuContent: View {
             // this half that cannot wait to be opened out — until it is pressed there are no
             // limits to fold in the first place.
             if service == .claude, model.slot.isConnectable {
-                Button(SlotPhrasing.connect) { model.propose(.connect) }
+                Button(interface.say(SlotPhrasing.connect)) { model.propose(.connect) }
                     .controlSize(.small)
-                    .help(SlotPhrasing.connectHelp)
+                    .help(interface.say(SlotPhrasing.connectHelp))
             } else if let summary = summary(of: service) {
                 // The window is named because two of them are being chosen between: a bare
                 // percentage in a folded row is a number whose question is missing.
@@ -287,7 +289,7 @@ struct MenuContent: View {
                 // Installed, connected, and nothing reported yet. Two quiet words rather than
                 // an empty half-row: right after the button is pressed this is the only place
                 // a person is looking, and nothing there reads as nothing happening.
-                Text(Wording.noReadingYet)
+                Text(interface.say(Wording.noReadingYet))
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
@@ -328,7 +330,10 @@ struct MenuContent: View {
     private func summary(of service: AgentService) -> (window: String, value: String)? {
         guard let assessment = model.limits[service] else { return nil }
         if let spent = assessment.spentWindow {
-            return (Wording.limitWindowShort(spent.kind), Wording.spentLabel)
+            return (
+                interface.say(Wording.limitWindowShort(spent.kind)),
+                interface.say(Wording.spentLabel)
+            )
         }
         guard let snapshot = model.usage?.limits(of: service).value else { return nil }
 
@@ -338,7 +343,7 @@ struct MenuContent: View {
         }
         guard let window = snapshot.window(kind) ?? snapshot.windows.first else { return nil }
         return (
-            Wording.limitWindowShort(window.kind),
+            interface.say(Wording.limitWindowShort(window.kind)),
             "\(TokenDisplay.percent(window.usedPercent)) used"
         )
     }
@@ -357,14 +362,14 @@ struct MenuContent: View {
             name: Wording.service(service),
             badge: reading.value?.planType,
             help: "This service's subscription limits — the first of its two dots in the menu bar. "
-                + Briefing.scaleHelp(model.thresholds),
+                + interface.say(Briefing.scaleHelp(model.thresholds)),
             // Only while there is no number in it, and not before the first pass: an entry
             // showing what it was built to show has nothing to explain, and a road named from
             // a slot nobody has read yet would point at the wrong line of the window.
             road: model.usage != nil && reading.value == nil ? .limits(service) : nil
         ) {
             if model.usage?.isInstalled(service) == false {
-                explanation(Wording.notInstalled)
+                explanation(interface.say(Wording.notInstalled))
             } else if service == .claude, let change = model.pendingChange {
                 // Everything else about this reading steps aside while a change to somebody's
                 // settings.json is on the table: it is the one thing in this panel that does
@@ -374,12 +379,13 @@ struct MenuContent: View {
             } else if let snapshot = reading.value {
                 ForEach(snapshot.windows, id: \.kind) { window in
                     row(
-                        Wording.limitWindow(window.kind, minutes: window.windowMinutes),
+                        interface.say(Wording.limitWindow(window.kind, minutes: window.windowMinutes)),
                         value: "\(TokenDisplay.percent(window.usedPercent)) used",
-                        note: window.resetsAt.map { "resets \(TimeDisplay.until($0))" } ?? "reset time not reported"
+                        note: window.resetsAt.map { "resets \(interface.say(TimeDisplay.until($0)))" }
+                            ?? "reset time not reported"
                     )
                 }
-                explanation("Reported \(TimeDisplay.age(of: snapshot.observedAt))")
+                explanation("Reported \(interface.say(TimeDisplay.age(of: snapshot.observedAt)))")
                 hint(Wording.limitsCommand(service))
                 if service == .claude { slotOffer }
             } else if service == .claude, model.usage != nil {
@@ -408,17 +414,17 @@ struct MenuContent: View {
     private var slotOffer: some View {
         switch model.slot {
         case .free, .somebodyElse:
-            Button(SlotPhrasing.connect) { model.propose(.connect) }
-                .help(SlotPhrasing.connectHelp)
+            Button(interface.say(SlotPhrasing.connect)) { model.propose(.connect) }
+                .help(interface.say(SlotPhrasing.connectHelp))
         case .oursElsewhere:
             // The one offer that stands under a working reading rather than in place of a
             // missing one: the numbers above it came through another copy of this app — the
             // old shell wrapper, or the same binary somewhere else — and this is the copy that
             // is running offering to carry them itself.
-            Button(SlotPhrasing.takeOver) { model.propose(.connect) }
-                .help(SlotPhrasing.takeOverHelp)
+            Button(interface.say(SlotPhrasing.takeOver)) { model.propose(.connect) }
+                .help(interface.say(SlotPhrasing.takeOverHelp))
         case .unreadable(let path):
-            explanation(SlotPhrasing.unreadable(path))
+            explanation(interface.say(SlotPhrasing.unreadable(path)))
         case .ours:
             // Nothing reported yet. `ClaudeStatusStore` has the sentence for that, and it is
             // already above.
@@ -429,7 +435,7 @@ struct MenuContent: View {
             explanation(model.usage?.limits(of: .claude).explanation ?? "")
         }
         if let problem = model.slotProblem {
-            explanation(problem)
+            explanation(interface.say(problem))
         }
     }
 
@@ -442,7 +448,7 @@ struct MenuContent: View {
         let preview = SlotPhrasing.preview(change)
 
         return VStack(alignment: .leading, spacing: 6) {
-            explanation(preview.title)
+            explanation(interface.say(preview.title))
             Text(preview.path)
                 .font(.caption.monospaced())
                 .fixedSize(horizontal: false, vertical: true)
@@ -453,12 +459,12 @@ struct MenuContent: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             ForEach(preview.notes, id: \.self) { note in
-                explanation(note)
+                explanation(interface.say(note))
             }
             HStack {
-                Button(SlotPhrasing.apply) { model.applyChange() }
+                Button(interface.say(SlotPhrasing.apply)) { model.applyChange() }
                     .keyboardShortcut(.defaultAction)
-                Button(SlotPhrasing.cancel) { model.cancelChange() }
+                Button(interface.say(SlotPhrasing.cancel)) { model.cancelChange() }
                     .keyboardShortcut(.cancelAction)
             }
         }
@@ -485,7 +491,7 @@ struct MenuContent: View {
             sessionReadings(session).modifier(Hoverable())
         }
         .buttonStyle(.plain)
-        .help(session.snapshot.processID != nil ? Wording.raiseSession : Wording.whyNoRaise)
+        .help(interface.say(session.snapshot.processID != nil ? Wording.raiseSession : Wording.whyNoRaise))
         // The plate needs room around what it sits behind, and that room would move this
         // row's light out of line with the rows that have no plate. Taken back off the
         // outside, the column of lights stays a column — the same trick the disclosure
@@ -507,7 +513,7 @@ struct MenuContent: View {
             tag: snapshot.model,
             badge: snapshot.project,
             help: "The context this session holds — the second of its service's two dots in the menu bar. "
-                + Briefing.scaleHelp(model.thresholds)
+                + interface.say(Briefing.scaleHelp(model.thresholds))
         ) {
             row("Context window", value: fill(of: snapshot), note: detail(of: snapshot))
             ForEach(session.subagents) { subagent in
@@ -541,7 +547,7 @@ struct MenuContent: View {
                 )
             VStack(alignment: .leading, spacing: 1) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(Wording.subagentName(snapshot.subagent?.type))
+                    Text(interface.say(Wording.subagentName(snapshot.subagent?.type)))
                         .font(.caption)
                     Spacer()
                     Text(fill(of: snapshot))
@@ -594,7 +600,7 @@ struct MenuContent: View {
             name: Wording.service(service),
             badge: nil,
             help: "The context this service's sessions hold — the second of its two dots in the "
-                + "menu bar. " + Briefing.scaleHelp(model.thresholds)
+                + "menu bar. " + interface.say(Briefing.scaleHelp(model.thresholds))
         ) {
             explanation(model.usage?.sessions(of: service).explanation ?? "No active sessions.")
         }
@@ -680,7 +686,7 @@ struct MenuContent: View {
                 // room would push this row's light out of the column the others stand in.
                 .padding(.horizontal, -4)
                 .padding(.vertical, -2)
-                .help(Wording.whyNoNumbers)
+                .help(interface.say(Wording.whyNoNumbers))
             } else {
                 heading(
                     light: light,
@@ -758,7 +764,7 @@ struct MenuContent: View {
     /// rest" — the same reason a notification ends with it. Monospaced, because it is something
     /// to type rather than something to read.
     private func hint(_ command: String) -> some View {
-        Text(Wording.moreDetails(command))
+        Text(interface.say(Wording.moreDetails(command)))
             .font(.caption.monospaced())
             .foregroundStyle(.tertiary)
     }
@@ -778,10 +784,10 @@ struct MenuContent: View {
             // sentence leads to the line of the window that says what the permission buys and —
             // for a copy signed ad-hoc — why a tick already in that pane grants nothing.
             wayOut(
-                Wording.permissionOffer(permission, signedAdHoc: OwnSignature.isAdHoc),
+                interface.say(Wording.permissionOffer(permission, signedAdHoc: OwnSignature.isAdHoc)),
                 to: .permission(permission)
             )
-            Button(Wording.permissionSettings(permission)) { model.openSettings(for: permission) }
+            Button(interface.say(Wording.permissionSettings(permission))) { model.openSettings(for: permission) }
                 .controlSize(.small)
         }
     }

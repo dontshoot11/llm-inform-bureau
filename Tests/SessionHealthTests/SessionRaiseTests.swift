@@ -276,24 +276,24 @@ func runSessionRaiseTests(_ suite: TestSuite, config: ThresholdConfig) {
     suite.test("an ad-hoc copy warns that a tick may belong to the version before") {
         let said = Wording.permissionOffer(.accessibility, signedAdHoc: true)
         suite.expect(
-            said.contains("version before this one"),
-            "the pane's tick is named as the earlier one — \(said)"
+            said.carries(Phrase("version before this one", "прошлой версии")),
+            "the pane's tick is named as the earlier one — \(said.shown)"
         )
         suite.expect(
-            said.contains("untick it and tick it again"),
-            "and the person is told what to do about it — \(said)"
+            said.carries(Phrase("untick it and tick it again", "снимите и поставьте заново")),
+            "and the person is told what to do about it — \(said.shown)"
         )
     }
 
     suite.test("a copy signed with a certificate keeps that sentence to itself") {
         let said = Wording.permissionOffer(.accessibility, signedAdHoc: false)
         suite.expect(
-            said.contains("allowed in Accessibility"),
-            "what is missing is still named — \(said)"
+            said.carries(Phrase("allowed in Accessibility", "в разделе «Универсальный доступ»")),
+            "what is missing is still named — \(said.shown)"
         )
         suite.expect(
-            !said.contains("untick"),
-            "and nobody is sent to undo a tick that works — \(said)"
+            !said.carries(Phrase("untick", "снимите")),
+            "and nobody is sent to undo a tick that works — \(said.shown)"
         )
     }
 
@@ -301,7 +301,7 @@ func runSessionRaiseTests(_ suite: TestSuite, config: ThresholdConfig) {
         // Automation is kept per application asked about rather than per copy of this one, and
         // the sentence would be a guess dressed as an explanation.
         suite.expect(
-            !Wording.permissionOffer(.automation, signedAdHoc: true).contains("untick"),
+            !Wording.permissionOffer(.automation, signedAdHoc: true).carries(Phrase("untick", "снимите")),
             "the automation answer says nothing about unticking"
         )
     }

@@ -104,7 +104,7 @@ func runClaudeAgentTests(_ suite: TestSuite, config: ThresholdConfig) {
             suite.expect(agent.subagent?.task == nil, "nor what it was asked to do")
             suite.expectEqual(agent.contextTokens, 40_000, "its context is read from its transcript all the same")
             suite.expect(
-                !Wording.subagentName(agent.subagent?.type).isEmpty,
+                Wording.subagentName(agent.subagent?.type).holds { !$0.isEmpty },
                 "and the panel has something to call it"
             )
         }

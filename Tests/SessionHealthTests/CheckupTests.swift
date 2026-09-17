@@ -48,8 +48,14 @@ func runCheckupTests(_ suite: TestSuite) {
                 "the list must keep the declared order, got \(rows.map(\.point.rawValue))"
             )
             for row in rows {
-                suite.expect(!row.title.isEmpty, "\(row.point.rawValue): a row with no title")
-                suite.expect(!row.detail.isEmpty, "\(row.point.rawValue): nothing says what this is for")
+                suite.expect(
+                    row.title.holds { !$0.isEmpty },
+                    "\(row.point.rawValue): a row with a side of its title missing"
+                )
+                suite.expect(
+                    row.detail.holds { !$0.isEmpty },
+                    "\(row.point.rawValue): a side of this row says nothing about what it is for"
+                )
                 suite.expectEqual(row.standing, state.standing(of: row.point), "\(row.point.rawValue) standing")
             }
         }
@@ -117,8 +123,8 @@ func runCheckupTests(_ suite: TestSuite) {
         for slot in [StatusLineSlotState.free, .somebodyElse("~/bin/my-status-line")] {
             let state = with(bare, slot: slot)
             suite.expectEqual(state.standing(of: .statusLineSlot), .missing, "\(slot)")
-            let detail = row(.statusLineSlot, of: state)?.detail ?? ""
-            suite.expect(detail.contains(Briefing.connectAction), "\(slot): \(detail)")
+            let detail = row(.statusLineSlot, of: state)?.detail ?? Phrase("", "")
+            suite.expect(detail.carries(Briefing.connectAction), "\(slot): \(detail.shown)")
         }
     }
 
@@ -126,8 +132,12 @@ func runCheckupTests(_ suite: TestSuite) {
     // and a threat to overwrite their config.
     suite.test("somebody else's command is quoted in the line about it") {
         let command = "~/bin/my-status-line --short"
-        let detail = row(.statusLineSlot, of: with(bare, slot: .somebodyElse(command)))?.detail ?? ""
-        suite.expect(detail.contains(command), "the command must be shown as it is written: \(detail)")
+        let detail = row(.statusLineSlot, of: with(bare, slot: .somebodyElse(command)))?.detail
+            ?? Phrase("", "")
+        suite.expect(
+            detail.holds { $0.contains(command) },
+            "the command must be shown as it is written: \(detail.shown)"
+        )
     }
 
     // Nothing is written to a file this app cannot read, and the checkup must not offer a
@@ -136,10 +146,13 @@ func runCheckupTests(_ suite: TestSuite) {
         let path = "/Users/someone/.claude/settings.json"
         let line = row(.statusLineSlot, of: with(bare, slot: .unreadable(path)))
         suite.expectEqual(line?.standing, .missing, "standing")
-        suite.expect(line?.detail.contains(path) == true, "the file must be named: \(line?.detail ?? "—")")
         suite.expect(
-            line?.detail.contains(Briefing.connectAction) != true,
-            "nothing is written to a file this app cannot read: \(line?.detail ?? "—")"
+            line?.detail.holds { $0.contains(path) } == true,
+            "the file must be named: \(line?.detail.shown ?? "—")"
+        )
+        suite.expect(
+            line?.detail.carries(Briefing.connectAction) != true,
+            "nothing is written to a file this app cannot read: \(line?.detail.shown ?? "—")"
         )
     }
 
@@ -161,18 +174,18 @@ func runCheckupTests(_ suite: TestSuite) {
     // tick from the build before is still there and grants nothing. A checkup that said
     // "not given" and stopped would be arguing with what they can see.
     suite.test("an ad-hoc copy explains a tick that belongs to the version before it") {
-        let adHoc = row(.accessibility, of: bare)?.detail ?? ""
+        let adHoc = row(.accessibility, of: bare)?.detail ?? Phrase("", "")
         suite.expect(
-            adHoc.contains(Wording.tickFromAnEarlierBuild),
-            "an ad-hoc copy must explain the stale tick: \(adHoc)"
+            adHoc.carries(Wording.tickFromAnEarlierBuild),
+            "an ad-hoc copy must explain the stale tick: \(adHoc.shown)"
         )
         let signed = row(.accessibility, of: with(bare, copy: RunningCopy(
             path: bare.copy.path,
             builtAt: bare.copy.builtAt,
             isAdHoc: false
-        )))?.detail ?? ""
+        )))?.detail ?? Phrase("", "")
         suite.expect(
-            !signed.contains(Wording.tickFromAnEarlierBuild),
+            !signed.carries(Wording.tickFromAnEarlierBuild),
             "a properly signed copy keeps its permissions and must not send anybody to undo a working tick: \(signed)"
         )
     }
@@ -202,9 +215,11 @@ func runCheckupTests(_ suite: TestSuite) {
     suite.test("automation says what it is for, when it is asked and where the answer is kept") {
         let line = row(.automation, of: bare)
         suite.expectEqual(line?.settings, .automation, "pane")
-        let detail = line?.detail ?? ""
-        for word in ["Terminal.app", "iTerm2", "click"] {
-            suite.expect(detail.contains(word), "the row must name \(word): \(detail)")
+        let detail = line?.detail ?? Phrase("", "")
+        // The two terminals are named the same in both languages; the click is not, so it is
+        // asked for as the pair it is.
+        for word in [Phrase("Terminal.app", "Terminal.app"), Phrase("iTerm2", "iTerm2"), Phrase("click", "Щелчок")] {
+            suite.expect(detail.carries(word), "the row must name \(word.shown): \(detail.shown)")
         }
         suite.expectEqual(row(.automation, of: settled)?.detail, detail, "nothing about it changes with the machine")
     }
@@ -232,8 +247,8 @@ func runCheckupTests(_ suite: TestSuite) {
         suite.expectEqual(line?.standing, .given, "standing")
         suite.expectEqual(line?.settings, .notifications, "pane")
         suite.expect(
-            line?.detail.contains("Script Editor") == true,
-            "the name in Notification settings is the whole point: \(line?.detail ?? "—")"
+            line?.detail.holds { $0.contains("Script Editor") } == true,
+            "the name in Notification settings is the whole point: \(line?.detail.shown ?? "—")"
         )
     }
 
@@ -251,17 +266,26 @@ func runCheckupTests(_ suite: TestSuite) {
             isAdHoc: true
         ))
 
-        let one = row(.runningCopy, of: here)?.detail ?? ""
-        let other = row(.runningCopy, of: there)?.detail ?? ""
-        suite.expect(one.contains("/Applications/App.app"), "the path must be shown: \(one)")
-        suite.expect(one.contains(TimeDisplay.moment(built)), "the build date must be shown: \(one)")
+        let one = row(.runningCopy, of: here)?.detail ?? Phrase("", "")
+        let other = row(.runningCopy, of: there)?.detail ?? Phrase("", "")
+        suite.expect(
+            one.holds { $0.contains("/Applications/App.app") },
+            "the path must be shown: \(one.shown)"
+        )
+        suite.expect(
+            one.carries(TimeDisplay.moment(built)),
+            "the build date must be shown, in the way each language writes one: \(one.shown)"
+        )
         suite.expect(one != other, "two copies of the same name must not read alike")
     }
 
     suite.test("a build date that could not be read says so rather than inventing one") {
-        let detail = row(.runningCopy, of: bare)?.detail ?? ""
-        suite.expect(!detail.isEmpty, "the row must still name the copy")
-        suite.expect(detail.contains(bare.copy.path), "the path is known even when the date is not: \(detail)")
+        let detail = row(.runningCopy, of: bare)?.detail ?? Phrase("", "")
+        suite.expect(detail.holds { !$0.isEmpty }, "the row must still name the copy")
+        suite.expect(
+            detail.holds { $0.contains(bare.copy.path) },
+            "the path is known even when the date is not: \(detail.shown)"
+        )
     }
 
     // MARK: The panes themselves
@@ -291,7 +315,7 @@ func runCheckupTests(_ suite: TestSuite) {
     suite.test("the button that opens a pane is named after the pane it opens") {
         let names = SystemSettingsPane.allCases.map(Wording.openSettings)
         suite.expect(Set(names).count == names.count, "two panes share a button name: \(names)")
-        for name in names { suite.expect(!name.isEmpty, "a button with no name") }
+        for name in names { suite.expect(name.holds { !$0.isEmpty }, "a button with a side missing") }
         suite.expectEqual(
             Wording.permissionSettings(.accessibility),
             Wording.openSettings(.accessibility),
@@ -396,12 +420,12 @@ func runCheckupTests(_ suite: TestSuite) {
                 continue
             }
             suite.expect(
-                row.detail.contains("~/.claude/sessions"),
-                "the file a click runs on is not named: \(row.detail)"
+                row.detail.holds { $0.contains("~/.claude/sessions") },
+                "the file a click runs on is not named: \(row.detail.shown)"
             )
             suite.expect(
-                row.detail.contains("Codex"),
-                "the one service whose sessions never click is not named: \(row.detail)"
+                row.detail.holds { $0.contains("Codex") },
+                "the one service whose sessions never click is not named: \(row.detail.shown)"
             )
             suite.expect(row.settings == nil, "nothing on this Mac takes an answer about these")
         }

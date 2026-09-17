@@ -84,7 +84,7 @@ final class UsageModel: ObservableObject {
 
     /// Why the last write did not happen, in words the panel can show. Cleared by the next
     /// attempt — a complaint about a file somebody has since fixed is worse than none.
-    @Published private(set) var slotProblem: String?
+    @Published private(set) var slotProblem: Phrase?
 
     /// Which permission the last click on a session turned out to need, and `nil` while none
     /// has.
@@ -113,7 +113,7 @@ final class UsageModel: ObservableObject {
     /// which half; this one line in the panel says which reading, because a lit dot with no
     /// explanation is a riddle.
     @Published private(set) var level: BudgetLevel = .normal
-    @Published private(set) var levelReason: String?
+    @Published private(set) var levelReason: Phrase?
 
     /// The worst reading drawn the way the bar draws it, so the line explaining a cross is
     /// marked with a cross and not with a dot of the same colour.
@@ -555,10 +555,10 @@ final class UsageModel: ObservableObject {
         of limits: [AgentService: LimitsAssessment],
         and sessions: [SessionView],
         config: ThresholdConfig
-    ) -> (level: BudgetLevel, reason: String?, isSpent: Bool) {
+    ) -> (level: BudgetLevel, reason: Phrase?, isSpent: Bool) {
         // A spent window outranks everything, including another reading at the same level: one
         // of them says the work may get harder, the other that it has stopped.
-        var candidates: [(level: BudgetLevel, reason: String, isSpent: Bool)] = []
+        var candidates: [(level: BudgetLevel, reason: Phrase, isSpent: Bool)] = []
         for (service, assessment) in limits {
             if let spent = assessment.spentWindow {
                 candidates.append((
@@ -574,8 +574,10 @@ final class UsageModel: ObservableObject {
         for session in sessions {
             guard let source = session.assessment.levelSource else { continue }
             let reason = Wording.reason(for: source, service: session.snapshot.service, config: config)
+            // The project is a folder name, so it is added to both sides as it is: it is what
+            // the row above it is called, and a translated one would point at nothing.
             let project = session.snapshot.project.map { " (\($0))" } ?? ""
-            candidates.append((session.assessment.level, reason + project, false))
+            candidates.append((session.assessment.level, reason.mapped { $0 + project }, false))
         }
         let worst = candidates.max {
             ($0.level, $0.isSpent ? 1 : 0) < ($1.level, $1.isSpent ? 1 : 0)
@@ -644,8 +646,8 @@ final class UsageModel: ObservableObject {
     /// keeps what comes back in `slotProblem`, and the window shows it beside the row it was
     /// pressed in. Whoever asked reads the file again afterwards, because both of them show
     /// what is in it rather than what this method believes it did.
-    func write(_ change: StatusLineChange) async -> String? {
-        var problem: String?
+    func write(_ change: StatusLineChange) async -> Phrase? {
+        var problem: Phrase?
         do {
             try statusLine.apply(change)
         } catch let failure as ClaudeSettings.Failure {
@@ -657,7 +659,7 @@ final class UsageModel: ObservableObject {
         return problem
     }
 
-    private static func explain(_ failure: ClaudeSettings.Failure) -> String {
+    private static func explain(_ failure: ClaudeSettings.Failure) -> Phrase {
         switch failure {
         case .unreadable(let path): SlotPhrasing.unreadable(path)
         case .notWritten(let reason): SlotPhrasing.failed(reason)

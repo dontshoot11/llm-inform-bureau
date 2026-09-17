@@ -34,6 +34,17 @@ public struct Phrase: Equatable, Sendable, Hashable {
         }
     }
 
+    /// A name that reads the same in both languages: a published title, a path, a command, a
+    /// word somebody's own configuration file chose.
+    ///
+    /// The one way out of the rule above, and made visible on purpose. Something has to be able
+    /// to say "this is not translated" — the title of a paper is what a reader will go and
+    /// search for, and a translated one sends them nowhere — but the dangerous version of that
+    /// is a plain string quietly staying English in a Russian window. So the decision is
+    /// written where it is made, and the completeness test treats everything that is not this
+    /// as a line still owing a second side.
+    public static func name(_ same: String) -> Phrase { Phrase(same, same) }
+
     /// The same phrase with something put on both sides.
     ///
     /// For the places where a phrase is built out of another one — a title with a unit after it,
@@ -41,5 +52,20 @@ public struct Phrase: Equatable, Sendable, Hashable {
     /// separate strings, so a builder cannot quietly forget the Russian half.
     public func mapped(_ transform: (String) -> String) -> Phrase {
         Phrase(transform(english), transform(russian))
+    }
+}
+
+extension Phrase {
+    /// Several phrases as one sentence, each side joined with its own.
+    ///
+    /// The only join this target does. A body built out of a measurement, an explanation and a
+    /// command is three phrases, and joining them side by side is what makes it impossible to
+    /// end up with one English sentence in the middle of a Russian notification — which is
+    /// exactly what joining already-resolved strings would allow.
+    public static func joined(_ phrases: [Phrase], separator: String = " ") -> Phrase {
+        Phrase(
+            phrases.map(\.english).joined(separator: separator),
+            phrases.map(\.russian).joined(separator: separator)
+        )
     }
 }
