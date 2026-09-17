@@ -281,6 +281,13 @@ finds nothing changed now costs 0.005 s against 1.27 s, and a pass where one fil
 sources: the transcripts are the expensive one, but an event that moved no file has no business
 opening one anywhere.
 
+What that is worth to the machine, measured with both builds running side by side on the same
+files: a working session cost 40.7% of a core before and 6.1% after, the thirty-second pulse
+with nothing happening 5.3% and 1.1%, and the app's lag behind a line just written fell from
+1.5 s to 0.46 s — reading less made it fresher, not staler. On a set three times as large with
+still one file being written, the old build climbed to the ceiling of a core and this one did
+not move: what a refresh costs is what changed, not what the machine has stored.
+
 **A file is the same file when its identifier, its size and its modification date all are.**
 The date carries nanoseconds on APFS (`1787242588.223001172`), so appending always moves it;
 the identifier (`fileResourceIdentifier`, the volume id and the inode) is what catches a file
