@@ -1,5 +1,6 @@
 import Foundation
 import AgentFiles
+import Phrasing
 import SessionHealthCore
 
 /// What the reader remembers between passes, and what makes it forget.
@@ -235,7 +236,7 @@ func runTranscriptMemoryTests(_ suite: TestSuite, config: ThresholdConfig) {
             var passes = 0
             var sightings = 0
             var highest = 0
-            var unreadable: String?
+            var unreadable: Phrase?
             var nobodyWrote: Int?
             var wentBackwards: Int?
             while !writer.isFinished {

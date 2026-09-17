@@ -20,6 +20,17 @@ which. The last one launched wins because launching an app is how a person asks 
 the menu bar app does this; the status line command may run several at once and exits on its
 own.
 
+**Not one word is written in this target.** Everything a person reads comes out of `Phrasing`
+as a `Phrase` — a value with an English side and a Russian one — and the views ask
+`InterfaceLanguage` which side is showing at the moment they draw it. That is what makes the
+picker in the settings window work without a restart: nothing is resolved until something
+draws it. The helpers the panel is built out of (`caption`, `explanation`, `row`, `entry`)
+take a `Phrase` rather than a `String`, so the compiler asks the question for most of the
+target, and `TranslationTests` asks it for the rest: a literal handed to `Text`, `Button`,
+`Link`, `Toggle`, `.help` or a `title:` argument fails the suite. What may still be a plain
+string is what is not this app's to translate — a service's name, a slash command, a path, an
+SF Symbol, the AppleScript a notification goes out over, and an error macOS worded itself.
+
 ## Build and run
 
 ```sh
@@ -567,7 +578,7 @@ the drag first and the first launch after it.
 | `LLMInformBureauApp.swift` | The `MenuBarExtra` scene |
 | `UsageModel.swift` | What is on screen, and what keeps it current: file events, the heartbeat, the one reader kept across passes, the alerts that come out of a refresh, the change to `settings.json` waiting for a yes or a no, and the one path that writes it — wherever the question was asked |
 | `MenuContent.swift` | The panel, the one light a section shows, the button that takes Claude Code's status line slot, and what it hands the settings window: how to read the checkup, and how to give that slot back |
-| `Notifier.swift` | Putting a notification on screen, silently, over whichever channel works — or not putting one there at all, which is the checkbox in the same file |
+| `Notifier.swift` | Putting a notification on screen, silently, over whichever channel works — the words in the language showing at the moment it goes out, the script it goes out over in `SessionHealthCore` — or not putting one there at all, which is the checkbox in the same file |
 | `TerminalRaiser.swift` | Taking a person to the window their session runs in: the tab where the terminal can name one, the application otherwise, and the settings pane after a refusal |
 | `OwnSignature.swift` | How this copy is signed, which decides whether the panel explains a tick left over from an earlier build |
 | `Checkup.swift` | Reading what this Mac has given the app without asking it for anything, and the one line that opens a pane of System Settings |
@@ -577,4 +588,4 @@ the drag first and the first launch after it.
 | `LoginItem.swift` | Starting with the Mac, and the checkbox both views share |
 | `InterfaceLanguage.swift` | Which language the app is speaking right now, handed to both roots so they cannot differ — and the picker at the top of the settings window that changes it without a restart |
 
-The English it speaks is its own target: see `Sources/Phrasing/Phrasing.md`.
+Both languages it speaks are their own target: see `Sources/Phrasing/Phrasing.md`.

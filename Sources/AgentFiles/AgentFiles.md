@@ -634,8 +634,8 @@ let reading = reader.read(config: load.config)
 
 switch reading.claudeLimits {
 case .value(let snapshot):     show(snapshot)           // snapshot.observedAt is its age
-case .noData(let explanation): show(explanation)        // e.g. nothing has reported yet
-case .unavailable(let reason): show(reason)
+case .noData(let explanation): show(explanation)        // a Phrase — e.g. nothing reported yet
+case .unavailable(let reason): show(reason)             // a Phrase too
 }
 
 reading.sessions(of: .codex).value ?? []                // an empty list means nothing is running
@@ -644,11 +644,19 @@ reading.sessions(of: .codex).value ?? []                // an empty list means n
 Every store takes the directory it reads as an initialiser argument, which is how the tests
 run against fixtures instead of against whatever the machine happens to have.
 
+**Why this target speaks.** A reading that came to nothing has to say why, and that sentence
+goes straight into the panel where a number would have been — "no sessions yet", "the format
+changed", "nothing answered yet". Only this target knows which of those is true, so the
+sentence is written here, as a `Phrase` with both of the app's languages in it rather than as
+English somebody downstream would have to translate without knowing what happened. That is
+what the dependency on `Phrasing` is for; the three sentences that are about a file rather
+than about a service are shared in `FileSaid`.
+
 ## Files
 
 | File | Holds |
 | --- | --- |
-| `SourceReading.swift` | The three outcomes every reader returns |
+| `SourceReading.swift` | The three outcomes every reader returns, each absence carrying the phrase that explains it — plus `FileSaid`, the three of those sentences that are about a file rather than about a service and are said the same by every reader |
 | `UsageReader.swift` | Both services read at once, and the join between the three Claude sources |
 | `CodexRollouts.swift` | Codex limits and Codex sessions, out of the rollouts — including whether one is waiting on its agent |
 | `ClaudeTranscripts.swift` | Claude sessions and the subagents running inside them, out of the transcripts — including whether one is waiting on its agent |

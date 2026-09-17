@@ -112,7 +112,7 @@ func runSourceMemoryTests(_ suite: TestSuite, config: ThresholdConfig) {
                 let reading = store.read()
                 suite.expect(reading.limits.value == nil, "nothing to report while the file will not open")
                 suite.expect(
-                    reading.limits.explanation?.contains("format") != true,
+                    reading.limits.explanation?.english.contains("format") != true,
                     "and no verdict on a format this pass never saw"
                 )
             }

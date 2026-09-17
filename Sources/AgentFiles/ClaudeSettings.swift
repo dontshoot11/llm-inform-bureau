@@ -1,4 +1,5 @@
 import Foundation
+import Phrasing
 import SessionHealthCore
 
 /// `~/.claude/settings.json` — the one file this app writes that is not its own.
@@ -69,8 +70,19 @@ public struct ClaudeSettings: Sendable {
         case unreadable(String)
         /// The edit could not be carried out. The file is untouched either way: it is written
         /// once, at the end, and only after the result has been parsed back.
-        case notWritten(String)
+        ///
+        /// The reason is shown, so it is a phrase: this app's own account of a refusal has two
+        /// sides like everything else it says, and a system error goes on both sides as the
+        /// system gave it.
+        case notWritten(Phrase)
     }
+
+    /// Said when the scan produced something that is no longer JSON, which is the one thing
+    /// standing between this app and somebody's configuration file.
+    static let editWasNotJSON = Phrase(
+        "the edit did not come out as JSON, so nothing was written",
+        "правка перестала быть JSON, поэтому ничего не записано"
+    )
 
     /// Puts `command` in the slot, keeping everything else in the file as it was — including
     /// anything else inside `statusLine`, such as `padding`, which is the user's setting and
@@ -116,7 +128,7 @@ public struct ClaudeSettings: Sendable {
         // configuration, so its result is parsed before it is written. A bug here then costs
         // a refusal rather than a file.
         guard (try? JSONSerialization.jsonObject(with: updated)) is [String: Any] else {
-            throw Failure.notWritten("the edit did not come out as JSON, so nothing was written")
+            throw Failure.notWritten(Self.editWasNotJSON)
         }
         try write(updated, tag: tag)
     }
@@ -130,7 +142,7 @@ public struct ClaudeSettings: Sendable {
             backup(tag: tag)
             try data.write(to: url, options: .atomic)
         } catch {
-            throw Failure.notWritten("\(url.path): \(error.localizedDescription)")
+            throw Failure.notWritten(Phrase.name("\(url.path): \(error.localizedDescription)"))
         }
     }
 

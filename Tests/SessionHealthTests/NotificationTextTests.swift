@@ -170,6 +170,39 @@ func runNotificationTextTests(_ suite: TestSuite, config: ThresholdConfig) {
         )
     }
 
+    // The road a notification takes when the notification centre will not take it from this
+    // app directly: `osascript`, which is a grammar, and a body that carries a slash command,
+    // a line break and — in either language — whatever the person typed into their terminal.
+    suite.test("the script a notification goes out over survives what the body carries") {
+        let said = NotificationScript.display(
+            title: "Claude ждёт вас в llm-inform-bureau",
+            body: "Который \"подход\"?\n/context"
+        )
+        suite.expect(said.hasPrefix("display notification "), "the verb is missing: \(said)")
+        suite.expect(
+            said.contains("with title \"Claude ждёт вас в llm-inform-bureau\""),
+            "the title did not arrive whole: \(said)"
+        )
+        // Two quotes of its own and no more: the ones the script is built out of. A quotation
+        // mark in the body that was not escaped would end the string early and leave the rest
+        // of the question as AppleScript to run.
+        suite.expect(
+            said.contains("\\\"подход\\\""), "a quotation mark left the string open: \(said)"
+        )
+        suite.expect(
+            !said.contains("\n"), "a real line break ends the line the script is on: \(said)"
+        )
+        suite.expect(said.contains("\\n/context"), "the command did not arrive: \(said)")
+    }
+
+    suite.test("a backslash in the body is escaped before the quotes are counted") {
+        let said = NotificationScript.display(title: "t", body: "a\\")
+        suite.expectEqual(
+            said, "display notification \"a\\\\\" with title \"t\"",
+            "a trailing backslash must not escape the quote that closes the string"
+        )
+    }
+
     // AGENTS.md draws this line: "answer quality may degrade past this point" is a fact about
     // a mark, "quality: 62%" is a measurement nothing in the data supports. Asked of both
     // sides, with each language's own words for it (`QualityClaims`).

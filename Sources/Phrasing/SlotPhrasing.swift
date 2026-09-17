@@ -200,9 +200,14 @@ public enum SlotPhrasing {
     /// Said when a write did not happen. It names the file, because the next thing anybody
     /// does is go and look at it.
     ///
-    /// The reason comes from the system and arrives in whatever language the system gives it —
-    /// so only the sentence around it has two sides.
-    public static func failed(_ reason: String) -> Phrase {
-        Phrase("Nothing was written — \(reason)", "Ничего не записано — \(reason)")
+    /// The reason is a phrase and not a string, because two quite different ones arrive here:
+    /// the app's own account of why it refused, which has both sides like everything else it
+    /// says, and a system error, which comes in whatever language the system gives it and goes
+    /// on both sides as it is (`Phrase.name`).
+    public static func failed(_ reason: Phrase) -> Phrase {
+        Phrase(
+            "Nothing was written — \(reason.english)",
+            "Ничего не записано — \(reason.russian)"
+        )
     }
 }

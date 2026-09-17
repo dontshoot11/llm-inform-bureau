@@ -282,23 +282,25 @@ func runSetupTests(_ suite: TestSuite, config: ThresholdConfig) {
             ).read(config: .builtIn)
 
             suite.expect(idle.isInstalled(.codex), "an empty tree means installed and idle, not absent")
+            let idleSaid = idle.codexSessions.explanation
             suite.expect(
-                idle.codexSessions.explanation?.lowercased().contains("yet") == true,
-                "an idle agent waits: \(idle.codexSessions.explanation ?? "(nothing)")"
+                idleSaid?.english.lowercased().contains("yet") == true
+                    && idleSaid?.russian.lowercased().contains("пока") == true,
+                "an idle agent waits: \(idleSaid?.shown ?? "(nothing)")"
             )
         }
 
         suite.test("an agent that was never installed says so in words, and is not an error") {
             suite.expect(reading.codexSessions.value == nil, "an absent agent must not report sessions")
             suite.expect(
-                reading.codexSessions.explanation?.isEmpty == false,
-                "an absent agent must explain itself: \(reading.codexSessions.explanation ?? "(nothing)")"
+                reading.codexSessions.explanation?.holds { !$0.isEmpty } == true,
+                "an absent agent must explain itself: \(reading.codexSessions.explanation?.shown ?? "(nothing)")"
             )
             if case .unavailable(let why) = reading.codexSessions {
-                suite.expect(false, "never installed must not read as a broken source: \(why)")
+                suite.expect(false, "never installed must not read as a broken source: \(why.shown)")
             }
             if case .unavailable(let why) = reading.codexLimits {
-                suite.expect(false, "never installed must not read as broken limits: \(why)")
+                suite.expect(false, "never installed must not read as broken limits: \(why.shown)")
             }
             suite.expect(reading.codexLimits.value == nil, "an absent agent must not report limits")
         }

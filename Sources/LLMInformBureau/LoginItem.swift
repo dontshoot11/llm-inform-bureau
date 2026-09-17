@@ -30,7 +30,7 @@ final class LoginItem: ObservableObject {
         /// Registered, but the user has yet to allow it in System Settings.
         case waitingForApproval
         /// Cannot be offered at all, with the reason.
-        case unavailable(String)
+        case unavailable(Phrase)
     }
 
     @Published private(set) var state: State = .off
@@ -49,7 +49,7 @@ final class LoginItem: ObservableObject {
     /// changed in System Settings while this app is running.
     func refresh() {
         guard let service else {
-            state = .unavailable("Available once the app runs from the bundle built by Scripts/build-app.sh.")
+            state = .unavailable(CheckupPhrasing.openAtLoginNeedsBundle)
             return
         }
         switch service.status {
@@ -89,7 +89,7 @@ struct LoginItemToggle: View {
         VStack(alignment: .leading, spacing: 3) {
             switch loginItem.state {
             case .unavailable(let why):
-                note(interface.say(CheckupPhrasing.openAtLoginUnavailable(why)))
+                note(CheckupPhrasing.openAtLoginUnavailable(why))
             case .on, .off, .waitingForApproval:
                 Toggle(interface.say(CheckupPhrasing.openAtLogin), isOn: Binding(
                     get: { loginItem.state != .off },
@@ -97,11 +97,12 @@ struct LoginItemToggle: View {
                 ))
                 .toggleStyle(.checkbox)
                 if loginItem.state == .waitingForApproval {
-                    note("Waiting to be allowed in System Settings › General › Login Items.")
+                    note(CheckupPhrasing.openAtLoginWaitingForApproval)
                 }
             }
             if let problem = loginItem.problem {
-                note(problem)
+                // The system's own words, which come in whatever language it gives them.
+                note(.name(problem))
             }
         }
         // Login Items can be changed in System Settings while this app runs, so the system is
@@ -109,8 +110,8 @@ struct LoginItemToggle: View {
         .onAppear { loginItem.refresh() }
     }
 
-    private func note(_ text: String) -> some View {
-        Text(text)
+    private func note(_ text: Phrase) -> some View {
+        Text(interface.say(text))
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)

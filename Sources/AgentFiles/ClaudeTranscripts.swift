@@ -1,4 +1,5 @@
 import Foundation
+import Phrasing
 import SessionHealthCore
 
 /// Reads the context budget of Claude sessions out of `~/.claude/projects`.
@@ -31,6 +32,24 @@ public struct ClaudeTranscriptStore: Sendable {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".claude/projects", isDirectory: true)
     }
+
+    /// Said when the projects directory holds no transcript at all — the CLI is installed
+    /// and has not been worked in.
+    static let noSessionsYet = Phrase(
+        "No Claude sessions yet — one appears the first time Claude Code answers.",
+        "Сессий Claude пока нет — первая появится, когда Claude Code ответит."
+    )
+
+    /// Said when transcripts were found, every one of them was walked, and none of them read.
+    /// A verdict on the format rather than on one file, which is why it takes all of them.
+    static let formatChanged = Phrase(
+        "Claude transcripts no longer look the way this app reads them.",
+        "Транскрипты Claude больше не выглядят так, как их читает это приложение."
+    )
+
+    /// Said of a session that has been closed off: it is on disk and there is nothing left to
+    /// watch in it.
+    static let sessionIsOver = Phrase("this one is over", "эта сессия закончена")
 
     /// How much of the end of a transcript to read before widening once.
     ///
@@ -94,7 +113,7 @@ public struct ClaudeTranscriptStore: Sendable {
             $0.pathExtension == "jsonl" && !SessionFiles.isSubagentTranscript($0)
         }
         guard !files.isEmpty else {
-            return .noData("No Claude sessions yet — one appears the first time Claude Code answers.")
+            return .noData(Self.noSessionsYet)
         }
 
         // Only the files that are still being worked on are opened at all: the activity rule
@@ -131,7 +150,7 @@ public struct ClaudeTranscriptStore: Sendable {
             }
         }
         if snapshots.isEmpty, unreadable {
-            return .unavailable("Claude transcripts no longer look the way this app reads them.")
+            return .unavailable(Self.formatChanged)
         }
         return .value(activity.active(snapshots, now: now))
     }
@@ -236,7 +255,7 @@ public struct ClaudeTranscriptStore: Sendable {
         // A file that would not open said nothing, and nothing is not an answer to keep — see
         // `FileMemory`, "What it never remembers". The pass goes without this session; the next
         // one asks the file again instead of repeating what it failed to hear.
-        guard let reading = parse(file, as: role) else { return .noData("could not be opened just now") }
+        guard let reading = parse(file, as: role) else { return .noData(FileSaid.couldNotOpen) }
         readings.remember(reading, of: file.url, as: file.stamp)
         return reading
     }
@@ -247,7 +266,7 @@ public struct ClaudeTranscriptStore: Sendable {
     /// `nil` when the file would not open at all, which is not something the file said.
     private func parse(_ file: SessionFiles.Found, as role: Role) -> SourceReading<Reading>? {
         var sawUnreadableLine = false
-        var result: SourceReading<Reading> = .noData("nothing answered yet")
+        var result: SourceReading<Reading> = .noData(FileSaid.nothingAnsweredYet)
         var opened = false
 
         for tail in Self.readableTailSizes(ofSize: file.stamp.size) {
@@ -259,7 +278,7 @@ public struct ClaudeTranscriptStore: Sendable {
 
             // Neither kind of file is worth a row once it is over — a session that has been
             // closed off, an agent that has answered for the last time.
-            if Self.isOver(entries, role: role) { return .noData("this one is over") }
+            if Self.isOver(entries, role: role) { return .noData(Self.sessionIsOver) }
 
             guard let lastAnswer = entries.last(where: { $0.isAnswer(sidechain: role.countsSidechain) })
             else { continue }
@@ -285,7 +304,7 @@ public struct ClaudeTranscriptStore: Sendable {
         }
         guard opened else { return nil }
         if case .noData = result, sawUnreadableLine {
-            return .unavailable("unparseable lines")
+            return .unavailable(FileSaid.unreadableLines)
         }
         return result
     }

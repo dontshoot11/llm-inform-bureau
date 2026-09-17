@@ -121,9 +121,7 @@ final class Notifier {
     }
 
     private func postThroughScript(_ text: NotificationText) {
-        // `display notification` without `sound name` is silent, which is the whole reason
-        // this is a usable fallback rather than a worse one.
-        let script = "display notification \(quoted(said(text.body))) with title \(quoted(said(text.title)))"
+        let script = NotificationScript.display(title: said(text.title), body: said(text.body))
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
         process.arguments = ["-e", script]
@@ -136,18 +134,6 @@ final class Notifier {
     /// can be minutes old by the time it is shown, and the language it should arrive in is the
     /// one the reader is looking at now.
     private func said(_ phrase: Phrase) -> String { InterfaceLanguage.shared.say(phrase) }
-
-    /// An AppleScript string literal. The body carries a slash command and a line break, so
-    /// this is not decoration. Cyrillic needs nothing added to it: the argument leaves this
-    /// process as UTF-8 and an AppleScript string takes it as it is — what the escaping is for
-    /// is the quote, the backslash and the newline, in either language.
-    private func quoted(_ text: String) -> String {
-        let escaped = text
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-            .replacingOccurrences(of: "\n", with: "\\n")
-        return "\"\(escaped)\""
-    }
 }
 
 /// The checkbox on the notifications row of the checkup: say something, or keep quiet.

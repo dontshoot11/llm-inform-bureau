@@ -250,8 +250,15 @@ func runCodexSessionTests(_ suite: TestSuite, config: ThresholdConfig) {
                 suite.expect(false, "expected no data")
                 return
             }
-            suite.expect(explanation.lowercased().contains("yet"), "the sentence waits: \(explanation)")
-            suite.expect(!explanation.contains("/"), "a filesystem path in a sentence for a person: \(explanation)")
+            suite.expect(
+                explanation.english.lowercased().contains("yet")
+                    && explanation.russian.lowercased().contains("пока"),
+                "the sentence waits: \(explanation.shown)"
+            )
+            suite.expect(
+                explanation.holds { !$0.contains("/") },
+                "a filesystem path in a sentence for a person: \(explanation.shown)"
+            )
         }
 
         suite.test("lines this app can no longer parse are an unavailable source") {

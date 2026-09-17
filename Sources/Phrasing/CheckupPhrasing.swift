@@ -199,13 +199,33 @@ public enum CheckupPhrasing {
             + "которое всё же уйдёт."
     )
 
-    /// Said where a login item cannot be offered at all, with the reason the system gave.
+    /// Said where a login item cannot be offered at all, with the reason.
     ///
-    /// The reason is the system's own words and arrives in whatever language it gives them, so
-    /// only the name in front of it has two sides.
-    public static func openAtLoginUnavailable(_ why: String) -> Phrase {
-        Phrase("\(openAtLogin.english): \(why)", "\(openAtLogin.russian): \(why)")
+    /// The reason is a phrase because two kinds arrive here: this app's own account of why
+    /// there is nothing to register, and the system's own words, which come in whatever
+    /// language it gives them and go on both sides as they are (`Phrase.name`).
+    public static func openAtLoginUnavailable(_ why: Phrase) -> Phrase {
+        Phrase(
+            "\(openAtLogin.english): \(why.english)",
+            "\(openAtLogin.russian): \(why.russian)"
+        )
     }
+
+    /// The reason there is nothing to register: the executable is being run on its own rather
+    /// than out of the bundle the build script makes. That is a developer at a terminal, and
+    /// the row says so rather than offering a checkbox that could not work.
+    public static let openAtLoginNeedsBundle = Phrase(
+        "Available once the app runs from the bundle built by Scripts/build-app.sh.",
+        "Станет доступно, когда приложение запустится из бандла, собранного Scripts/build-app.sh."
+    )
+
+    /// Said under the checkbox while the system has the registration and has not let it
+    /// through. Ticked here, off over there — and nothing launches until somebody says so in
+    /// System Settings, so the pane is named rather than described.
+    public static let openAtLoginWaitingForApproval = Phrase(
+        "Waiting to be allowed in System Settings › General › Login Items.",
+        "Ожидает разрешения в Системных настройках › Основные › Объекты входа."
+    )
 
     /// What the app needs the slot for, and what is in it. The same sentence about where the
     /// limits come from on every branch: it is the reason the row exists, and a reader whose

@@ -10,6 +10,13 @@ Instructions for AI agents working in this repository.
 - README, `INSTALL.txt`, issue and PR text: **English**. The public documents of the project
   are not translated; the app is.
 - Planning documents under `TODO/` (git-ignored): Russian.
+- **No string in a view.** The app target writes no words of its own: `Text`, `Button`,
+  `Link`, `Toggle`, `.help` and anything with a `title:` take what `InterfaceLanguage` says of
+  a `Phrase`, and `TranslationTests` fails on a literal handed to one of them. A sentence about
+  a reading that came to nothing — "no sessions yet", "the format changed" — is a `Phrase`
+  where it is written, in `AgentFiles`, rather than English on its way to the panel.
+- What stays a plain string is what is not this app's to translate: a service's name, a slash
+  command, a path, an SF Symbol, a published title, and an error macOS worded itself.
 
 ## Updating the thresholds
 

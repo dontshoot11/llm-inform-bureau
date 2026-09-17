@@ -66,12 +66,13 @@ func runClaudeStatusTests(_ suite: TestSuite, config: ThresholdConfig) {
                 return
             }
             suite.expect(
-                explanation.lowercased().contains("status line"),
-                "the sentence has to name where the numbers come from: \(explanation)"
+                explanation.english.lowercased().contains("status line")
+                    && explanation.russian.lowercased().contains("строки состояния"),
+                "the sentence has to name where the numbers come from: \(explanation.shown)"
             )
             suite.expect(
-                !explanation.contains("Scripts/"),
-                "and must not send anybody to a script: \(explanation)"
+                explanation.holds { !$0.contains("Scripts/") },
+                "and must not send anybody to a script: \(explanation.shown)"
             )
         }
 
@@ -85,7 +86,7 @@ func runClaudeStatusTests(_ suite: TestSuite, config: ThresholdConfig) {
                 suite.expect(false, "expected no data rather than 0%")
                 return
             }
-            suite.expect(!explanation.isEmpty, "the panel needs a sentence to show")
+            suite.expect(explanation.holds { !$0.isEmpty }, "the panel needs a sentence to show")
         }
 
         suite.test("a payload this app can no longer parse is an unavailable source") {

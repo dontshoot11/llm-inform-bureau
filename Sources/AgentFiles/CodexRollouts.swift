@@ -1,4 +1,5 @@
 import Foundation
+import Phrasing
 import SessionHealthCore
 
 /// Everything one walk of the rollout tree has to say.
@@ -34,6 +35,26 @@ public struct CodexRolloutStore: Sendable {
     /// The pool `/usage` reports. Codex meters other pools in the same field — a reserve
     /// pool, a premium one that is usually all nulls — and those are not the subscription.
     static let subscriptionLimitID = "codex"
+
+    /// Said when the sessions directory holds no rollout at all — the CLI is installed and
+    /// has not been worked in.
+    static let noSessionsYet = Phrase(
+        "No Codex sessions yet — one appears the first time Codex answers.",
+        "Сессий Codex пока нет — первая появится, когда Codex ответит."
+    )
+
+    /// Said when rollouts were found, every one of them was walked, and none of them read.
+    /// A verdict on the format rather than on one file, which is why it takes all of them.
+    static let formatChanged = Phrase(
+        "Codex rollouts no longer look the way this app reads them.",
+        "Роллауты Codex больше не выглядят так, как их читает это приложение."
+    )
+
+    /// Said when the rollouts read and none of them carried the limits field yet.
+    static let noLimitsYet = Phrase(
+        "Codex has not reported any limits yet — they arrive with its next answer.",
+        "Codex ещё не сообщал лимиты — они придут с его следующим ответом."
+    )
 
     /// How much of the end of a rollout to read before widening the window. The first size
     /// covers a normal session's trailing traffic; the second is the concession to a session
@@ -97,9 +118,7 @@ public struct CodexRolloutStore: Sendable {
         // the memory: whatever was not asked about is not in the walk any more.
         defer { limitsReadings.forgetUnasked() }
 
-        guard !rollouts.isEmpty else {
-            return .noData("No Codex sessions yet — one appears the first time Codex answers.")
-        }
+        guard !rollouts.isEmpty else { return .noData(Self.noSessionsYet) }
 
         // A file is only reached once the ones newer than it had nothing to say, which is why
         // the unreadable ones are counted as they are passed rather than looked for afterwards.
@@ -111,10 +130,8 @@ public struct CodexRolloutStore: Sendable {
         }
         // Asked only once nothing could be read at all: a broken line in a file that still
         // answered is not a broken source.
-        if sawUnreadableLine {
-            return .unavailable("Codex rollouts no longer look the way this app reads them.")
-        }
-        return .noData("Codex has not reported any limits yet — they arrive with its next answer.")
+        if sawUnreadableLine { return .unavailable(Self.formatChanged) }
+        return .noData(Self.noLimitsYet)
     }
 
     // MARK: One file
@@ -266,9 +283,7 @@ extension CodexRolloutStore {
             metas.forgetUnasked()
         }
 
-        guard !rollouts.isEmpty else {
-            return .noData("No Codex sessions yet — one appears the first time Codex answers.")
-        }
+        guard !rollouts.isEmpty else { return .noData(Self.noSessionsYet) }
 
         // The activity rule is a property of the modification date, so it decides what gets
         // opened at all: a refresh costs what is running, not what the machine has stored.
@@ -285,9 +300,7 @@ extension CodexRolloutStore {
             case .unavailable: unreadable = true
             }
         }
-        if snapshots.isEmpty, unreadable {
-            return .unavailable("Codex rollouts no longer look the way this app reads them.")
-        }
+        if snapshots.isEmpty, unreadable { return .unavailable(Self.formatChanged) }
         return .value(activity.active(snapshots, now: now))
     }
 
@@ -318,7 +331,7 @@ extension CodexRolloutStore {
         }
         // A file that would not open said nothing, and nothing is not an answer to keep — see
         // `FileMemory`, "What it never remembers".
-        guard let reading = parse(rollout) else { return .noData("could not be opened just now") }
+        guard let reading = parse(rollout) else { return .noData(FileSaid.couldNotOpen) }
         sessionReadings.remember(reading, of: rollout.url, as: rollout.stamp)
         return reading
     }
@@ -334,7 +347,7 @@ extension CodexRolloutStore {
 
         guard let last = counts.last, let held = last.element.tokensHeld else {
             let unreadable = events.contains { $0.looksLikeAnEntry && $0.json == nil }
-            return unreadable ? .unavailable("unparseable lines") : .noData("nothing answered yet")
+            return unreadable ? .unavailable(FileSaid.unreadableLines) : .noData(FileSaid.nothingAnsweredYet)
         }
 
         // A turn starts with `task_started`; the reading before it is where this turn began.

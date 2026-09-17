@@ -653,7 +653,8 @@ final class UsageModel: ObservableObject {
         } catch let failure as ClaudeSettings.Failure {
             problem = Self.explain(failure)
         } catch {
-            problem = SlotPhrasing.failed(error.localizedDescription)
+            // The system's own words, which come in whatever language it gives them.
+            problem = SlotPhrasing.failed(.name(error.localizedDescription))
         }
         await refresh()
         return problem

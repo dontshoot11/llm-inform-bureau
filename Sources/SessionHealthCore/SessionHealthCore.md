@@ -297,6 +297,7 @@ Nothing in the loader throws: a broken config file degrades to the values below 
 | `CheckupState.swift` | Everything the app runs on that this Mac had to give it — the sources, the slot, the permissions, the records a click on a session runs on, which copy is running — what each of those answers means, the panes of System Settings where the answers are kept, and which row answers each dead end in the panel (`CheckupRoad`) |
 | `StatusLineSlotState.swift` | Whose Claude Code's one status line slot is, and what taking it or giving it back would change |
 | `TerminalRaise.swift` | How far a click on a session's row can get — the tab, the window titled after the project, or the application — the AppleScript that asks for a tab, and which permission each answer costs |
+| `NotificationScript.swift` | The AppleScript a notification goes out over when the notification centre will not take it from the app directly, and the escaping that keeps a quotation mark in somebody's question from ending the script early |
 | `NotificationChoice.swift` | Whether the app may say anything out loud — the one thing about notifications the person decides, and where that answer is kept |
 | `LanguageChoice.swift` | The two languages the interface is written in, and the file that records which one somebody picked — the absence of which means following the Mac |
 | `SupportDirectory.swift` | The directory this app keeps its own files in |

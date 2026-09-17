@@ -622,7 +622,7 @@ private struct WelcomeView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     // Nothing published stands behind a number somebody chose for themselves.
                     if !isChosen, let source = mark.source {
-                        Link("source", destination: source)
+                        Link(interface.say(Briefing.sourceLink), destination: source)
                             .font(WindowType.detail)
                     }
                 }

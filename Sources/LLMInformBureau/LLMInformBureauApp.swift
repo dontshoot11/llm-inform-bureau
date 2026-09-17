@@ -45,6 +45,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Welcome.showIfDue()
     }
 
+    /// What the quit item calls an app whose bundle does not name itself — which is the
+    /// executable run straight from `swift run`, and the one case where there is no name to
+    /// use. A name and not a sentence, so it reads the same in both languages.
+    private static let unnamedApp = "App"
+
     /// Makes sure ⌘Q exists.
     ///
     /// The panel has no Quit button — it was the widest thing in a panel that is otherwise all
@@ -55,15 +60,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func ensureQuitShortcut() {
         guard NSApp.mainMenu == nil else { return }
 
+        // The one word AppKit draws rather than SwiftUI, so it is said once, here, in the
+        // language the app is running in — a menu built at launch is never redrawn, and the
+        // language cannot change before there is a menu.
+        let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String
+        let quit = NSMenuItem(
+            title: InterfaceLanguage.shared.say(Wording.quit(name ?? Self.unnamedApp)),
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        )
         let application = NSMenuItem()
         application.submenu = NSMenu()
-        application.submenu?.addItem(
-            NSMenuItem(
-                title: "Quit \(Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "App")",
-                action: #selector(NSApplication.terminate(_:)),
-                keyEquivalent: "q"
-            )
-        )
+        application.submenu?.addItem(quit)
         let main = NSMenu()
         main.addItem(application)
         NSApp.mainMenu = main

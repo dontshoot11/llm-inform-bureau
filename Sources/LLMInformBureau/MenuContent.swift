@@ -24,7 +24,7 @@ struct MenuContent: View {
             // two subjects and nothing else says which is which. They are also built by the
             // same two helpers below, so neither half can drift into looking more important
             // than the other.
-            caption("Subscription limits")
+            caption(Wording.limitsSection)
             ForEach(AgentService.allCases, id: \.self) { service in
                 if showsLimitsInFull {
                     limitsEntry(service)
@@ -35,7 +35,7 @@ struct MenuContent: View {
             limitsDisclosure
 
             Divider()
-            caption("Active sessions — context")
+            caption(Wording.contextSection)
             ForEach(model.sessions) { session in
                 sessionEntry(session)
             }
@@ -44,7 +44,7 @@ struct MenuContent: View {
                 silentEntry(service)
             }
             if model.sessions.isEmpty, silentServices.isEmpty {
-                explanation("No active sessions.")
+                explanation(Wording.noActiveSessions)
             }
             if let permission = model.missingPermission {
                 permissionOffer(permission)
@@ -91,15 +91,15 @@ struct MenuContent: View {
     private var settings: some View {
         HStack(spacing: 8) {
             if confirmingTerminate {
-                Text("Terminate?")
+                Text(interface.say(Wording.terminateQuestion))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Button("Yes") { NSApplication.shared.terminate(nil) }
+                Button(interface.say(Wording.yes)) { NSApplication.shared.terminate(nil) }
                     .buttonStyle(.borderless)
                     .keyboardShortcut(.defaultAction)
                 // Both answers are on screen: a question with one button offers no way to say
                 // no except to guess that clicking elsewhere means no.
-                Button("No") { confirmingTerminate = false }
+                Button(interface.say(Wording.no)) { confirmingTerminate = false }
                     .buttonStyle(.borderless)
                     .keyboardShortcut(.cancelAction)
             }
@@ -118,7 +118,7 @@ struct MenuContent: View {
                     Image(systemName: "gearshape").modifier(Hoverable())
                 }
                 .buttonStyle(.borderless)
-                .help("Settings: where the numbers come from, what is connected, and whether to open at login")
+                .help(interface.say(Wording.settingsHelp))
 
                 Button {
                     confirmingTerminate.toggle()
@@ -126,7 +126,7 @@ struct MenuContent: View {
                     Image(systemName: "power").modifier(Hoverable())
                 }
                 .buttonStyle(.borderless)
-                .help("Terminate the widget")
+                .help(interface.say(Wording.terminateHelp))
             }
             .padding(.trailing, -4)
         }
@@ -174,11 +174,11 @@ struct MenuContent: View {
     /// controls wear under the pointer (`Hoverable`): a sentence that leads somewhere has to
     /// say so, and a sentence set apart from the ones beside it would read as a different kind
     /// of news rather than as the same news with a way out.
-    private func wayOut(_ text: String, to road: CheckupRoad) -> some View {
+    private func wayOut(_ text: Phrase, to road: CheckupRoad) -> some View {
         Button {
             openTheWindow(showing: road.point(slot: model.slot))
         } label: {
-            Text(text)
+            Text(interface.say(text))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -227,12 +227,8 @@ struct MenuContent: View {
                 HStack(spacing: 4) {
                     Image(systemName: showsLimitsInFull ? "chevron.down" : "chevron.right")
                         .font(.caption2.weight(.semibold))
-                    Text(
-                        showsLimitsInFull
-                            ? "Show less"
-                            : "Show both windows and when they reset"
-                    )
-                    .font(.caption)
+                    Text(interface.say(showsLimitsInFull ? Wording.showLess : Wording.showBothWindows))
+                        .font(.caption)
                 }
                 .foregroundStyle(.secondary)
                 .modifier(Hoverable())
@@ -279,10 +275,10 @@ struct MenuContent: View {
             } else if let summary = summary(of: service) {
                 // The window is named because two of them are being chosen between: a bare
                 // percentage in a folded row is a number whose question is missing.
-                Text(summary.window)
+                Text(interface.say(summary.window))
                     .font(.caption)
                     .foregroundStyle(.tertiary)
-                Text(summary.value)
+                Text(interface.say(summary.value))
                     .font(.callout.monospacedDigit())
                     .foregroundStyle(.secondary)
             } else if model.usage?.isInstalled(service) == true {
@@ -327,13 +323,10 @@ struct MenuContent: View {
     /// beside it. A window with nothing left is what the cross stands for, and a weekly window
     /// that has crossed a mark the five-hour one has not is the reason the dot is that
     /// colour — so each of those is the window shown.
-    private func summary(of service: AgentService) -> (window: String, value: String)? {
+    private func summary(of service: AgentService) -> (window: Phrase, value: Phrase)? {
         guard let assessment = model.limits[service] else { return nil }
         if let spent = assessment.spentWindow {
-            return (
-                interface.say(Wording.limitWindowShort(spent.kind)),
-                interface.say(Wording.spentLabel)
-            )
+            return (Wording.limitWindowShort(spent.kind), Wording.spentLabel)
         }
         guard let snapshot = model.usage?.limits(of: service).value else { return nil }
 
@@ -342,10 +335,7 @@ struct MenuContent: View {
             kind = .weekly
         }
         guard let window = snapshot.window(kind) ?? snapshot.windows.first else { return nil }
-        return (
-            interface.say(Wording.limitWindowShort(window.kind)),
-            "\(TokenDisplay.percent(window.usedPercent)) used"
-        )
+        return (Wording.limitWindowShort(window.kind), Wording.used(window.usedPercent))
     }
 
     // MARK: The two halves
@@ -355,21 +345,20 @@ struct MenuContent: View {
     /// vanished would leave no way to learn the widget covers it.
     @ViewBuilder
     private func limitsEntry(_ service: AgentService) -> some View {
-        let reading = model.usage?.limits(of: service) ?? .noData("Reading…")
+        let reading = model.usage?.limits(of: service) ?? .noData(Wording.firstPass)
 
         entry(
             light: model.lights(of: service).limits,
             name: Wording.service(service),
             badge: reading.value?.planType,
-            help: "This service's subscription limits — the first of its two dots in the menu bar. "
-                + interface.say(Briefing.scaleHelp(model.thresholds)),
+            help: Phrase.joined([Wording.limitsEntryHelp, Briefing.scaleHelp(model.thresholds)]),
             // Only while there is no number in it, and not before the first pass: an entry
             // showing what it was built to show has nothing to explain, and a road named from
             // a slot nobody has read yet would point at the wrong line of the window.
             road: model.usage != nil && reading.value == nil ? .limits(service) : nil
         ) {
             if model.usage?.isInstalled(service) == false {
-                explanation(interface.say(Wording.notInstalled))
+                explanation(Wording.notInstalled)
             } else if service == .claude, let change = model.pendingChange {
                 // Everything else about this reading steps aside while a change to somebody's
                 // settings.json is on the table: it is the one thing in this panel that does
@@ -379,13 +368,13 @@ struct MenuContent: View {
             } else if let snapshot = reading.value {
                 ForEach(snapshot.windows, id: \.kind) { window in
                     row(
-                        interface.say(Wording.limitWindow(window.kind, minutes: window.windowMinutes)),
-                        value: "\(TokenDisplay.percent(window.usedPercent)) used",
-                        note: window.resetsAt.map { "resets \(interface.say(TimeDisplay.until($0)))" }
-                            ?? "reset time not reported"
+                        Wording.limitWindow(window.kind, minutes: window.windowMinutes),
+                        value: Wording.used(window.usedPercent),
+                        note: window.resetsAt.map { Wording.resets(at: $0) }
+                            ?? Wording.resetTimeNotReported
                     )
                 }
-                explanation("Reported \(interface.say(TimeDisplay.age(of: snapshot.observedAt)))")
+                explanation(Wording.reported(at: snapshot.observedAt))
                 hint(Wording.limitsCommand(service))
                 if service == .claude { slotOffer }
             } else if service == .claude, model.usage != nil {
@@ -397,8 +386,8 @@ struct MenuContent: View {
                 // looked at the slot yet, and a button offering to connect something that is
                 // already connected would flash up on every launch.
                 slotOffer
-            } else {
-                explanation(reading.explanation ?? "")
+            } else if let why = reading.explanation {
+                explanation(why)
             }
         }
     }
@@ -424,18 +413,20 @@ struct MenuContent: View {
             Button(interface.say(SlotPhrasing.takeOver)) { model.propose(.connect) }
                 .help(interface.say(SlotPhrasing.takeOverHelp))
         case .unreadable(let path):
-            explanation(interface.say(SlotPhrasing.unreadable(path)))
+            explanation(SlotPhrasing.unreadable(path))
         case .ours:
             // Nothing reported yet. `ClaudeStatusStore` has the sentence for that, and it is
             // already above.
             EmptyView()
         }
+        // Before the first pass there is no reading and so no sentence about one; a line
+        // saying nothing is what stood here, and nothing is what stands here now.
         if model.slot.isOurs || model.slot.needsTakingOver,
-           model.usage?.limits(of: .claude).value == nil {
-            explanation(model.usage?.limits(of: .claude).explanation ?? "")
+           let why = model.usage?.limits(of: .claude).explanation {
+            explanation(why)
         }
         if let problem = model.slotProblem {
-            explanation(interface.say(problem))
+            explanation(problem)
         }
     }
 
@@ -448,7 +439,7 @@ struct MenuContent: View {
         let preview = SlotPhrasing.preview(change)
 
         return VStack(alignment: .leading, spacing: 6) {
-            explanation(interface.say(preview.title))
+            explanation(preview.title)
             Text(preview.path)
                 .font(.caption.monospaced())
                 .fixedSize(horizontal: false, vertical: true)
@@ -459,7 +450,7 @@ struct MenuContent: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             ForEach(preview.notes, id: \.self) { note in
-                explanation(interface.say(note))
+                explanation(note)
             }
             HStack {
                 Button(interface.say(SlotPhrasing.apply)) { model.applyChange() }
@@ -512,10 +503,9 @@ struct MenuContent: View {
             name: Wording.service(snapshot.service),
             tag: snapshot.model,
             badge: snapshot.project,
-            help: "The context this session holds — the second of its service's two dots in the menu bar. "
-                + interface.say(Briefing.scaleHelp(model.thresholds))
+            help: Phrase.joined([Wording.sessionContextHelp, Briefing.scaleHelp(model.thresholds)])
         ) {
-            row("Context window", value: fill(of: snapshot), note: detail(of: snapshot))
+            row(Wording.contextWindowRow, value: fill(of: snapshot), note: detail(of: snapshot))
             ForEach(session.subagents) { subagent in
                 subagentRow(subagent)
             }
@@ -540,17 +530,13 @@ struct MenuContent: View {
             )
                 .opacity(blinkedOut(model.pulse(ofSession: snapshot.sessionID)) ? 0 : 1)
                 .alignmentGuide(.firstTextBaseline) { $0.height * 0.5 + 2.5 }
-                .help(
-                    "A subagent started by this session. It runs on the session's context window "
-                        + "unless it was given a model of its own, and its mark never notifies: it "
-                        + "ends by itself, usually within minutes."
-                )
+                .help(interface.say(Wording.subagentHelp))
             VStack(alignment: .leading, spacing: 1) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(interface.say(Wording.subagentName(snapshot.subagent?.type)))
                         .font(.caption)
                     Spacer()
-                    Text(fill(of: snapshot))
+                    Text(interface.say(fill(of: snapshot)))
                         .font(.caption.monospacedDigit())
                 }
                 explanation(subagentDetail(of: snapshot))
@@ -561,11 +547,12 @@ struct MenuContent: View {
 
     /// What the agent was asked to do, and what it holds. The task first: it is what tells two
     /// agents of the same kind apart.
-    private func subagentDetail(of snapshot: SessionSnapshot) -> String {
-        var parts: [String] = []
-        if let task = Wording.subagentTask(snapshot.subagent?.task) { parts.append(task) }
-        parts.append("\(TokenDisplay.short(snapshot.contextTokens)) tokens held")
-        return parts.joined(separator: " · ")
+    private func subagentDetail(of snapshot: SessionSnapshot) -> Phrase {
+        var parts: [Phrase] = []
+        // The task is the agent's own words, so it goes through as it is on both sides.
+        if let task = Wording.subagentTask(snapshot.subagent?.task) { parts.append(.name(task)) }
+        parts.append(Wording.tokensHeld(snapshot.contextTokens))
+        return Phrase.joined(parts, separator: " · ")
     }
 
     /// The services owed a line in the context half although they have no session to show —
@@ -599,10 +586,9 @@ struct MenuContent: View {
             light: model.lights(of: service).context,
             name: Wording.service(service),
             badge: nil,
-            help: "The context this service's sessions hold — the second of its two dots in the "
-                + "menu bar. " + interface.say(Briefing.scaleHelp(model.thresholds))
+            help: Phrase.joined([Wording.serviceContextHelp, Briefing.scaleHelp(model.thresholds)])
         ) {
-            explanation(model.usage?.sessions(of: service).explanation ?? "No active sessions.")
+            explanation(model.usage?.sessions(of: service).explanation ?? Wording.noActiveSessions)
         }
     }
 
@@ -626,11 +612,11 @@ struct MenuContent: View {
 
     /// How much of the window is gone, or a sentence when nothing knows the window. Never a
     /// percentage of something unknown.
-    private func fill(of snapshot: SessionSnapshot) -> String {
+    private func fill(of snapshot: SessionSnapshot) -> Phrase {
         guard let fill = snapshot.windowFillPercent, let window = snapshot.contextWindowTokens else {
-            return "size unknown"
+            return Wording.windowSizeUnknown
         }
-        return "\(TokenDisplay.percent(fill)) of \(TokenDisplay.short(window))"
+        return Wording.windowFill(percent: fill, of: window)
     }
 
     /// What is held, and what the last request added to it.
@@ -638,12 +624,12 @@ struct MenuContent: View {
     /// "Request" rather than the domain's own word: a turn is what the rules measure between
     /// two user prompts, and a person reading the panel calls that the last thing they asked
     /// for.
-    private func detail(of snapshot: SessionSnapshot) -> String {
-        var parts = ["\(TokenDisplay.short(snapshot.contextTokens)) tokens held"]
+    private func detail(of snapshot: SessionSnapshot) -> Phrase {
+        var parts = [Wording.tokensHeld(snapshot.contextTokens)]
         if let growth = snapshot.turnGrowthTokens {
-            parts.append("\(TokenDisplay.growth(growth)) last request")
+            parts.append(Wording.lastRequest(growth))
         }
-        return parts.joined(separator: " · ")
+        return Phrase.joined(parts, separator: " · ")
     }
 
     // MARK: The shape both halves share
@@ -661,7 +647,7 @@ struct MenuContent: View {
         name: String,
         tag: String? = nil,
         badge: String?,
-        help: String,
+        help: Phrase,
         road: CheckupRoad? = nil,
         @ViewBuilder rows: () -> some View
     ) -> some View {
@@ -710,14 +696,14 @@ struct MenuContent: View {
         name: String,
         tag: String?,
         badge: String?,
-        help: String
+        help: Phrase
     ) -> some View {
         HStack(spacing: 6) {
             StatusLight(light: light, sign: sign)
                 // Hidden rather than removed: the row must not shift sideways while it
                 // blinks, or the blink reads as the layout moving instead of the light.
                 .opacity(blinkedOut ? 0 : 1)
-                .help(help)
+                .help(interface.say(help))
             Text(name)
                 .font(.headline)
             if let tag {
@@ -743,13 +729,13 @@ struct MenuContent: View {
     }
 
     /// One row of either half: what is being spent, how much of it, and the detail beneath.
-    private func row(_ title: String, value: String, note: String) -> some View {
+    private func row(_ title: Phrase, value: Phrase, note: Phrase) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             HStack {
-                Text(title)
+                Text(interface.say(title))
                     .font(.callout)
                 Spacer()
-                Text(value)
+                Text(interface.say(value))
                     .font(.callout.monospacedDigit())
             }
             explanation(note)
@@ -784,7 +770,7 @@ struct MenuContent: View {
             // sentence leads to the line of the window that says what the permission buys and —
             // for a copy signed ad-hoc — why a tick already in that pane grants nothing.
             wayOut(
-                interface.say(Wording.permissionOffer(permission, signedAdHoc: OwnSignature.isAdHoc)),
+                Wording.permissionOffer(permission, signedAdHoc: OwnSignature.isAdHoc),
                 to: .permission(permission)
             )
             Button(interface.say(Wording.permissionSettings(permission))) { model.openSettings(for: permission) }
@@ -793,15 +779,15 @@ struct MenuContent: View {
     }
 
     /// A section's name: quiet, above the section, in the words the bar's dots go by.
-    private func caption(_ text: String) -> some View {
-        Text(text.uppercased())
+    private func caption(_ text: Phrase) -> some View {
+        Text(interface.say(text).uppercased())
             .font(.caption2.weight(.semibold))
             .foregroundStyle(.secondary)
             .tracking(0.5)
     }
 
-    private func explanation(_ text: String) -> some View {
-        Text(text)
+    private func explanation(_ text: Phrase) -> some View {
+        Text(interface.say(text))
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)

@@ -15,34 +15,77 @@ import Phrasing
 /// easily: a `Phrase` whose second argument is the English sentence copied across. A phrase
 /// with nothing Russian anywhere in it is that, and it fails here.
 func runTranslationTests(_ suite: TestSuite) {
-    let phrasing = URL(fileURLWithPath: #filePath)
+    let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()   // Tests/SessionHealthTests
         .deletingLastPathComponent()   // Tests
         .deletingLastPathComponent()   // the package root
-        .appendingPathComponent("Sources/Phrasing", isDirectory: true)
 
-    let files = ((try? FileManager.default.contentsOfDirectory(atPath: phrasing.path)) ?? [])
-        .filter { $0.hasSuffix(".swift") }
-        .sorted()
+    let phrasing = read("Sources/Phrasing", under: root)
+    let views = read("Sources/LLMInformBureau", under: root)
+    let files = read("Sources/AgentFiles", under: root)
+    let everywhere = [phrasing, views, files]
 
-    var literals: [FoundLiteral] = []
-    var phrases: [PhraseCall] = []
-    var unreadable: [String] = []
-    for file in files {
-        guard let text = try? String(contentsOf: phrasing.appendingPathComponent(file), encoding: .utf8) else {
-            unreadable.append(file)
-            continue
+    suite.test("the sources are where this test thinks they are, and all of them were read") {
+        for target in everywhere {
+            suite.expect(
+                target.files > 5,
+                "found \(target.files) Swift files under \(target.path)"
+            )
+            suite.expect(target.unreadable.isEmpty, "could not read \(target.unreadable)")
         }
-        let read = readSwift(text, in: file)
-        literals += read.literals
-        phrases += read.phrases
+        suite.expect(
+            phrasing.literals.count > 100,
+            "only \(phrasing.literals.count) strings found — the reader is not reading"
+        )
+        suite.expect(
+            phrasing.phrases.count > 50,
+            "only \(phrasing.phrases.count) phrases found — the reader is not reading"
+        )
+        suite.expect(
+            views.literals.count > 20,
+            "only \(views.literals.count) strings found in the views — the reader is not reading"
+        )
     }
 
-    suite.test("the phrasing is where this test thinks it is, and all of it was read") {
-        suite.expect(files.count > 5, "found \(files.count) Swift files under \(phrasing.path)")
-        suite.expect(unreadable.isEmpty, "could not read \(unreadable)")
-        suite.expect(literals.count > 100, "only \(literals.count) strings found — the reader is not reading")
-        suite.expect(phrases.count > 50, "only \(phrases.count) phrases found — the reader is not reading")
+    let literals = phrasing.literals
+    let phrases = everywhere.flatMap(\.phrases)
+
+    // The rule for the target the views draw from. A view has other strings to hold — an SF
+    // Symbol, an AppleScript, a coordinate space — so the question here is not whether a
+    // string is a sentence but whether it is going on screen: a literal handed to one of the
+    // calls that draw words is a word that will arrive in whatever language it was typed in,
+    // whatever the reader picked.
+    //
+    // Empty ones are allowed, and are not an oversight: `Picker("")`, `TextField("")` and
+    // `Stepper("")` are how SwiftUI is told a control carries no label of its own.
+    // The rule that catches what the one above cannot: a word put together in a view, kept in
+    // a variable and drawn a screenful later. A space with a letter beside it is a word, and
+    // words live in `Phrasing` — the app target has none of its own, so the whole of it is the
+    // rule, with no list of allowed sentences to keep up to date.
+    //
+    // What is left is a token: an SF Symbol, a path, a key equivalent, a coordinate space, the
+    // word an AppleScript answers with. Punctuation between two phrases has no letters in it
+    // and is not a word either.
+    suite.test("no word is written in a view") {
+        for literal in views.literals {
+            let hasWord = literal.text.contains(" ") && literal.text.contains(where: \.isLetter)
+            suite.expect(
+                !hasWord,
+                "\(literal.file):\(literal.line) — a word written in a view: \"\(literal.text)\""
+            )
+        }
+    }
+
+    suite.test("nothing in a view is drawn from a string written in the view") {
+        for literal in views.literals {
+            let drawn = (screenCalls.contains(literal.enclosing) && literal.label.isEmpty)
+                || screenLabels.contains(literal.label)
+            guard drawn else { continue }
+            suite.expect(
+                literal.text.isEmpty,
+                "\(literal.file):\(literal.line) — \(literal.enclosing) draws a string written here: \"\(literal.text)\""
+            )
+        }
     }
 
     // The rule the compiler cannot state. A sentence in this target is something the app says,
@@ -108,7 +151,14 @@ func runTranslationTests(_ suite: TestSuite) {
     // off one composed sentence, so a phrase nothing in the suite happens to build is covered
     // too.
     suite.test("no side of anything the app says grades the session") {
-        for literal in literals {
+        // Every string of the phrasing target, because every string there is something the
+        // app says — and, in the two targets that merely speak, the sides of a phrase alone:
+        // a file name or an SF Symbol is not a sentence, and `SessionHealthCore` is a word
+        // that appears in both.
+        let said = literals + [views, files].flatMap { target in
+            target.literals.filter { $0.enclosing == "Phrase" || $0.enclosing == "Phrase.name" }
+        }
+        for literal in said {
             let claims = QualityClaims.found(in: literal.text)
             suite.expect(
                 claims.isEmpty,
@@ -118,14 +168,67 @@ func runTranslationTests(_ suite: TestSuite) {
     }
 }
 
-/// One string literal as it stands in the source: what it says, where it is, and the call it is
-/// an argument of.
+/// The calls whose unlabelled argument is the words themselves — SwiftUI's own.
+///
+/// Not the app's own helpers — a caption, an explanation, a row of an entry — because those
+/// take a `Phrase` and the compiler has already asked this question of them.
+private let screenCalls: Set<String> = [
+    "Text", "Button", "Link", "Toggle", "Picker", "TextField", "Stepper", "Label",
+    "help", "accessibilityLabel", "accessibilityValue", "accessibilityHint"
+]
+
+/// The argument labels that carry words wherever they turn up. What AppKit draws goes through
+/// one of these — a menu item's title, an alert's message — and beside them stand arguments
+/// that are not words at all, such as the key a menu item answers to.
+private let screenLabels: Set<String> = ["title", "message", "label", "placeholder"]
+
+/// One target of the package, as this test reads it.
+private struct SourcesRead {
+    let path: String
+    let files: Int
+    let literals: [FoundLiteral]
+    let phrases: [PhraseCall]
+    let unreadable: [String]
+}
+
+/// Reads every Swift file of one target.
+private func read(_ target: String, under root: URL) -> SourcesRead {
+    let directory = root.appendingPathComponent(target, isDirectory: true)
+    let names = ((try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? [])
+        .filter { $0.hasSuffix(".swift") }
+        .sorted()
+
+    var literals: [FoundLiteral] = []
+    var phrases: [PhraseCall] = []
+    var unreadable: [String] = []
+    for name in names {
+        guard let text = try? String(contentsOf: directory.appendingPathComponent(name), encoding: .utf8) else {
+            unreadable.append(name)
+            continue
+        }
+        let read = readSwift(text, in: name)
+        literals += read.literals
+        phrases += read.phrases
+    }
+    return SourcesRead(
+        path: directory.path,
+        files: names.count,
+        literals: literals,
+        phrases: phrases,
+        unreadable: unreadable
+    )
+}
+
+/// One string literal as it stands in the source: what it says, where it is, the call it is an
+/// argument of, and which argument of it.
 private struct FoundLiteral {
     let file: String
     let line: Int
     let text: String
     /// The name in front of the innermost open bracket around it, or empty at the top level.
     let enclosing: String
+    /// The label of the argument it is, or empty for an argument that has none.
+    let label: String
 }
 
 /// One `Phrase(...)` construction, as the arguments written between its brackets.
@@ -188,8 +291,9 @@ private func readSwift(_ source: String, in file: String) -> (literals: [FoundLi
     let characters = Array(source)
     var literals: [FoundLiteral] = []
     var phrases: [PhraseCall] = []
-    /// The calls currently open, innermost last: what each bracket was called and where it began.
-    var open: [(name: String, from: Int, line: Int)] = []
+    /// The calls currently open, innermost last: what each bracket was called, where it began,
+    /// and the label of the argument being written in it right now.
+    var open: [(name: String, from: Int, line: Int, label: String)] = []
     /// The identifier being spelled right now, which is the call's name if a bracket follows it.
     var word = ""
     var index = 0
@@ -266,14 +370,38 @@ private func readSwift(_ source: String, in file: String) -> (literals: [FoundLi
             }
             index += 1
             literals.append(
-                FoundLiteral(file: file, line: startedAt, text: text, enclosing: open.last?.name ?? "")
+                FoundLiteral(
+                    file: file,
+                    line: startedAt,
+                    text: text,
+                    enclosing: open.last?.name ?? "",
+                    label: open.last?.label ?? ""
+                )
             )
             word = ""
             continue
         }
 
         if character == "(" {
-            open.append((name: word, from: index, line: line))
+            open.append((name: word, from: index, line: line, label: ""))
+            word = ""
+            index += 1
+            continue
+        }
+
+        // `label:` in front of an argument. The fifth thing this reader knows, and the one that
+        // tells a menu item's title from the key it answers to. A colon outside a call — a
+        // ternary, a `case`, a type annotation — sets a label nothing ever asks about.
+        if character == ":", !open.isEmpty, !word.isEmpty {
+            open[open.count - 1].label = word
+            word = ""
+            index += 1
+            continue
+        }
+
+        // The next argument, and a label that belongs to the last one.
+        if character == ",", !open.isEmpty {
+            open[open.count - 1].label = ""
             word = ""
             index += 1
             continue

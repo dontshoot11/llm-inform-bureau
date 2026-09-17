@@ -1,4 +1,5 @@
 import Foundation
+import Phrasing
 import SessionHealthCore
 
 /// Claude Code's one status line slot, as something the app can take and give back.
@@ -231,7 +232,7 @@ public struct StatusLineSlot: Sendable {
             // it was. Taking it while the command it displaced could not be saved is the one
             // failure here that would cost somebody something.
             throw ClaudeSettings.Failure.notWritten(
-                "\(previousCommandFile.path): \(error.localizedDescription)"
+                Phrase.name("\(previousCommandFile.path): \(error.localizedDescription)")
             )
         }
     }

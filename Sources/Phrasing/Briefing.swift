@@ -250,6 +250,11 @@ public enum Briefing {
     /// that undoes nothing is a control a reader learns to skip over.
     public static let resetMark = Phrase("Reset to default", "Вернуть как было")
 
+    /// The link beside a mark that came from somewhere published: it goes to the paper the
+    /// number was read off. One word, because the line it stands at the end of has already
+    /// said who the source is and when.
+    public static let sourceLink = Phrase("source", "источник")
+
     /// How the bar is worked, said once under it. Dragging is discoverable; the arrow keys are
     /// not, and they are the only way to land on an exact number.
     public static let markEditHint = Phrase(

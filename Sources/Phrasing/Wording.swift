@@ -43,6 +43,142 @@ public enum Wording {
     /// beside it is already saying most of it.
     public static let spentLabel = Phrase("spent", "исчерпано")
 
+    // MARK: The panel, as it is laid out
+
+    /// The name over the first half of the panel. Capitals are the panel's own — it sets both
+    /// of these in small caps, and the word itself is written the way a sentence would have it.
+    public static let limitsSection = Phrase("Subscription limits", "Лимиты подписки")
+
+    /// The name over the second half. The dash is doing the work of "and what they hold": the
+    /// caption has the width of the panel and no more.
+    public static let contextSection = Phrase("Active sessions — context", "Активные сессии — контекст")
+
+    /// Said where the second half would be, with nothing running anywhere.
+    public static let noActiveSessions = Phrase("No active sessions.", "Активных сессий нет.")
+
+    /// Said in place of a reading before the first pass has come back. It is not an absence —
+    /// nothing has been asked yet — so it says what is happening rather than what is missing.
+    public static let firstPass = Phrase("Reading…", "Читаем…")
+
+    /// How much of a window is gone, as a row of either half says it.
+    public static func used(_ percent: Double) -> Phrase {
+        let share = TokenDisplay.percent(percent)
+        return Phrase("\(share) used", "\(share) израсходовано")
+    }
+
+    /// When a window comes back, under the number saying how much of it is gone.
+    public static func resets(at date: Date, now: Date = Date()) -> Phrase {
+        let when = TimeDisplay.until(date, now: now)
+        return Phrase("resets \(when.english)", "сбросится \(when.russian)")
+    }
+
+    /// Said instead, for a window whose reset time nobody reported. The reading is still a
+    /// reading; what is missing is the half of it that says when it stops mattering.
+    public static let resetTimeNotReported = Phrase(
+        "reset time not reported",
+        "время сброса не сообщено"
+    )
+
+    /// How old a limits reading is, under the windows it describes.
+    public static func reported(at observedAt: Date, now: Date = Date()) -> Phrase {
+        let age = TimeDisplay.age(of: observedAt, now: now)
+        return Phrase("Reported \(age.english)", "Сообщено \(age.russian)")
+    }
+
+    /// The one row a session entry has: what is being spent.
+    public static let contextWindowRow = Phrase("Context window", "Окно контекста")
+
+    /// How full a context window is, when the size of it was reported.
+    public static func windowFill(percent: Double, of windowTokens: Int) -> Phrase {
+        let share = TokenDisplay.percent(percent)
+        let size = TokenDisplay.short(windowTokens)
+        return Phrase("\(share) of \(size)", "\(share) из \(size)")
+    }
+
+    /// Said in place of that share when nobody reported the size of the window. Never a
+    /// percentage of something unknown.
+    public static let windowSizeUnknown = Phrase("size unknown", "размер неизвестен")
+
+    /// What a session is holding, in the line under its reading.
+    public static func tokensHeld(_ tokens: Int) -> Phrase {
+        let held = TokenDisplay.short(tokens)
+        return Phrase("\(held) tokens held", "в контексте \(held) токенов")
+    }
+
+    /// What the last request added to it.
+    ///
+    /// "Request" rather than the domain's own word: a turn is what the rules measure between
+    /// two user prompts, and a person reading the panel calls that the last thing they asked
+    /// for.
+    public static func lastRequest(_ growth: Int) -> Phrase {
+        let added = TokenDisplay.growth(growth)
+        return Phrase("\(added) last request", "\(added) за последний запрос")
+    }
+
+    // MARK: What is under the pointer
+
+    /// Said over the light of a limits entry, in front of the scale the light is read on.
+    public static let limitsEntryHelp = Phrase(
+        "This service's subscription limits — the first of its two dots in the menu bar.",
+        "Лимиты подписки этого сервиса — первая из двух его точек в строке меню."
+    )
+
+    /// The same, over one session's light.
+    public static let sessionContextHelp = Phrase(
+        "The context this session holds — the second of its service's two dots in the menu bar.",
+        "Контекст, который держит эта сессия, — вторая из двух точек её сервиса в строке меню."
+    )
+
+    /// And over the light of a service whose sessions could not be read at all.
+    public static let serviceContextHelp = Phrase(
+        "The context this service's sessions hold — the second of its two dots in the menu bar.",
+        "Контекст, который держат сессии этого сервиса, — вторая из двух его точек в строке меню."
+    )
+
+    /// Said over the smaller light of a subagent's row: what it is, whose window it runs on,
+    /// and why its own mark never announces itself.
+    public static let subagentHelp = Phrase(
+        "A subagent started by this session. It runs on the session's context window unless it "
+            + "was given a model of its own, and its mark never notifies: it ends by itself, "
+            + "usually within minutes.",
+        "Подагент, запущенный этой сессией. Он идёт на окне контекста сессии, если ему не "
+            + "выдали собственную модель, и его отметка не уведомляет: он заканчивается сам, "
+            + "обычно за минуты."
+    )
+
+    /// What the gear opens, said where the pointer is on it.
+    public static let settingsHelp = Phrase(
+        "Settings: where the numbers come from, what is connected, and whether to open at login",
+        "Настройки: откуда берутся числа, что подключено и запускаться ли при входе"
+    )
+
+    // MARK: Folding the limits away, and the way out of the app
+
+    /// The control under the limits, in the words of what it does next.
+    public static let showLess = Phrase("Show less", "Свернуть")
+
+    public static let showBothWindows = Phrase(
+        "Show both windows and when they reset",
+        "Показать оба окна и когда они сбрасываются"
+    )
+
+    /// The question the power icon asks, and the two answers to it. Quitting is two taps
+    /// rather than one because the panel is opened to read something, and the icon sits where
+    /// a thumb lands.
+    public static let terminateHelp = Phrase("Terminate the widget", "Завершить виджет")
+
+    public static let terminateQuestion = Phrase("Terminate?", "Завершить?")
+
+    public static let yes = Phrase("Yes", "Да")
+
+    public static let no = Phrase("No", "Нет")
+
+    /// The one item of the menu the app builds for itself, so that ⌘Q exists. The name of the
+    /// app is its own and goes through untranslated.
+    public static func quit(_ application: String) -> Phrase {
+        Phrase("Quit \(application)", "Завершить \(application)")
+    }
+
     /// The shortest name a limit window has, for a row that has room for a number and little
     /// else. The opened-out rows say "5-hour window" and "Weekly window"; folded away, next to
     /// its own percentage, the only question left is which of the two windows this is.
@@ -88,7 +224,7 @@ public enum Wording {
             let when = TimeDisplay.until(resetsAt, now: now)
             comesBack = Phrase("back \(when.english)", "вернётся \(when.russian)")
         } else {
-            comesBack = Phrase("reset time not reported", "время сброса не сообщено")
+            comesBack = resetTimeNotReported
         }
         let name = limitName(window)
         return Phrase(

@@ -1,4 +1,5 @@
 import Foundation
+import Phrasing
 import SessionHealthCore
 
 /// One statusLine payload, as the status line last saw it for a session.
@@ -67,10 +68,7 @@ public struct ClaudeStatusReading: Sendable {
             if let limits = payload.limits { return .value(limits) }
         }
         if sawUnreadableFile { return .unavailable(ClaudeStatusStore.unreadablePayload) }
-        return .noData("""
-            Claude reported no limits: the rate_limits field is for Pro and Max subscriptions \
-            and arrives with the first answer of a session.
-            """)
+        return .noData(ClaudeStatusStore.noLimitsReported)
     }
 
     /// The sessions the status line has seen that are still being worked on.
@@ -128,18 +126,44 @@ public struct ClaudeStatusStore: Sendable {
     /// connected at all is `StatusLineSlot`'s answer and the panel's to act on — it puts a
     /// button here instead of this sentence. What is left for this to say is the other case,
     /// where the slot is the app's and the reporting has simply not started.
-    static let nothingReported = """
+    static let nothingReported = Phrase(
+        """
         No Claude data yet — its limits and the size of its context window come from its \
         status line, which reports with the first answer of a session. The limits themselves \
         are Pro and Max only.
+        """,
         """
+        Данных Claude пока нет: его лимиты и размер окна контекста приходят из его строки \
+        состояния, а она сообщает их с первым ответом сессии. Сами лимиты есть только у \
+        подписок Pro и Max.
+        """
+    )
+
+    /// Said when the payloads are there and carry no limits — the field they would be in
+    /// belongs to the paid subscriptions and arrives with the first answer.
+    static let noLimitsReported = Phrase(
+        """
+        Claude reported no limits: the rate_limits field is for Pro and Max subscriptions \
+        and arrives with the first answer of a session.
+        """,
+        """
+        Claude не сообщил лимиты: поле rate_limits есть у подписок Pro и Max и приходит \
+        с первым ответом сессии.
+        """
+    )
 
     /// The status line is this app itself, so an unreadable payload is this app failing to read
     /// back what it wrote — the shape Claude Code puts on stdin is the part that can change.
-    static let unreadablePayload = """
+    static let unreadablePayload = Phrase(
+        """
         The status line wrote something this app cannot read — the payload format may have \
         changed.
+        """,
         """
+        Строка состояния записала то, что приложение не может прочитать — формат полезной \
+        нагрузки мог измениться.
+        """
+    )
 
     public let directory: URL
 
