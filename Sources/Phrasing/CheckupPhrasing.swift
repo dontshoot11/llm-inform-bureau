@@ -44,7 +44,7 @@ public struct CheckupRow: Equatable, Sendable {
 /// it is allowed to do.
 public enum CheckupPhrasing {
     /// The name over the list. Not "where the numbers come from" any more — that is three of
-    /// its eight lines, and the rest are about what the app was allowed to do.
+    /// its lines, and the rest are about what the app was allowed to do.
     public static let title = "What it uses on this Mac"
 
     public static let intro = """
@@ -92,6 +92,17 @@ public enum CheckupPhrasing {
                     // permission already given is kept is a control with nothing to do, and
                     // this list is long enough without them.
                     settings: standing == .given ? nil : .accessibility
+                )
+            case .automation:
+                return CheckupRow(
+                    point: point,
+                    title: "Allowed to control Terminal and iTerm2",
+                    standing: standing,
+                    detail: automationDetail,
+                    // Offered whatever has happened, because the answer is not knowable from
+                    // here: somebody who refused the dialog months ago has nothing else that
+                    // would tell them where that answer is kept.
+                    settings: .automation
                 )
             case .notifications:
                 return CheckupRow(
@@ -170,6 +181,22 @@ public enum CheckupPhrasing {
             return "\(why) \(SlotPhrasing.unreadable(path))"
         }
     }
+
+    /// Why the app asks a terminal anything, and why this row has a question mark where every
+    /// other permission has a tick.
+    ///
+    /// The honest shape of the only permission macOS will not answer for: there is no call that
+    /// says whether controlling another app is allowed, and the one way to find out is to send
+    /// an event and see. So the row says when that happens — a click on a session in one of
+    /// those two terminals — rather than showing a tick the app would have had to invent.
+    private static let automationDetail = """
+        A click on a session running in Terminal.app or iTerm2 brings up its tab, and finding \
+        which tab holds it means asking the terminal — which macOS counts as controlling \
+        another app. It will not say in advance whether that is allowed: the system asks the \
+        first time it happens, with your click behind it, and nothing about it is needed until \
+        then. Refused, a click still brings the terminal to the front, and the answer is kept \
+        under Privacy & Security → Automation.
+        """
 
     private static func accessibilityDetail(_ state: CheckupState) -> String {
         let why = """

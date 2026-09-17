@@ -22,7 +22,13 @@ enum Welcome {
     private static var window: NSWindow?
 
     /// Held because a window's delegate is a weak reference and this one has no other owner.
-    private static var closeWatcher: CloseWatcher?
+    private static var watcher: WindowWatcher?
+
+    /// The checkup this window is showing, kept so it can be read again while the window is
+    /// open. Held here rather than by the view for the same reason the window is: a SwiftUI
+    /// view is rebuilt at the system's convenience, and what it shows about this Mac has to
+    /// outlive that.
+    private static var live: LiveCheckup?
 
     /// A pass of the panel, asked for by whoever opened this window — the panel is where the
     /// model lives, and this window is opened from it.
@@ -46,8 +52,15 @@ enum Welcome {
         marksMoved = true
     }
 
+    /// Opens the window, or brings back the one that is already open.
+    ///
+    /// The checkup arrives as a way of reading it rather than as a reading, because this window
+    /// outlives the answer: somebody opens it, finds a permission missing, goes and gives it,
+    /// and comes back to the same window. What they come back to has to be read again
+    /// (`LiveCheckup`), and only the caller knows how — the panel is where the slot and the
+    /// notification channel are known.
     static func show(
-        checkup: CheckupState = CheckupReader.read(),
+        checkup: @escaping @MainActor () -> CheckupState = { CheckupReader.read() },
         marks: ThresholdConfigLoad = ThresholdConfigLoader.load(),
         askForPass: (@MainActor () -> Void)? = nil
     ) {
@@ -57,10 +70,17 @@ enum Welcome {
         if let askForPass { Self.askForPass = askForPass }
 
         if let window {
+            // Read afresh here as well as on the way back to the window: the panel has been
+            // running all the while this window was closed, and the gear is the same gesture
+            // as opening it the first time.
+            live?.readAgain(with: checkup)
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
+
+        let live = LiveCheckup(reading: checkup)
+        Self.live = live
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 460, height: 460),
@@ -69,7 +89,7 @@ enum Welcome {
             defer: false
         )
         window.title = Briefing.windowTitle
-        let content = NSHostingView(rootView: WelcomeView(checkup: checkup, marks: marks, close: close))
+        let content = NSHostingView(rootView: WelcomeView(live: live, marks: marks, close: close))
         window.contentView = content
         // Sized to what it actually holds — the marks come from the config and the list can
         // grow — but never taller than the screen it opens on.
@@ -78,13 +98,20 @@ enum Welcome {
         window.setContentSize(NSSize(width: wanted.width, height: min(wanted.height, room)))
         window.isReleasedWhenClosed = false
         window.center()
-        let watcher = CloseWatcher { finishedWithTheWindow() }
-        window.delegate = watcher
-        Self.closeWatcher = watcher
         Self.window = window
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+
+        // Watched from here on, and not before: coming to the front is what asks for the
+        // checkup to be read again, and the window is coming to the front for the first time
+        // on the line above — with a reading taken a moment ago, by whoever opened it.
+        let watcher = WindowWatcher(
+            cameBack: { live.readAgain() },
+            closed: { finishedWithTheWindow() }
+        )
+        window.delegate = watcher
+        Self.watcher = watcher
     }
 
     /// Takes the focus ring off whatever holds it.
@@ -116,18 +143,59 @@ enum Welcome {
     }
 }
 
-/// Tells `Welcome` when its window closes. A window's delegate is a weak reference and an enum
-/// cannot be one, so this exists to be held.
+/// Tells `Welcome` the two things that happen to its window from outside: it came back to the
+/// front, and it closed. A window's delegate is a weak reference and an enum cannot be one, so
+/// this exists to be held.
 @MainActor
-private final class CloseWatcher: NSObject, NSWindowDelegate {
+private final class WindowWatcher: NSObject, NSWindowDelegate {
+    private let cameBack: () -> Void
     private let closed: () -> Void
 
-    init(closed: @escaping () -> Void) {
+    init(cameBack: @escaping () -> Void, closed: @escaping () -> Void) {
+        self.cameBack = cameBack
         self.closed = closed
+    }
+
+    func windowDidBecomeKey(_ notification: Notification) {
+        cameBack()
     }
 
     func windowWillClose(_ notification: Notification) {
         closed()
+    }
+}
+
+/// The checkup as the open window shows it, read again whenever the window comes back to the
+/// front.
+///
+/// The one thing in this window that belongs to the machine rather than to the person. They
+/// read a row, leave for System Settings, give the permission and come back — and a row still
+/// saying "not given" would be the app arguing with what they had just done. Coming back is
+/// both the moment it is worth looking again and the only moment it is worth anything: nobody
+/// gives a permission to a window they are looking at.
+///
+/// So no timer. Every state here is a directory listing, a small file or a question about this
+/// process — cheap once, and a waste every thirty seconds of a window nobody has touched. The
+/// same conclusion the panel came to about its own reading, for the same reason
+/// (`TODO/archive/refresh-cost`), and measured here too: a re-read costs a fraction of a pass.
+@MainActor
+final class LiveCheckup: ObservableObject {
+    @Published private(set) var state: CheckupState
+
+    /// How to read the machine again. Kept rather than called once, and replaced when the
+    /// window is opened afresh, because the reading belongs to whoever opened this window: the
+    /// slot and the notification channel are the panel's own knowledge, and reading them here
+    /// as well is how two parts of one app come to disagree about the same fact.
+    private var reading: @MainActor () -> CheckupState
+
+    init(reading: @escaping @MainActor () -> CheckupState) {
+        self.reading = reading
+        self.state = reading()
+    }
+
+    func readAgain(with reading: (@MainActor () -> CheckupState)? = nil) {
+        if let reading { self.reading = reading }
+        state = self.reading()
     }
 }
 
@@ -189,8 +257,9 @@ private struct FoldingSection<Content: View>: View {
 /// background they rest on, then the checkup — everything the app runs on that this Mac had to
 /// give it, folded away unless something in it is missing.
 private struct WelcomeView: View {
-    /// Everything this Mac has given the app, and what it has not.
-    let checkup: CheckupState
+    /// Everything this Mac has given the app, and what it has not — watched rather than held,
+    /// because it changes under the open window: the person is out giving a permission.
+    @ObservedObject var live: LiveCheckup
 
     let config: ThresholdConfig
 
@@ -222,8 +291,8 @@ private struct WelcomeView: View {
     /// mark must stop offering the shipped explanation the moment it stops describing it.
     @State private var chosen: Set<ThresholdMark>
 
-    init(checkup: CheckupState, marks: ThresholdConfigLoad, close: @escaping () -> Void) {
-        self.checkup = checkup
+    init(live: LiveCheckup, marks: ThresholdConfigLoad, close: @escaping () -> Void) {
+        self.live = live
         self.config = marks.config
         self.shipped = marks.shipped
         self.close = close
@@ -245,7 +314,10 @@ private struct WelcomeView: View {
         _scales = State(initialValue: scales)
         _minutes = State(initialValue: minutes)
         _chosen = State(initialValue: chosen)
-        _checkupOpen = State(initialValue: checkup.hasSomethingMissing)
+        // Off the reading the window opened with. It is not re-decided when the list is read
+        // again: a section folding itself away under somebody who has just given a permission
+        // would take away the row they came back to look at.
+        _checkupOpen = State(initialValue: live.state.hasSomethingMissing)
     }
 
     var body: some View {
@@ -310,7 +382,7 @@ private struct WelcomeView: View {
                 Text(CheckupPhrasing.intro)
                     .font(WindowType.item)
                     .fixedSize(horizontal: false, vertical: true)
-                ForEach(CheckupPhrasing.rows(for: checkup), id: \.point) { row in
+                ForEach(CheckupPhrasing.rows(for: live.state), id: \.point) { row in
                     checkupRow(row)
                 }
                 Text(CheckupPhrasing.closing)

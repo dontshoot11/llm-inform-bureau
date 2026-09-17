@@ -415,8 +415,8 @@ settings and the checkup, and a question mark promises reading rather than doing
 
 The window's second half is one list of everything the app runs on and did not bring with it:
 the three sources, Claude Code's status line slot, the Accessibility permission a click on a
-session needs, which name the notifications arrive under, the login checkbox, and which copy of
-the app this is. One shape per line — what the machine answered, what it is, what it costs
+session needs, the permission to ask a terminal about its tabs, which name the notifications
+arrive under, the login checkbox, and which copy of the app this is. One shape per line — what the machine answered, what it is, what it costs
 while the answer is no, and the button that opens the pane where the answer is kept. To the
 reader a source, a permission and a fact about the running bundle are the same kind of thing,
 and a list that changed shape halfway down would read as two lists.
@@ -427,6 +427,14 @@ permission dialog.** A dialog is a question, and the moment to ask one is when s
 click needs the answer — so accessibility is asked for with the plain `AXIsProcessTrusted()`,
 the notification centre is not touched at all, and everything else is a file or a fact about
 this process. A test holds the prompting call to the one file that is allowed to make it.
+
+The list is read again whenever the window comes back to the front (`LiveCheckup`). That is
+the whole point of it being a list somebody acts on: they read a row, leave for System
+Settings, give the permission and come back — and a row still saying "not given" would be the
+app arguing with what they had just done. Coming back is also the only moment worth reading at,
+so there is no timer; measured on this machine, a re-read costs about one pass of the panel
+(15 ms, nearly all of it the same walk of the three source trees a pass makes anyway), and a
+timer would spend that on a window nobody has touched.
 
 Two lines earn their place by being the ones nothing else on the Mac will give:
 
@@ -439,6 +447,12 @@ Two lines earn their place by being the ones nothing else on the Mac will give:
   centre outright and falls back to `osascript`, which the system credits to Script Editor —
   and which of the two it will be is not knowable until the first notification is sent. So the
   line says the channel it got, and before that says it is settled on first use.
+- **Automation**, which gets no tick either, and never will. macOS has no question that answers
+  "may this app control Terminal" — the only way to find out is to send an event and see, and
+  the sending is somebody's click on a session. So the row says what the app will ask for and
+  when, and offers the pane where a refusal is kept. A tick drawn from one successful attempt
+  against one terminal, or a gap drawn from a script that simply found no tab, would be the
+  app's guess wearing the system's authority.
 
 The slot reads as held when another copy of this app is in it: the limits are arriving, which
 is what that line is about, and which copy is doing the job is the panel's offer to take over
@@ -495,7 +509,7 @@ the drag first and the first launch after it.
 | `TerminalRaiser.swift` | Taking a person to the window their session runs in: the tab where the terminal can name one, the application otherwise, and the settings pane after a refusal |
 | `OwnSignature.swift` | How this copy is signed, which decides whether the panel explains a tick left over from an earlier build |
 | `Checkup.swift` | Reading what this Mac has given the app without asking it for anything, and the one line that opens a pane of System Settings |
-| `WelcomeWindow.swift` | The first-run explanation, the only window this app has, and the marks it hands over |
+| `WelcomeWindow.swift` | The first-run explanation, the only window this app has, the marks it hands over, and the checkup it reads again whenever it comes back to the front |
 | `MarkScaleBar.swift` | A scale as something to move: the bar in the colours of its own lights, a handle on each mark and the number under it |
 | `MinuteMarkField.swift` | A mark that is one number as something to set: the field, the stepper beside it and the unit after them |
 | `LoginItem.swift` | Starting with the Mac, and the checkbox both views share |

@@ -93,6 +93,7 @@ public struct CheckupState: Equatable, Sendable {
         case codex
         case statusLineSlot
         case accessibility
+        case automation
         case notifications
         case openAtLogin
         case runningCopy
@@ -157,6 +158,15 @@ public struct CheckupState: Equatable, Sendable {
             return slot.isOurs || slot.needsTakingOver ? .given : .missing
         case .accessibility:
             return isAccessibilityTrusted ? .given : .missing
+        case .automation:
+            // Never a tick and never a gap, whatever has happened in this run. macOS has no
+            // question that answers "may this app control Terminal" — the only way to find out
+            // is to try, and the trying is somebody's click. A row that went on to read
+            // "missing" after one failed attempt would be reporting a script that found no tab
+            // as a permission refused, and a row that read "given" after a successful one
+            // would be saying it of every terminal on the machine because one of them
+            // answered.
+            return .settledOnUse
         case .notifications:
             return notifications == nil ? .settledOnUse : .given
         case .openAtLogin, .runningCopy:

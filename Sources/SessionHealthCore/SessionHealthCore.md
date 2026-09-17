@@ -104,7 +104,7 @@ it are about what may be claimed:
 - A **plain note** for a line that states a fact rather than reporting a permission: which copy
   is running, and the login checkbox, which is its own answer.
 - Only a `missing` line unfolds the list. The two that state a fact never do — a window that
-  opened a list of eight to show a path is asking for attention it has no use for.
+  opened the whole list to show a path is asking for attention it has no use for.
 
 Reading any of it is the app's job, not this module's, and the rule there is that **opening the
 window must not raise a permission dialog**: a dialog is a question, and the moment to ask one

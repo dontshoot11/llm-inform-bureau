@@ -92,7 +92,7 @@ func runCheckupTests(_ suite: TestSuite) {
     }
 
     // The two lines that state a fact must never be what opens the list: neither of them is
-    // something to act on, and a window that unfolded a list of eight to show a path would be
+    // something to act on, and a window that unfolded the whole list to show a path would be
     // asking for attention it has no use for.
     suite.test("a line that only states a fact never counts as missing") {
         for point in [CheckupState.Point.openAtLogin, .runningCopy] {
@@ -173,6 +173,48 @@ func runCheckupTests(_ suite: TestSuite) {
             !signed.contains(Wording.tickFromAnEarlierBuild),
             "a properly signed copy keeps its permissions and must not send anybody to undo a working tick: \(signed)"
         )
+    }
+
+    // MARK: Automation, which macOS will not answer for
+
+    // The one permission the system has no question for: there is no call that says whether
+    // controlling another app is allowed, and the only way to find out is to send an event.
+    // Everything this app knows about that is what it tried once, at somebody's click, against
+    // one terminal — so a tick or a gap drawn from it would be the app's guess wearing the
+    // system's authority.
+    suite.test("automation is settled on use whatever else the machine has answered") {
+        for state in [bare, settled] {
+            suite.expectEqual(state.standing(of: .automation), .settledOnUse, "\(state == bare ? "bare" : "settled")")
+        }
+    }
+
+    // It has no answer to be missing, so it must never be what unfolds the list: a window that
+    // opened itself on a question mark nobody can answer in advance would do it on every run.
+    suite.test("automation never counts as something missing") {
+        suite.expect(!settled.hasSomethingMissing, "a settled machine has an automation row too")
+    }
+
+    // The row a person reads while nothing has gone wrong yet. It has to say what the app will
+    // ask for and when — the click is the moment — and where the answer ends up, because a
+    // refusal given months ago leaves nothing else that would tell them.
+    suite.test("automation says what it is for, when it is asked and where the answer is kept") {
+        let line = row(.automation, of: bare)
+        suite.expectEqual(line?.settings, .automation, "pane")
+        let detail = line?.detail ?? ""
+        for word in ["Terminal.app", "iTerm2", "click"] {
+            suite.expect(detail.contains(word), "the row must name \(word): \(detail)")
+        }
+        suite.expectEqual(row(.automation, of: settled)?.detail, detail, "nothing about it changes with the machine")
+    }
+
+    // Both permissions a click can need have a row now, and each sends the person to the pane
+    // where that answer is actually kept. A row that offered the other one would be worse than
+    // no row: the pane it opens lists the app under a tick that means something else.
+    suite.test("every permission a click can need has a checkup row that opens its own pane") {
+        for permission in [TerminalRaise.Permission.accessibility, .automation] {
+            let rows = CheckupPhrasing.rows(for: bare).filter { $0.settings == permission.pane }
+            suite.expectEqual(rows.count, 1, "\(permission) is offered by \(rows.map(\.point.rawValue))")
+        }
     }
 
     // MARK: Notifications, which have no tick to show

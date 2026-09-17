@@ -123,11 +123,15 @@ struct MenuContent: View {
                     // The checkup is read here rather than inside the window: the slot and
                     // the notification channel are the panel's own knowledge, and reading them
                     // twice is how two parts of one app come to disagree about the same fact.
+                    // Handed over as a way of reading rather than as a reading, because the
+                    // window reads it again every time it comes back to the front.
                     Welcome.show(
-                        checkup: CheckupReader.read(
-                            slot: model.slot,
-                            notifications: model.notificationChannel
-                        ),
+                        checkup: {
+                            CheckupReader.read(
+                                slot: model.slot,
+                                notifications: model.notificationChannel
+                            )
+                        },
                         askForPass: { Task { await model.refresh() } }
                     )
                 } label: {
