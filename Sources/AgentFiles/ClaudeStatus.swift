@@ -53,7 +53,8 @@ public struct ClaudeStatusReading: Sendable {
     /// reported yet from one whose report this app cannot read.
     let foundFiles: Bool
 
-    /// Whether a file the walk did find would not parse.
+    /// Whether a file the walk did find would not parse. A file that could not be opened at
+    /// all is not that: one is a verdict on the format, the other is a moment.
     let sawUnreadableFile: Bool
 
     /// The freshest limits any session has reported.
@@ -167,11 +168,11 @@ public struct ClaudeStatusStore: Sendable {
         defer { readings.forgetUnasked() }
 
         let files = newestFiles()
-        let payloads = files.map { payload(at: $0) }
+        let reads = files.map { read($0) }
         return ClaudeStatusReading(
-            payloads: payloads.compactMap { $0 },
+            payloads: reads.compactMap { $0.payload },
             foundFiles: !files.isEmpty,
-            sawUnreadableFile: payloads.contains { $0 == nil }
+            sawUnreadableFile: reads.contains { $0.wouldNotParse }
         )
     }
 
@@ -193,20 +194,39 @@ public struct ClaudeStatusStore: Sendable {
         SessionFiles.newest(in: directory, limit: filesToScan) { $0.pathExtension == "json" }
     }
 
-    private func payload(at file: SessionFiles.Found) -> ClaudeStatusPayload? {
-        if let remembered = readings.value(of: file.url, unchangedSince: file.stamp) {
-            return remembered
+    /// How one payload file turned out. Three outcomes rather than two: a file this app cannot
+    /// make sense of is the status line writing something new, and worth saying out loud; a
+    /// file that would not open is neither that nor anything to remember.
+    private enum PayloadRead {
+        case parsed(ClaudeStatusPayload)
+        case wouldNotParse
+        case wouldNotOpen
+
+        var payload: ClaudeStatusPayload? {
+            if case .parsed(let payload) = self { payload } else { nil }
         }
-        let payload = parse(file)
-        readings.remember(payload, of: file.url, as: file.stamp)
-        return payload
+
+        var wouldNotParse: Bool {
+            if case .wouldNotParse = self { true } else { false }
+        }
     }
 
-    /// What the file itself says, with nothing remembered.
-    private func parse(_ file: SessionFiles.Found) -> ClaudeStatusPayload? {
-        guard
-            let data = try? Data(contentsOf: file.url),
-            let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    private func read(_ file: SessionFiles.Found) -> PayloadRead {
+        if let remembered = readings.value(of: file.url, unchangedSince: file.stamp) {
+            return remembered.map { .parsed($0) } ?? .wouldNotParse
+        }
+        // A file that would not open said nothing, and nothing is not an answer to keep — see
+        // `FileMemory`, "What it never remembers". A file that opened and made no sense is a
+        // different matter, and that one is remembered on purpose.
+        guard let data = try? Data(contentsOf: file.url) else { return .wouldNotOpen }
+        let payload = parse(file, from: data)
+        readings.remember(payload, of: file.url, as: file.stamp)
+        return payload.map { .parsed($0) } ?? .wouldNotParse
+    }
+
+    /// What the bytes of the file say, with nothing remembered.
+    private func parse(_ file: SessionFiles.Found, from data: Data) -> ClaudeStatusPayload? {
+        guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
         else { return nil }
 
         // The file is named after the session, so a payload whose own field went missing is

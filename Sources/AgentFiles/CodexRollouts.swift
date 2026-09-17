@@ -134,18 +134,25 @@ public struct CodexRolloutStore: Sendable {
         if let remembered = limitsReadings.value(of: rollout.url, unchangedSince: rollout.stamp) {
             return remembered
         }
-        let reading = parseLimits(rollout)
+        // A file that would not open said nothing about the limits, and nothing is not an
+        // answer to keep — see `FileMemory`, "What it never remembers".
+        guard let reading = parseLimits(rollout) else {
+            return LimitsInFile(snapshot: nil, sawUnreadableLine: false)
+        }
         limitsReadings.remember(reading, of: rollout.url, as: rollout.stamp)
         return reading
     }
 
-    /// The last usable limits reading in one rollout, read from its end.
-    private func parseLimits(_ rollout: SessionFiles.Found) -> LimitsInFile {
+    /// The last usable limits reading in one rollout, read from its end. `nil` when the file
+    /// would not open at all, which is not something the file said.
+    private func parseLimits(_ rollout: SessionFiles.Found) -> LimitsInFile? {
         var sawUnreadableLine = false
+        var opened = false
         for (index, tail) in Self.tailSizes.enumerated() {
             // Widening past the size of the file would only re-read the same lines.
             if index > 0, rollout.stamp.size <= Self.tailSizes[index - 1] { break }
             guard let lines = FileTail.lines(of: rollout.url, maxBytes: tail) else { break }
+            opened = true
             for line in lines.reversed() where line.contains("\"rate_limits\"") {
                 if let snapshot = Self.snapshot(fromLine: line, fileModified: rollout.modified) {
                     return LimitsInFile(snapshot: snapshot, sawUnreadableLine: sawUnreadableLine)
@@ -155,6 +162,7 @@ public struct CodexRolloutStore: Sendable {
                 }
             }
         }
+        guard opened else { return nil }
         return LimitsInFile(snapshot: nil, sawUnreadableLine: sawUnreadableLine)
     }
 
@@ -308,15 +316,18 @@ extension CodexRolloutStore {
         if let remembered = sessionReadings.value(of: rollout.url, unchangedSince: rollout.stamp) {
             return remembered
         }
-        let reading = parse(rollout)
+        // A file that would not open said nothing, and nothing is not an answer to keep — see
+        // `FileMemory`, "What it never remembers".
+        guard let reading = parse(rollout) else { return .noData("could not be opened just now") }
         sessionReadings.remember(reading, of: rollout.url, as: rollout.stamp)
         return reading
     }
 
-    /// What the file itself says, with nothing remembered.
-    private func parse(_ rollout: SessionFiles.Found) -> SourceReading<Reading> {
+    /// What the file itself says, with nothing remembered. `nil` when the file would not open
+    /// at all, which is not something the file said.
+    private func parse(_ rollout: SessionFiles.Found) -> SourceReading<Reading>? {
         guard let lines = FileTail.lines(of: rollout.url, maxBytes: Self.tailSizes[0]) else {
-            return .noData("unreadable file")
+            return nil
         }
         let events = lines.map { RolloutLine(raw: $0) }
         let counts = events.enumerated().filter { $0.element.isTokenCount }

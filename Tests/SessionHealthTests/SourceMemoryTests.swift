@@ -93,6 +93,33 @@ func runSourceMemoryTests(_ suite: TestSuite, config: ThresholdConfig) {
             )
             suite.expectEqual(reading.payloads.count, 2, "and every payload's window size, from the same walk")
         }
+
+        // A file that would not open is not a file that would not parse. The first is a moment;
+        // the second is this app failing to read back what it wrote, and the panel says so in
+        // those words. Calling the first the second would be wrong twice over — wrong now, and
+        // wrong for as long as the file stands still, because what a pass decides about a file
+        // is what the next pass is told.
+        suite.test("a payload that could not be opened is not remembered as unreadable") {
+            let directory = makeDirectory(root, "unopenable", suite)
+            writeStatus(
+                payload(session: "s1", fiveHour: 23.5, sevenDay: 41.2),
+                to: directory, named: "s1.json", modified: now.addingTimeInterval(-60), suite
+            )
+            let store = ClaudeStatusStore(directory: directory)
+
+            withoutPermissions(directory.appendingPathComponent("s1.json"), suite) {
+                let reading = store.read()
+                suite.expect(reading.limits.value == nil, "nothing to report while the file will not open")
+                suite.expect(
+                    reading.limits.explanation?.contains("format") != true,
+                    "and no verdict on a format this pass never saw"
+                )
+            }
+            suite.expectClose(
+                store.read().limits.value?.window(.short)?.usedPercent, 23.5,
+                "and the pass after it reads the file, rather than repeating what it failed to hear"
+            )
+        }
     }
 
     // MARK: The rollouts Codex writes
@@ -191,6 +218,108 @@ func runSourceMemoryTests(_ suite: TestSuite, config: ThresholdConfig) {
             suite.expectEqual(second?.project, "llm-inform-bureau", "the head is not")
             suite.expectEqual(second?.sessionID, "01a0a5cb-b39e-7991-9d49-e6bcc8a8f2d2", "nor the session id in it")
         }
+
+        // Codex ends a session by writing the last line of its rollout, and nothing observed
+        // here shortens one afterwards. The rule must not rest on that: what is remembered is
+        // keyed by what the file looks like, and a file that got smaller does not look the same.
+        suite.test("a rollout that got shorter is read again") {
+            let directory = makeRolloutDirectory(root, "shorter", suite)
+            let name = "rollout-2026-09-15T17-59-45-aaa.jsonl"
+            write(
+                lines: rollout + [
+                    limitsLine(primary: 71, secondary: 9, at: "2026-09-12T18:00:00.000Z"),
+                    tokenCount(held: 41_000, window: 258_400)
+                ],
+                to: directory, named: name, modified: now.addingTimeInterval(-60), suite
+            )
+            let store = CodexRolloutStore(sessionsDirectory: directory)
+            let first = store.read(activity: activity, now: now)
+            suite.expectEqual(first.sessions.value?.first?.contextTokens, 41_000, "the first pass")
+            suite.expectClose(first.limits.value?.window(.short)?.usedPercent, 71, "and its limits")
+
+            write(lines: rollout, to: directory, named: name, modified: now, suite)
+            let second = store.read(activity: activity, now: now)
+            suite.expectEqual(
+                second.sessions.value?.first?.contextTokens, 20_622,
+                "what the shorter file says, not what the longer one said"
+            )
+            suite.expectClose(second.limits.value?.window(.short)?.usedPercent, 52, "and the limits in it")
+        }
+
+        // Not rewritten in place but replaced: the name is the same and the file behind it is
+        // another one. Same size and same date on purpose — the identifier is then the only
+        // thing left to notice it by, and the head is remembered by the identifier alone, so
+        // without it this session would keep answering under the name of the one before it.
+        suite.test("a rollout replaced by another file under the same name is read again") {
+            let directory = makeRolloutDirectory(root, "replaced", suite)
+            let name = "rollout-2026-09-15T17-59-45-aaa.jsonl"
+            let written = now.addingTimeInterval(-60)
+            write(
+                lines: [
+                    sessionMeta(session: "01a0a5cb-b39e-7991-9d49-e6bcc8a8f2d2", cwd: "/Users/nobody/projects/one"),
+                    limitsLine(primary: 52, secondary: 8, at: "2026-09-12T17:32:38.307Z"),
+                    taskStarted(),
+                    tokenCount(held: 20_622, window: 258_400)
+                ],
+                to: directory, named: name, modified: written, suite
+            )
+            let url = rolloutFile(in: directory, named: name)
+            let before = facts(of: url)
+            let store = CodexRolloutStore(sessionsDirectory: directory)
+            let first = store.read(activity: activity, now: now).sessions.value?.first
+            suite.expectEqual(first?.sessionID, "01a0a5cb-b39e-7991-9d49-e6bcc8a8f2d2", "the session of the first pass")
+            suite.expectEqual(first?.project, "one", "and where it started")
+
+            removeFile(url, suite)
+            write(
+                lines: [
+                    sessionMeta(session: "02b1b6dc-c4af-8aa2-ae5a-f7cdd9b9e3e3", cwd: "/Users/nobody/projects/two"),
+                    limitsLine(primary: 71, secondary: 9, at: "2026-09-12T17:32:38.307Z"),
+                    taskStarted(),
+                    tokenCount(held: 41_000, window: 258_400)
+                ],
+                to: directory, named: name, modified: written, suite
+            )
+            let after = facts(of: url)
+            suite.expectEqual(after.size, before.size, "the case only means what it says at the same size")
+            suite.expectEqual(after.modified, before.modified, "and at the same date")
+            suite.expect(
+                after.identity != nil && after.identity != before.identity,
+                "and only while the volume gives the new file an identifier of its own"
+            )
+
+            let second = store.read(activity: activity, now: now)
+            suite.expectEqual(
+                second.sessions.value?.first?.sessionID, "02b1b6dc-c4af-8aa2-ae5a-f7cdd9b9e3e3",
+                "whose session the new file is, not whose the old one was"
+            )
+            suite.expectEqual(second.sessions.value?.first?.project, "two", "and where that one started")
+            suite.expectEqual(second.sessions.value?.first?.contextTokens, 41_000, "and what it holds")
+            suite.expectClose(second.limits.value?.window(.short)?.usedPercent, 71, "and the limits in it")
+        }
+
+        // The same rule as for the payloads above and the transcripts next door: a file that
+        // would not open said nothing, and nothing is not an answer to keep.
+        suite.test("a rollout that could not be opened is not remembered as having nothing to say") {
+            let directory = makeRolloutDirectory(root, "unopenable", suite)
+            write(
+                lines: rollout, to: directory, named: "rollout-2026-09-15T17-59-45-aaa.jsonl",
+                modified: now.addingTimeInterval(-60), suite
+            )
+            let store = CodexRolloutStore(sessionsDirectory: directory)
+
+            withoutPermissions(everyFile(under: directory), suite) {
+                let reading = store.read(activity: activity, now: now)
+                suite.expect(reading.limits.value == nil, "nothing to report while the file will not open")
+                suite.expect(reading.sessions.value?.isEmpty == true, "and no session either")
+            }
+            let after = store.read(activity: activity, now: now)
+            suite.expectClose(
+                after.limits.value?.window(.short)?.usedPercent, 52,
+                "and the pass after it reads the file"
+            )
+            suite.expectEqual(after.sessions.value?.first?.contextTokens, 20_622, "the session too")
+        }
     }
 
     // MARK: A whole pass
@@ -241,4 +370,11 @@ func runSourceMemoryTests(_ suite: TestSuite, config: ThresholdConfig) {
             }
         }
     }
+}
+
+// MARK: Getting at one rollout
+
+/// Where `write(lines:to:named:)` puts a rollout: nested by date, the way Codex nests them.
+private func rolloutFile(in root: URL, named name: String) -> URL {
+    root.appendingPathComponent("2026/09", isDirectory: true).appendingPathComponent(name)
 }

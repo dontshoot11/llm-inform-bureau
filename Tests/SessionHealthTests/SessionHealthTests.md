@@ -37,8 +37,8 @@ the cases are plain functions and would port to swift-testing mechanically.
 | `SessionActivityTests` | Which sessions count as being worked on right now, and both sides of the edge |
 | `ClaudeStatusTests` | Reading the payloads the status line command leaves, and the join between the two Claude sources |
 | `ClaudeTranscriptTests` | Reading a session out of a transcript: tokens held, turn growth, sidechains, `/clear` |
-| `TranscriptMemoryTests` | What the reader remembers between passes: a file whose stamp has not moved is not opened again — checked by taking its permissions away rather than by counting — and one that grew, got shorter or had its date moved is read afresh |
-| `SourceMemoryTests` | The same question for the other two sources and for a whole pass: a payload and a rollout that have not moved are not read again, one walk of a tree answers everything asked of it, and an event that changed no file at all opens none |
+| `TranscriptMemoryTests` | What the reader remembers between passes: a file whose stamp has not moved is not opened again — checked by taking its permissions away rather than by counting — and one that grew, got shorter, had its date moved or was replaced by another file under the same name is read afresh. Plus what the memory must not become: a file the walk stopped seeing is forgotten, a file that would not open is not filed as one with nothing to say, and a file somebody else is writing is read neither stale nor torn |
+| `SourceMemoryTests` | The same questions for the other two sources and for a whole pass: a payload and a rollout that have not moved are not read again, one walk of a tree answers everything asked of it, and an event that changed no file at all opens none |
 | `WaitingStateTests` | Whether a session is waiting on its agent: the four moments of a turn, the housekeeping written after an answer, and a response arriving as several entries |
 | `CodexRolloutTests` | Reading limits and sessions out of rollout fixtures, including the shapes that mean "no data" and "source changed" |
 | `SetupTests` | Which sources read as connected, what the first run says about the ones that do not, and showing that explanation once |
@@ -58,6 +58,12 @@ suite.test("what the rule should do") {
   `expectClose(_:_:_:)` for percentages. All of them record and continue, so one run reports
   every failure in the case rather than the first.
 - Compare optionals with `expect(x == y, …)`; the equality helper is for non-optionals.
+
+A case that works on files has the rest of the harness for it: `withTemporaryDirectory` for a
+directory that lives as long as the case, `withoutPermissions` for checking that a file was not
+opened rather than assuming it, `facts(of:)` for the three things the reader's memory is keyed
+by, and `removeFile` / `moveFile` for the difference between a file rewritten, a file replaced
+and a file the walk has stopped finding.
 
 ## The rule these cases follow
 
@@ -81,6 +87,14 @@ one reader be tested against two different ideas of what its files look like.
 **A case that waits for something waits for the real thing.** The watcher cases block on a
 semaphore with a generous timeout instead of sleeping for a fixed while: a loaded machine does
 not fail them, and an event that never arrives still does.
+
+**A case about a race asserts what has to hold whatever the timing does.** The transcripts are
+written by somebody else while the app reads them, so one case has a thread appending to a file
+while passes run against it — and it waits for no particular interleaving. What it asserts is
+what must be true of every pass: the number is one that was actually written, it is never less
+than an earlier pass gave, the file is never called unreadable, and the pass after the writing
+stops says what the file finally says. A case that needed a race to happen would pass on a quiet
+machine for the wrong reason; this one only needs passes to happen, and it says so.
 
 **The machine an older release left behind is a fixture, not a memory.** The cases for taking
 over from the shell wrapper build that machine on disk — the wrapper's file in the app's own

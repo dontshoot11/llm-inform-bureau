@@ -36,6 +36,22 @@ struct FileStamp: Hashable, Sendable {
 /// stays `.unavailable`. Freshness is not what is being traded here; re-reading the unchanged
 /// is.
 ///
+/// **What it never remembers.** A file that would not open said nothing, and nothing is not an
+/// answer. Filing it as one would make a moment — a file gone between the walk and the read, a
+/// permission that came back, one descriptor too many — into a verdict that stands until the
+/// file moves again, which for a session between turns is the length of the activity window. So
+/// each reader tells "this file says nothing yet" from "this file could not be opened", and only
+/// the first is kept. A file that opened and made no sense *is* remembered: that is a verdict on
+/// its contents, and re-reading it every pass would be the same disappointment at the same price.
+///
+/// **What a file written mid-pass costs, and what it cannot cost.** The stamp is the walk's,
+/// taken before a single byte is read, so a file appended to while the reader is inside it is
+/// remembered under how it looked *before* that — and the next walk, seeing a stamp that has
+/// moved, reads it again. A race therefore costs one more read than it had to, and can never
+/// cost a stale answer; a stamp taken after the read would have made exactly that trade the
+/// other way round. What comes back is never torn either: `FileTail` drops the last line when it
+/// is not finished, which is what a file being written ends in.
+///
 /// **What bounds it.** Entries are made only for files a walk found, and a walk is bounded
 /// (`filesToScan`, plus the subagents of each active session). `forgetUnasked()` at the end of
 /// a pass drops everything this pass did not ask about, so a session that ended, or that has

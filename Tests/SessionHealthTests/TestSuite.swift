@@ -143,3 +143,47 @@ func everyFile(under directory: URL) -> [URL] {
         (try? $0.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true
     }
 }
+
+/// What the reader's memory is keyed by, as a test can see it: how big a file is, when it was
+/// last written, and the volume's own identifier for it.
+///
+/// Read through a `URL` made on the spot every time. A `URL` caches the resource values it is
+/// asked for, so one kept from before answers with what the file looked like then — the same
+/// trap the reader itself has to stay out of.
+struct FileFacts: Equatable {
+    let size: Int?
+    let modified: Date?
+    let identity: Data?
+}
+
+func facts(of url: URL) -> FileFacts {
+    let values = try? URL(fileURLWithPath: url.path).resourceValues(
+        forKeys: [.fileSizeKey, .contentModificationDateKey, .fileResourceIdentifierKey]
+    )
+    return FileFacts(
+        size: values?.fileSize,
+        modified: values?.contentModificationDate,
+        identity: values?.fileResourceIdentifier as? Data
+    )
+}
+
+/// Removes a file, so that what is written under its name next is a *different* file with an
+/// identifier of its own — a directory tidied and written again, a transcript restored from
+/// elsewhere. Writing over a file in place keeps its identifier and is a different case.
+func removeFile(_ url: URL, _ suite: TestSuite) {
+    do {
+        try FileManager.default.removeItem(at: url)
+    } catch {
+        suite.expect(false, "could not remove \(url.lastPathComponent): \(error)")
+    }
+}
+
+/// Moves a file, which leaves its size, its date and its identifier exactly as they were.
+/// What changes is only whether a walk of the tree still finds it.
+func moveFile(_ url: URL, to destination: URL, _ suite: TestSuite) {
+    do {
+        try FileManager.default.moveItem(at: url, to: destination)
+    } catch {
+        suite.expect(false, "could not move \(url.lastPathComponent): \(error)")
+    }
+}

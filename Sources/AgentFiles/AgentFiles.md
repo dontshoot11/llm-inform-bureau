@@ -299,6 +299,23 @@ answer. It is kept until the file is not that file any more. A head with no `cwd
 not remembered at all: a transcript one line long would otherwise keep its fallback name for
 as long as it lives.
 
+**A file that would not open said nothing, and nothing is not an answer.** Filing a failure to
+open as "this file has nothing to report" would turn a moment — a file gone between the walk and
+the read, a permission that came back, one descriptor too many — into a verdict that stands
+until the file moves again, and for a session between turns that is the whole activity window: a
+row would vanish from the panel for half an hour over one unlucky read. So each reader tells the
+two apart, and only what the file *said* is kept. A file that opened and made no sense is the
+other case and is remembered on purpose: that is a verdict on its contents, not on a moment.
+
+**A file written while the pass reads it costs one extra read, and never a stale answer.** Both
+CLIs append to a transcript as the turn goes on, including while it is being read — a pass does
+not stop the world. The stamp is the walk's, taken before a byte is read, so a file appended to
+mid-pass is remembered under how it looked *before* the appending, and the next walk sees a
+stamp that has moved and reads it again. A stamp taken after the read would make the opposite
+trade: one read saved, and the reading filed under bytes it did not come from. What comes back
+is never torn either — `FileTail` drops the last line when it is unfinished, which is what a
+file being written ends in.
+
 **What is remembered is what the file said, never what time it was.** A session that has been
 waiting three minutes has been waiting four a minute later, with the file standing still — so
 what a reader keeps is the moment the wait began, and the rule is applied to it afresh on every

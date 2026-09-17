@@ -227,19 +227,26 @@ public struct ClaudeTranscriptStore: Sendable {
         if let remembered = readings.value(of: file.url, unchangedSince: file.stamp) {
             return remembered
         }
-        let reading = parse(file, as: role)
+        // A file that would not open said nothing, and nothing is not an answer to keep — see
+        // `FileMemory`, "What it never remembers". The pass goes without this session; the next
+        // one asks the file again instead of repeating what it failed to hear.
+        guard let reading = parse(file, as: role) else { return .noData("could not be opened just now") }
         readings.remember(reading, of: file.url, as: file.stamp)
         return reading
     }
 
     /// What the file itself says, with nothing remembered — the whole of the cost a pass used
     /// to pay for every active file whether or not it had changed.
-    private func parse(_ file: SessionFiles.Found, as role: Role) -> SourceReading<Reading> {
+    ///
+    /// `nil` when the file would not open at all, which is not something the file said.
+    private func parse(_ file: SessionFiles.Found, as role: Role) -> SourceReading<Reading>? {
         var sawUnreadableLine = false
         var result: SourceReading<Reading> = .noData("nothing answered yet")
+        var opened = false
 
         for tail in Self.readableTailSizes(ofSize: file.stamp.size) {
             guard let lines = FileTail.lines(of: file.url, maxBytes: tail) else { break }
+            opened = true
 
             let entries = lines.map { TranscriptLine(raw: $0) }
             sawUnreadableLine = sawUnreadableLine || entries.contains { $0.looksLikeAnEntry && $0.json == nil }
@@ -269,6 +276,7 @@ public struct ClaudeTranscriptStore: Sendable {
             // beginning is further back than that is worth reading more of the file for.
             if growth != nil || role == .subagent { break }
         }
+        guard opened else { return nil }
         if case .noData = result, sawUnreadableLine {
             return .unavailable("unparseable lines")
         }
