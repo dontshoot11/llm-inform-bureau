@@ -384,6 +384,21 @@ extension CodexRolloutStore {
     /// is the last one written this reader has no complete line to read at all — the row goes
     /// quiet rather than wrong, which is the older behaviour of the reading and not of the
     /// wait.
+    ///
+    /// **Only the agent is ever waited on here.** Claude has a third answer — the person is
+    /// the one being waited on, and the bar draws it as a pause sign — and Codex has no way to
+    /// give it: nothing it writes down says a request is standing open. Measured on Codex
+    /// 0.154.0 with a live approval prompt held open (see the task's research.md): while the
+    /// person is being asked, the app-server tells its client over the socket
+    /// (`waitingOnApproval`) and the rollout says nothing — its last lines are the tool call
+    /// and a token count, which is exactly what an allowed command that is still running
+    /// writes. No line marks the moment of an answer, there is no per-process record beside
+    /// the rollout as there is for Claude, and the state databases hold an inventory rather
+    /// than a live status. The tool call does carry the model's own
+    /// `sandbox_permissions: "require_escalated"`, and reading that as a request was turned
+    /// down twice over: it cannot be told from a command the person already allowed, and where
+    /// the reviewer is `auto_review` no person is asked at all. So a Codex session that is
+    /// standing on a request blinks, like every other turn in flight.
     private static func awaitingSince(_ events: [RolloutLine], writtenBy modified: Date) -> Date? {
         guard let boundary = events.last(where: { $0.isTurnStart || $0.isTurnEnd }), boundary.isTurnStart
         else { return nil }

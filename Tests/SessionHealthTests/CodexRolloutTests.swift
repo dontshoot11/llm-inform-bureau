@@ -464,6 +464,33 @@ func runCodexWaitingStateTests(_ suite: TestSuite, config: ThresholdConfig) {
             )
         }
 
+        // The third answer Claude has and Codex does not: the person is the one being waited
+        // on. Measured on 0.154.0 with an approval prompt held open — the app-server tells its
+        // client over the socket and the file says nothing, so this reader sees a turn in
+        // flight and the bar blinks. The case is here to make that a decision on the record
+        // rather than a gap: if a Codex release starts writing the request down, this is the
+        // case that has to be argued with.
+        //
+        // The turn before it is what a live rollout has under the request: a session standing
+        // on its first turn has no token count yet, and a reading with no numbers in it is no
+        // row in the panel — which is the older behaviour of the reading, not of the wait.
+        suite.test("a session standing on an approval request blinks, it does not draw a pause sign") {
+            guard let snapshot = session(
+                root, "awaiting-approval",
+                [
+                    sessionMeta(),
+                    taskStarted(at: now.addingTimeInterval(-300)),
+                    tokenCount(held: 20_000, window: 258_400, at: now.addingTimeInterval(-290)),
+                    taskComplete(at: now.addingTimeInterval(-289)),
+                    taskStarted(at: now.addingTimeInterval(-90)),
+                    escalatedToolCall(at: now.addingTimeInterval(-60)),
+                    tokenUsageRecord(at: now.addingTimeInterval(-60))
+                ]
+            ) else { return }
+            suite.expectEqual(snapshot.replyWait, .waiting, "a request on disk looks like a tool in flight")
+            suite.expect(!snapshot.replyWait.isAsking, "nothing in a rollout says the person is being waited on")
+        }
+
         // The one thing the announcement does not survive: a turn whose opening is further
         // back than the half megabyte this reader looks at. That takes a tool output running
         // to megabytes, and on a guess the light stays steady rather than blinking.

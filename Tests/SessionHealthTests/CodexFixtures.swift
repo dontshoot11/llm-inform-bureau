@@ -141,6 +141,34 @@ func itemCompleted(at moment: Date) -> String {
     "{\"timestamp\":\"\(stamp(moment))\",\"type\":\"event_msg\",\"payload\":{\"type\":\"item_completed\"}}"
 }
 
+/// The call Codex writes when the model asks for a command the sandbox will not allow — the
+/// line that stands at the end of a rollout for as long as the person is being asked to allow
+/// it. Copied down from a live approval prompt held open on Codex 0.154.0 and trimmed to the
+/// fields this app reads.
+///
+/// `status: "completed"` is the delivery of the call, not the running of the command: the same
+/// line stands there whether the person has been asked, has allowed it and the command is
+/// running, or has never been asked at all. That is the measurement the case using this
+/// fixture guards — see the task's research.md.
+func escalatedToolCall(at moment: Date) -> String {
+    """
+    {"timestamp":"\(stamp(moment))","type":"response_item","payload":{"type":"custom_tool_call",\
+    "status":"completed","call_id":"call_ODqyjWuc5CuDHfq0C0TZGgtC","name":"exec",\
+    "input":"text(await tools.exec_command({cmd:\\"printf 'hi' > probe.txt\\",\
+    sandbox_permissions:\\"require_escalated\\",\
+    justification:\\"Allow creating probe.txt in the current directory?\\"}));"}}
+    """
+}
+
+/// What follows that call: the usage of the response that carried it. A line of its own rather
+/// than an `event_msg`, so it has no `type` inside the payload.
+func tokenUsageRecord(at moment: Date) -> String {
+    """
+    {"timestamp":"\(stamp(moment))","type":"token_usage_record","payload":{\
+    "usage":{"input_tokens":17101,"output_tokens":80,"total_tokens":17181}}}
+    """
+}
+
 func tokenCount(held: Int, window: Int, at moment: Date = fixtureAnsweredAt) -> String {
     """
     {"timestamp":"\(stamp(moment))","type":"event_msg","payload":{"type":"token_count",\

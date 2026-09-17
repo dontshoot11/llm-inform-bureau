@@ -292,6 +292,20 @@ Everything else about the wait is the same rule as Claude's, for the same reason
   is not claimed as a wait.** That takes a tool output running to megabytes; on a guess the
   light stays steady rather than blinking.
 
+The fourth outcome is the one Codex does not have. **A rollout never says the person is the one
+being waited on**, and that is measured rather than assumed: on Codex 0.154.0, with an approval
+prompt held open for the better part of a minute, the app-server tells its own client over the
+socket (`waitingOnApproval`) while the file keeps its counsel — the last lines under an open
+request are the tool call and a token count, byte for byte what a command the person already
+allowed writes while it runs. Nothing marks the moment of an answer either (`exec_command_begin`
+is an event of the interface and appears in none of the 144 rollouts here), there is no record
+beside the rollout as there is for Claude, and the state databases hold an inventory rather than
+a live status. The model's own `sandbox_permissions: "require_escalated"` does travel in the
+call, and reading it as a request was turned down twice over: it cannot be told from a command
+already allowed, and where `approvals_reviewer` is `auto_review` nobody is asked at all. So a
+Codex session standing on a request blinks, like any other turn in flight — the reading a person
+gets today, and the one the case in `CodexRolloutTests` pins down.
+
 ### From a pid to the window a person is sitting in front of
 
 The same record carries the one thing no file in `~/.claude` mentions: `pid`, the process
