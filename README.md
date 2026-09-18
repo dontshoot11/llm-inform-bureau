@@ -112,8 +112,10 @@ Mac, so the Xcode Command Line Tools are not needed; there is nothing to sign in
 app makes no network calls at any point — during installation or after it.
 
 What you are given is one file, `LLMInformBureau-<version>.dmg`, holding the built app and an
-`INSTALL.txt` saying everything this section says. Building it yourself instead is one
-command — see [Development](#development).
+`INSTALL.txt` saying everything this section says. From a release page it comes with a second
+file beside it, `LLMInformBureau-<version>.pdf`, saying what the app is for and what each of its
+lights means — that one is worth reading before installing anything. Building both yourself
+instead is one command — see [Development](#development).
 
 **No script of anybody else's runs on your Mac.** You drag the app in, the way you drag any
 other app, and run one command. There is nothing else to set up: the marks the app watches
@@ -357,9 +359,10 @@ swift run SessionHealthTests # the test suite: one line per case, exit code 0 or
 Scripts/build-app.sh --run   # rebuild the bundle and restart it
 Scripts/build-dmg.sh         # the whole disk image, version and all — one command
 Scripts/build-handout.sh     # the PDF description that goes on the release page beside it
+Scripts/release.sh -         # both of those, the tag and the release page — one command
 ```
 
-`Scripts/build-dmg.sh` is the release: it builds the app, checks it, and writes
+`Scripts/build-dmg.sh` builds the app, checks it, and writes
 `.build/LLMInformBureau-<version>.dmg`, the single file that is handed to anybody else. The
 version in the file name is `CFBundleShortVersionString` from `Scripts/Info.plist`, so there is
 no second place to remember. The recipient's instructions ride inside the image as
@@ -369,11 +372,33 @@ no second place to remember. The recipient's instructions ride inside the image 
 in [Install](#install). There is no developer-only installation path in this repository, which
 is why the one path there is stays working.
 
+### Releasing a version
+
+```sh
+Scripts/release.sh - <<'NOTES'
+- The interface speaks Russian as well as English.
+NOTES
+```
+
+That is the whole of a release: it builds the image, builds the PDF, tags `v<version>` and
+publishes a GitHub release page with both files attached. The number comes from
+`CFBundleShortVersionString` alone, so bumping that one line in `Scripts/Info.plist` is the whole
+of "releasing 0.2.0". The argument is what changed, in Markdown — there is no changelog file here,
+and the page is written at the moment of release; under it the script adds the first steps of
+installing, with the version in them.
+
+It refuses before it builds anything: no notes, no `gh`, `gh` not logged in, a dirty tree, a
+version already released, a commit not pushed. The tag is made by GitHub in the same call that
+creates the page, so an attempt that stops early leaves nothing to undo on either side. What each
+refusal means, and why the order is that one:
+[Scripts/Scripts.md](Scripts/Scripts.md#publishing-a-release).
+
 ### What to send with the link
 
 Everything the recipient is given in writing rides inside the image — including the part that
-says to mount it, which is no use to somebody who has not. So the message carrying the link
-carries the first steps too:
+says to mount it, which is no use to somebody who has not. The release page says those first
+steps above the two files, so a link to it needs nothing added. A file handed over directly — in
+a chat, without the page — still does, and this is the text for that message:
 
 ```
 Download the image, then:

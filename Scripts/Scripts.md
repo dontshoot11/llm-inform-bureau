@@ -1,12 +1,13 @@
 # Scripts
 
-Three scripts, all the author's: one builds the app bundle, one builds the image that is handed
-out, one builds the description that goes with it. Nothing here is run by the person who
-receives the app — they drag a bundle into `/Applications` and run one command, and the app does
-the rest of its setting up itself.
+Four scripts, all the author's: one builds the app bundle, one builds the image that is handed
+out, one builds the description that goes with it, and one publishes all of that as a release.
+Nothing here is run by the person who receives the app — they drag a bundle into `/Applications`
+and run one command, and the app does the rest of its setting up itself.
 
 | Script | Run by | Does |
 | --- | --- | --- |
+| `release.sh` | the author | Publishes the release: both files, the tag and the page, after refusing everything that should not be published |
 | `build-dmg.sh` | the author | Builds the disk image that is handed out: the app, the shortcut to drag it onto, and the instructions |
 | `build-app.sh` | the author | Builds the `.app` bundle and, with `--run`, restarts it |
 | `build-handout.sh` | the author | Builds the PDF description that goes on the release page beside the image |
@@ -22,6 +23,50 @@ That is the point of the arrangement, not a tidying-up. The old path asked someb
 hundred lines of someone else's `sh` against their own machine, and the only way to judge it
 was to read them. What replaces it is a gesture macOS already taught them and a change they are
 shown before it happens.
+
+## Publishing a release
+
+```sh
+Scripts/release.sh <notes-file>    # prints the URL of the release page it published
+Scripts/release.sh -               # the same, with the notes read from standard input
+```
+
+One command from the author's machine to a page on GitHub: it builds the image, builds the PDF,
+makes the tag `v<version>` and creates the release with both files attached. The version is
+`CFBundleShortVersionString` from `Scripts/Info.plist` — the same single source the image and the
+PDF read, so the number in the app, in two file names and in the tag cannot come apart.
+
+The argument is what changed in this version, in Markdown, and it is the only thing the script
+cannot work out for itself: there is no `CHANGELOG.md` here, and the page is written at the
+moment of release. A file holding it must live outside the repository, because an untracked file
+inside would leave the tree dirty and the script refuses a dirty tree; `-` reads the text from
+standard input instead, which is the usual way. Under the notes the script writes the first steps
+of installing — mount, drag, the one command, open — with the version in them. That text is a
+heredoc in the script for the reason `INSTALL.txt` is one in `build-dmg.sh`: a copy kept as a file
+drifts from the version it is published with. The long form still rides on the image, and the page
+says so.
+
+### What it refuses, and why nothing is left behind
+
+Every check is before the first irreversible step, in this order, each naming its cause:
+
+1. **No notes, or notes that are only whitespace** — asked for first, so that the one thing a
+   person forgets is not discovered after two builds.
+2. **`gh` missing, or `gh` not logged in** — both, because an authorised tool is what the last
+   line needs, and a login failure there would arrive after everything was built.
+3. **A dirty tree** — the image is built from the working copy while the release points at a
+   commit; with anything uncommitted those are two different things and the page cannot say which.
+4. **The version is already released, or the tag already exists** — publishing over a release is
+   not possible, and reusing a tag would point a new page at an old commit. Bump
+   `CFBundleShortVersionString`.
+5. **`HEAD` is not on GitHub** — the release is made against a sha, and GitHub cannot tag a commit
+   it has never seen. Push first.
+
+**The tag is not made locally.** `gh release create --target <sha>` makes it on GitHub, in the
+same call that creates the page and uploads the files, so an attempt that stops early leaves no
+tag to delete here, no release to withdraw there and nothing to clean up before trying again. The
+only file the script writes for itself is the temporary one holding the page's text, removed on
+the way out however it leaves.
 
 ## Building the file that is handed out
 
@@ -81,8 +126,8 @@ AppKit's — the package needs nothing installed that `build-app.sh` does not al
 HTML rather than a Markdown file and a converter, what else was tried, and the three habits of
 the HTML importer that shape how that source is written: [Handout.md](../Sources/Handout/Handout.md).
 
-Not run by the release script yet — the command that ties the image, the PDF and the tag
-together is the next thing to be written.
+`release.sh` runs it, so a release is never published with last version's description; running
+it by hand is for looking at the document while editing it.
 
 ## Building the app
 
