@@ -33,6 +33,21 @@ let package = Package(
             dependencies: ["SessionHealthCore", "Phrasing"],
             exclude: ["AgentFiles.md"]
         ),
+        // The description handed out with the release: its English source and the AppKit
+        // rendering that turns it into a PDF. A target rather than a step inside the release
+        // script, so that the test suite can render the document and read back what came out.
+        // Nothing here is a dependency of the app — it is built at release time and what
+        // travels is the file.
+        .target(
+            name: "Handout",
+            exclude: ["Handout.md"],
+            resources: [.process("Description.html")]
+        ),
+        // The command Scripts/build-handout.sh runs.
+        .executableTarget(
+            name: "BuildHandout",
+            dependencies: ["Handout"]
+        ),
         // The menu bar app. Built into a .app bundle by Scripts/build-app.sh — SwiftPM
         // produces the executable, and a menu bar app needs a bundle with LSUIElement.
         .executableTarget(
@@ -45,7 +60,7 @@ let package = Package(
         // See Tests/SessionHealthTests/SessionHealthTests.md.
         .executableTarget(
             name: "SessionHealthTests",
-            dependencies: ["SessionHealthCore", "AgentFiles", "Phrasing"],
+            dependencies: ["SessionHealthCore", "AgentFiles", "Phrasing", "Handout"],
             path: "Tests/SessionHealthTests",
             exclude: ["SessionHealthTests.md"]
         )

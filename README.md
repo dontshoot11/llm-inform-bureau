@@ -356,6 +356,7 @@ swift build                  # the library targets and the executable
 swift run SessionHealthTests # the test suite: one line per case, exit code 0 or 1
 Scripts/build-app.sh --run   # rebuild the bundle and restart it
 Scripts/build-dmg.sh         # the whole disk image, version and all — one command
+Scripts/build-handout.sh     # the PDF description that goes on the release page beside it
 ```
 
 `Scripts/build-dmg.sh` is the release: it builds the app, checks it, and writes
@@ -410,4 +411,5 @@ Each module has its documentation next to the code:
 [AgentFiles](Sources/AgentFiles/AgentFiles.md) (the files and their formats),
 [Phrasing](Sources/Phrasing/Phrasing.md) (every English string and what it may claim),
 [LLMInformBureau](Sources/LLMInformBureau/LLMInformBureau.md) (the app),
+[Handout](Sources/Handout/Handout.md) (the PDF description handed out with a release),
 [Scripts](Scripts/Scripts.md) (building and installing).

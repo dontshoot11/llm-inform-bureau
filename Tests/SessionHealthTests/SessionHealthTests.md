@@ -1,6 +1,6 @@
 # SessionHealthTests
 
-The test suite for `SessionHealthCore` and `AgentFiles`. Run it with:
+The test suite for everything the app is built out of — the rules, the files they are read from, both languages the interface speaks, and the description handed out with a release. Run it with:
 
 ```sh
 swift run SessionHealthTests
@@ -51,6 +51,7 @@ the cases are plain functions and would port to swift-testing mechanically.
 | `CheckupTests` | The list the settings window shows of everything the app runs on that this Mac had to give it: that every point reaches the list with a title, a line saying what it costs and the standing the state actually holds, that the three sources keep the wording the first run already had, that a slot held by another copy of this app still reads as held, that an ad-hoc copy explains the tick belonging to the build before it while a properly signed one does not, that notifications get no tick before the first one is sent, that automation is settled on use whatever else the machine answered and never counts as something missing, that each permission a click can need is offered by exactly one row and its own pane, that two bundles of the same name do not read alike, that every pane of System Settings has a URL of its own — and that the prompting form of the accessibility check is made in the one file a click can reach |
 | `StatusLineSlotTests` | `~/.claude/settings.json` edited from Swift: the key set and removed, every other byte of a hand-used file where it was, a command already in the slot saved and put back, the two branches that refuse to write, and taking over from the shell wrapper an earlier release installed |
 | `TranslationTests` | That the app speaks both languages everywhere: read off the text of `Sources/Phrasing`, `Sources/LLMInformBureau` and `Sources/AgentFiles`, because the rule is about what is not written. Every sentence in the phrasing target is one side of a `Phrase` rather than a bare string that would reach a Russian window in English; nothing in a view is drawn from a string written in the view — a literal handed to `Text`, `Button`, `Link`, `Toggle`, `.help` or a `title:` argument fails here; every phrase writes its second side in the second language rather than the first copied across, a duration said in full agrees with the number in front of it, and neither side grades the session |
+| `HandoutTests` | That the description that goes out with a release says what it is for: the document is rendered from its source and read back with PDFKit, and a missing one of the four things the app is for, a missing row of the legend, a mark that did not survive the encoding, a page count of one, or a sentence grading a session fails here |
 | `OfflineTests` | That no source file reaches for a network API — the reason the app works with the network off |
 
 ## Writing a case

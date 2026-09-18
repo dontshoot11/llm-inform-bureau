@@ -1,13 +1,15 @@
 # Scripts
 
-Two scripts, both the author's: one builds the app bundle, one builds the file that is handed
-out. Nothing here is run by the person who receives the app — they drag a bundle into
-`/Applications` and run one command, and the app does the rest of its setting up itself.
+Three scripts, all the author's: one builds the app bundle, one builds the image that is handed
+out, one builds the description that goes with it. Nothing here is run by the person who
+receives the app — they drag a bundle into `/Applications` and run one command, and the app does
+the rest of its setting up itself.
 
 | Script | Run by | Does |
 | --- | --- | --- |
 | `build-dmg.sh` | the author | Builds the disk image that is handed out: the app, the shortcut to drag it onto, and the instructions |
 | `build-app.sh` | the author | Builds the `.app` bundle and, with `--run`, restarts it |
+| `build-handout.sh` | the author | Builds the PDF description that goes on the release page beside the image |
 
 There used to be three more — an installer, a statusLine installer and a shell wrapper Claude
 Code ran. All three are gone, and so is most of what they did: the marks the app watches ship
@@ -61,6 +63,26 @@ Before anything is packed the script checks the bundle it was given: the binary 
 architectures, and the signature verifies. Both of those are only ever wrong on the other
 side — an Intel Mac, or a notification centre that quietly refuses — so the check belongs on
 the last line where a Mac to test on is still this one.
+
+## Building the description
+
+```sh
+Scripts/build-handout.sh    # prints the path of the PDF it built
+```
+
+The other file on the release page: an English PDF of a few pages saying what the app is for,
+what each light means and how it is installed — for somebody deciding whether to install it at
+all, who has nothing but a link. It writes `.build/LLMInformBureau-<version>.pdf`, with the
+version read from the same `Scripts/Info.plist` the image reads it from, so the number on the
+page, the number in the file name and the number in the app are one number.
+
+The text is `Sources/Handout/Description.html`, the only copy of it, and the rendering is
+AppKit's — the package needs nothing installed that `build-app.sh` does not already need. Why
+HTML rather than a Markdown file and a converter, what else was tried, and the three habits of
+the HTML importer that shape how that source is written: [Handout.md](../Sources/Handout/Handout.md).
+
+Not run by the release script yet — the command that ties the image, the PDF and the tag
+together is the next thing to be written.
 
 ## Building the app
 

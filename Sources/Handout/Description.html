@@ -1,0 +1,203 @@
+<!--
+The description handed out with the release: what the app is for, before anybody installs it.
+
+It is HTML because the PDF is rendered from it by the Handout target, and HTML is what macOS
+can paginate with nothing installed beside the Command Line Tools. It is the only copy of this
+text — the version it is about is filled in where {{version}} stands.
+
+No screenshots, by decision: a picture of a menu bar goes out of date with the next build and
+prints badly. The shapes are drawn as the characters they are, and every colour is named in
+words beside its dot, so a page printed in black and white still carries the legend.
+
+Sizes are in px because px is what the importer measures in one for one: 11px arrives as 11pt
+on the page, while a size written in pt comes out a third larger than it says — 9pt becomes
+12pt, measured both ways. So the number here is the number that prints.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body { font-family: "Helvetica Neue", Helvetica, sans-serif; font-size: 11px; color: #111111; }
+h1 { font-size: 24px; margin: 0 0 3px 0; }
+h2 { font-size: 15px; margin: 24px 0 7px 0; }
+p { margin: 0 0 10px 0; }
+li { margin: 0 0 8px 0; }
+pre { font-family: Menlo, monospace; font-size: 10px; background-color: #f4f4f4; padding: 12px; margin: 0 0 6px 0; }
+table { border-collapse: collapse; margin: 0 0 10px 0; width: 100%; }
+td, th { border-bottom: 1px solid #cccccc; padding: 6px 10px 6px 0; text-align: left; vertical-align: top; }
+th { font-size: 9px; text-transform: uppercase; color: #777777; }
+.mark { font-size: 14px; text-align: center; }
+.subtitle { font-size: 13px; color: #444444; margin: 0 0 5px 0; }
+.version { font-size: 9.5px; color: #777777; margin: 0 0 22px 0; }
+.caption { font-size: 9.5px; color: #666666; margin: 0 0 16px 0; }
+</style>
+</head>
+<body>
+
+<h1>LLM Inform Bureau</h1>
+<p class="subtitle">A macOS menu bar app for working in Claude Code and Codex at the same time.</p>
+<p class="version">Version {{version}} &middot; macOS 13 or newer &middot; Apple Silicon and Intel</p>
+
+<p>Two things quietly run out while you work: the subscription window you are spending, and the
+context window each session holds. Both are already inside the CLIs &mdash; <b>/&#8288;usage</b>,
+<b>/&#8288;context</b>, <b>/&#8288;status</b> &mdash; and reading either means stopping to ask. This app keeps
+them in the menu bar and says something, silently, at the moment one of them crosses a mark.</p>
+
+<p>Everything comes from files this Mac already has. It makes no network calls, holds no
+credentials, and writes nothing outside its own folder in Application Support and one key of
+Claude Code's settings, which it shows you before touching.</p>
+
+<h2>The four things it is for</h2>
+
+<ol>
+<li><b>Keeping several agents in the background without losing track of them.</b> The panel
+lists every session running right now &mdash; its project, what it holds, and what its last
+request added &mdash; with the subagents of a Claude session indented under the session that
+started them, each filling a window of its own.</li>
+
+<li><b>Watching the subscription limits.</b> Claude's 5-hour and weekly windows, Codex's primary
+and secondary ones: how much is spent, when it resets, and how old the reading is. Hitting a
+limit in the middle of a task costs the rest of the window.</li>
+
+<li><b>Watching the state of each session.</b> How full its context window is, in tokens and in
+percent, whether it is still working, and whether it has gone quiet for long enough to be worth
+a look. A full window is worth knowing about for two reasons: the more of it is old history, the
+more the model works around it, and past a point the CLI rewrites the session itself and the
+detail in the middle is what goes.</li>
+
+<li><b>Answering an agent that is waiting on you.</b> A session that has asked a question is
+standing still, and in the bar that looks exactly like one hard at work. Here it does not: its
+light becomes a pause sign the moment the question appears, and clicking its line in the panel
+brings up the terminal it is waiting in.</li>
+</ol>
+
+<h2>What the bar shows</h2>
+
+<table width="483" style="margin: 0 0 6px 0">
+<tr>
+<td width="30" style="border-bottom: none; background-color: #f4f4f4; text-align: right; vertical-align: middle; font-size: 13px; line-height: 15px">&#9679;<br>&#9679;</td>
+<td width="56" style="border-bottom: none; background-color: #f4f4f4; vertical-align: middle; font-family: Menlo, monospace; font-size: 11px">&nbsp;cld</td>
+<td width="30" style="border-bottom: none; background-color: #f4f4f4; text-align: right; vertical-align: middle; font-size: 13px; line-height: 15px">&#9679;<br>&nbsp;</td>
+<td width="56" style="border-bottom: none; background-color: #f4f4f4; vertical-align: middle; font-family: Menlo, monospace; font-size: 11px">&nbsp;cdx</td>
+<td width="311" style="border-bottom: none; background-color: #f4f4f4">&nbsp;</td>
+</tr>
+</table>
+<p class="caption">One small plate per service, its name in three letters and two lights beside
+it: the upper light is the subscription limits, the lower one the context its running sessions
+hold &mdash; the order the panel is in. Here Codex has limits to report and no session running,
+and the empty place still names the light.</p>
+
+<p>No numbers in the bar, on purpose. The bar answers <i>is anything worth looking at</i>; the
+panel behind it answers <i>how much exactly</i>.</p>
+
+<h2>The colours</h2>
+
+<p>One scale under both lights and under either service, so a colour means the same thing
+wherever it appears. It measures how full something is, and nothing else.</p>
+
+<table>
+<tr><th class="mark" width="34">&nbsp;</th><th width="132">Colour</th><th width="317">What it means</th></tr>
+<tr><td class="mark" style="color: #3c8f3c" width="34">&#9679;</td><td width="132">Green&nbsp;&mdash;&nbsp;under&nbsp;40%</td><td width="317">The window has room</td></tr>
+<tr><td class="mark" style="color: #c9a227" width="34">&#9679;</td><td width="132">Yellow&nbsp;&mdash;&nbsp;past&nbsp;40%</td><td width="317">Colours the light and says nothing &mdash; nearly every session passes it, and an alert here would only teach you to ignore the ones that matter</td></tr>
+<tr><td class="mark" style="color: #d2691e" width="34">&#9679;</td><td width="132">Orange&nbsp;&mdash;&nbsp;past&nbsp;60%</td><td width="317">Notifies once, for this session</td></tr>
+<tr><td class="mark" style="color: #b22222" width="34">&#9679;</td><td width="132">Red&nbsp;&mdash;&nbsp;past&nbsp;90%</td><td width="317">Notifies once, for this session</td></tr>
+<tr><td class="mark" style="color: #b22222" width="34">&#10005;</td><td width="132">Red cross</td><td width="317">A limit window with nothing left in it. No shade of red reads as "the end arrived", so the shape says it instead</td></tr>
+<tr><td class="mark" style="color: #9a9a9a" width="34">&#9675;</td><td width="132">Nothing,&nbsp;or&nbsp;an&nbsp;outline</td><td width="317">Nothing to report &mdash; which is not the same as "all good". The bar leaves the place empty and the panel draws an outline; either way the light keeps its position, because position is what names it</td></tr>
+</table>
+
+<p>The three marks on that scale are the app's own, and they travel inside it. Both scales, and
+the marks that are one number of minutes, can be moved in the settings window behind the gear;
+what you move stays yours across updates.</p>
+
+<h2>The shapes</h2>
+
+<p>Colour carries how full a window is. Shape carries what the session is doing, so the two
+never compete: a session that stalled with its window against the ceiling wears a red figure
+eight. Both services are read for it, in two different ways: Codex brackets every turn in its
+rollout, and Claude's boundaries are read off the last entry of the transcript &mdash; whose it
+was, and whether it promised another.</p>
+
+<table>
+<tr><th class="mark" width="58">&nbsp;</th><th width="118">Shape</th><th width="307">What it means</th></tr>
+<tr><td class="mark" width="58">&#9679;</td><td width="118">Steady</td><td width="307">Nothing is being waited on</td></tr>
+<tr><td class="mark" width="58">&#9679;&nbsp;&#9675;&nbsp;&#9679;</td><td width="118">Three&nbsp;blinks,&nbsp;then steady</td><td width="307">The reading moved</td></tr>
+<tr><td class="mark" width="58">&#9679;&nbsp;&#9675;&nbsp;&#9679;</td><td width="118">Blinking&nbsp;that&nbsp;does not stop</td><td width="307">The session is waiting on its agent &mdash; a question asked, a tool running, nothing back yet. It stops the moment the answer lands</td></tr>
+<tr><td class="mark" width="58">&#8734;</td><td width="118">Figure eight</td><td width="307">Nothing back for more than ten minutes. A closed terminal, a killed process and an agent hard at work leave the same thing on disk, so this says the one thing that is known rather than guessing which of the three it was</td></tr>
+<tr><td class="mark" width="58">&#10073;&#10073;</td><td width="118">Pause sign</td><td width="307">The agent is waiting on <i>you</i>: a question is on screen and nothing will move until you answer. Click the line in the panel to be taken to its terminal</td></tr>
+</table>
+
+<h2>Notifications</h2>
+
+<p>Silent, once per mark per session, each ending with the command that shows the rest:</p>
+
+<pre>
+Claude context window past 90%
+92% full, 920K tokens held. Our mark, placed below where the CLI
+compacts on its own: past here it may rewrite the session, and what
+it drops first is the detail in the middle.
+/context
+</pre>
+
+<p>A mark is said once per session &mdash; <b>/&#8288;clear</b> starts a new one, so it can be said
+there again &mdash; and nothing is said twice about the same crossing. Or nothing at all: one
+checkbox in the settings window stops the banners and leaves everything else exactly as it
+was.</p>
+
+<h2>Where the numbers come from</h2>
+
+<table>
+<tr><th width="90">Service</th><th width="190">Read from</th><th width="203">Gives</th></tr>
+<tr><td width="90">Codex</td><td width="190">its own rollouts</td><td width="203">limits, context, window size</td></tr>
+<tr><td width="90">Claude Code</td><td width="190">the session transcripts</td><td width="203">context held, turn growth, project, subagents</td></tr>
+<tr><td width="90">Claude Code</td><td width="190">the statusLine slot, once you hand it over</td><td width="203">limits, context window size</td></tr>
+<tr><td width="90">Claude Code</td><td width="190">the record it keeps per running process</td><td width="203">whether a session is waiting on you</td></tr>
+</table>
+
+<p>Claude's limits are handed to the statusLine command and to nothing else, and there is exactly
+one such slot &mdash; so the app asks for it rather than taking it. Where the limits would be
+there is a button instead, which shows you the exact line it would write and changes nothing
+until you say yes; whatever command was in the slot before goes on being called, its output
+printed unchanged. The same settings window gives the slot back.</p>
+
+<p>Running only one of the two agents is normal: the other keeps its place, with no lights and
+one line saying it is not installed.</p>
+
+<h2>What it does not claim</h2>
+
+<p>It does not measure how good the answers are. No such number follows from anything the app
+can read &mdash; not the transcripts, not the rollouts, not the statusLine payload. "The window
+is 92% full" is a fact; a score for a session would be an invention, and the interface never
+shows one.</p>
+
+<p>There is no mark for "this context has got too long" either. No published measurement supports
+one for the models in use today, the vendors' position is that there is no such length, and every
+number this app compares against is its own &mdash; not one of them carries a source, because an
+entry with no measurement is honest and an entry with an invented one lies silently. Which
+numbers, what they rest on, and what would make them wrong is written down in the repository.</p>
+
+<h2>Getting it</h2>
+
+<p>One file, <b>LLMInformBureau-{{version}}.dmg</b>, holding the app and an INSTALL.txt that says
+all of this at length. Nothing is compiled on your side, there is nothing to sign in to, and no
+script of anybody else's runs on your Mac:</p>
+
+<ol>
+<li>Open the image, and drag the app onto the Applications shortcut beside it.</li>
+<li>In Terminal: <b>xattr -d -r com.apple.quarantine /Applications/LLMInformBureau.app</b><br>
+macOS marks everything that arrives over the network, and an app signed without a paid developer
+account is refused until that mark is cleared. The command has to run after the drag, and it has
+to name the copy in Applications.</li>
+<li>Open it from Launchpad. It has no Dock icon &mdash; it appears at the right-hand end of the
+menu bar and opens one window explaining where each of its numbers comes from and what is not
+connected yet.</li>
+</ol>
+
+<p>If you opened it too early, macOS says it could not verify the app. Nothing is wrong with the
+download. Do not press the blue button &mdash; it reads "Move to Trash" and removes the app
+rather than the mark. Press "Done", then run the command.</p>
+
+<p>The app speaks English and Russian. It follows the language of your Mac until you pick one in
+its settings window, and then it follows you.</p>
+
+</body>
+</html>
